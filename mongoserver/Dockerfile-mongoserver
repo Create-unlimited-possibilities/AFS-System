@@ -1,0 +1,8 @@
+FROM mongo:7.0.14
+
+COPY init/ /docker-entrypoint-initdb.d/
+
+# 确保脚本可执行（推荐）
+RUN find /docker-entrypoint-initdb.d/ -type f -name "*.sh" -exec chmod +x {} \;
+
+EXPOSE 27017

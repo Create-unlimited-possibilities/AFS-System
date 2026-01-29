@@ -1,0 +1,45 @@
+/* dashboard.css - 档案主页专属样式 */
+.elder-card {
+  background: rgba(22,33,62,0.7);
+  border: 1px solid rgba(0,212,255,0.3);
+  border-radius: 20px;
+  overflow: hidden;
+  transition: all 0.5s ease;
+  backdrop-filter: blur(10px);
+}
+
+.elder-card:hover {
+  transform: translateY(-20px) scale(1.03);
+  border-color: var(--afs-accent);
+  box-shadow: 0 30px 60px rgba(0,212,255,0.25);
+}
+
+.elder-card .progress {
+  height: 12px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.elder-card .progress-bar {
+  background: linear-gradient(90deg, var(--afs-accent), var(--afs-gold));
+  box-shadow: 0 0 20px rgba(0,212,255,0.6);
+}
+
+.elder-card h5 {
+  color: var(--afs-accent);
+  font-weight: 800;
+  margin: 1rem 0;
+}
+
+.elder-card .btn-outline-primary {
+  border-color: var(--afs-accent);
+  color: var(--afs-accent);
+  font-weight: bold;
+}
+
+.elder-card .btn-outline-primary:hover {
+  background: var(--afs-accent);
+  color: #000;
+  transform: scale(1.1);
+}

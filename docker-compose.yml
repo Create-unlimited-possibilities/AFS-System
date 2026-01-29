@@ -1,0 +1,73 @@
+services:
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile-client
+    ports:
+      - "8080:80"
+    volumes:
+      - ./client/public:/usr/share/nginx/html:ro
+      - ./client/public:/app:delegated
+    depends_on:
+      - server
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    networks:
+      - afs-network
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile-server
+    ports:
+      - "3001:3000"  # Map host 3001 to container 3000
+    volumes:
+      - ./server/src:/app/src:delegated
+    env_file:
+      - .env
+    depends_on:
+      - mongoserver
+      - modelserver
+    networks:
+      - afs-network
+
+  modelserver:
+    build:
+      context: ./modelserver
+      dockerfile: Dockerfile-modelserver
+    ports:
+      - "11435:11434"
+    volumes:
+     - ./modelserver/models:/root/.ollama/models
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - afs-network
+
+  mongoserver:
+    build:
+      context: ./mongoserver
+      dockerfile: Dockerfile-mongoserver
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo-data:/data/db
+      - ./mongoserver:/docker-entrypoint-initdb.d
+    environment:
+      MONGO_INITDB_DATABASE: afs_db
+    networks:
+      - afs-network
+
+volumes:
+  mongo-data:
+
+networks:
+  afs-network:
+    driver: bridge

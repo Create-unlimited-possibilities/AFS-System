@@ -1,0 +1,38 @@
+# 官方 Ollama 镜像（已包含 ollama 可执行文件）
+FROM ollama/ollama:0.14.2
+
+# 安装 Python 和依赖
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制 requirements.txt 并安装依赖
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir --break-system-packages \
+    -r requirements.txt
+
+# 复制所有模块代码
+COPY config/ /app/config/
+COPY utils/ /app/utils/
+COPY core/ /app/core/
+COPY api/ /app/api/
+COPY train-notebooks/ /app/train-notebooks/
+
+# 创建必要的目录
+RUN mkdir -p /app/logs /app/data/jsonl /app/models/adapters /app/models/merged
+
+# 暴露端口
+EXPOSE 11434 8000
+
+# 创建启动脚本
+COPY run-server.sh /app/run-server.sh
+ENV PYTHONPATH=/app:${PYTHONPATH}
+RUN chmod +x /app/run-server.sh
+
+# 启动命令（同时启动 Ollama 和 FastAPI）
+ENTRYPOINT ["/app/run-server.sh"]

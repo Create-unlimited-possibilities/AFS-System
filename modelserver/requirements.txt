@@ -1,0 +1,23 @@
+# FastAPI 和服务器相关
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.0.0
+requests>=2.31.0
+
+# 数据处理
+pymongo>=4.10.0
+pandas>=2.2.0
+pyyaml>=6.0.0
+
+# Ollama 客户端
+ollama
+
+# Jupyter Notebook 支持
+jupyter>=1.0.0
+notebook>=7.0.0
+ipykernel>=6.29.5
+papermill>=2.5.0
+
+# 工具库
+tqdm>=4.66.0
+python-dotenv>=1.0.0

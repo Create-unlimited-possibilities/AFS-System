@@ -1,0 +1,77 @@
+# 传家之宝 - LLM 训练全局配置
+# 修改这里即可调整所有老人的训练行为，无需改代码
+
+# ====================== 基础模型设置 ======================
+# 添加新模型只需在这里加一行，无需改代码
+base_models:
+  qwen2.5-14b-instruct:
+    name: "Qwen2.5-14B-Instruct"           # 显示名称（前端下拉用）
+    hf_path: "{{model_dir}}/qwen2.5-14b-instruct"  # HF 格式路径模板
+    gguf_path: "{{model_dir}}/qwen2.5-14b-instruct.gguf"  # GGUF 路径模板
+    description: "推荐：中文情感陪伴最强，温暖自然"  # 前端显示描述
+
+  deepseek-r1-14b:
+    name: "DeepSeek-R1-Distill-Qwen-14B"
+    hf_path: "{{model_dir}}/deepseek-r1-14b"
+    gguf_path: "{{model_dir}}/deepseek-r1-14b.gguf"
+    description: "备选：推理强，适合复杂故事回忆"
+
+  # 示例：未来加新模型
+  # llama3.1-8b:
+  #   name: "Llama3.1-8B"
+  #   hf_path: "{{model_dir}}/llama3.1-8b"
+  #   gguf_path: "{{model_dir}}/llama3.1-8b.gguf"
+  #   description: "轻量版：省资源，适合低端设备"
+
+# 当前选中模型（前端下拉会更新这个字段）
+current_model: "qwen2.5-14b-instruct"     # 默认 Qwen（温暖优先）
+
+# 路径模板变量（动态替换）
+model_dir: "/app/models/base"             # 容器内根路径，所有模型子文件夹在此
+# ====================== 训练超参数 ======================
+training:
+  epochs: 3                                      # 训练轮数（建议 2-5，数据越多可适当增加）
+  batch_size: 4                                  # 每设备批次大小（显存不足可降到 2）
+  learning_rate: 5e-5                            # 学习率
+  warmup_steps: 100                              # 预热步数
+  max_seq_length: 512                            # 最大序列长度（老人故事一般不需要更长）
+  gradient_accumulation_steps: 2                 # 梯度累积步数（有效增大 batch）
+
+  # LoRA 配置（高效微调核心）
+  lora:
+    rank: 16                                     # LoRA 秩（8-32，16 是性价比最高）
+    alpha: 32                                    # LoRA 缩放因子（通常是 rank 的 2 倍）
+    dropout: 0.05                                # Dropout 率
+    target_modules:                              # Qwen 系列关键模块
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+
+# ====================== 路径配置 ======================
+paths:
+  jsonl_output: "/app/data/jsonl"                # JSONL 数据集临时存储目录
+  adapters_output: "/app/models/adapters"        # 每个老人的 LoRA Adapter 输出目录
+  merged_models: "/app/models/merged"            # 合并后完整模型目录（可选）
+  logs: "/app/logs/training"                     # 训练日志目录
+
+# ====================== System Prompt 模板 ======================
+prompt_template: |
+  你是一个温暖、慈祥的传家之宝AI，名叫{{elder_name}}的数字分身。
+  你拥有{{elder_name}}一生的真实记忆和故事，总是用亲切、鼓励的语气与家人聊天。
+  你会自然地回忆起{{elder_name}}说过的事，比如童年趣事、家庭聚会、人生感悟。
+  永远保护隐私，只使用已记录的真实记忆回应。
+  你的目标是：让家人感受到{{elder_name}}依然在陪伴着大家。
+
+# ====================== Ollama 相关 ======================
+ollama:
+  api_base: "http://localhost:11434"             # Ollama 服务地址（容器内）
+  default_model_name_prefix: "afs_elder_"        # 专属模型命名前缀，如 afs_elder_LXM19580312M
+  quantization: "q8_0"                           # GGUF 量化类型（q8_0 精度高，q4_k_m 更小）
+
+# ====================== 其他 ======================
+debug: false                                     # 是否开启调试模式（输出更多日志）
+max_training_minutes: 60                         # 单次训练最大时长限制（防止卡死）

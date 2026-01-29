@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>回答问题 - 传家之宝</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/global.css">
+  <style>
+    .question-card {
+      transition: all 0.3s;
+      border-left: 4px solid #0d6efd;
+    }
+    .question-card:hover {
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .answered {
+      border-left-color: #198754;
+      background-color: #f8f9fa;
+    }
+    .empty-answer {
+      border-left-color: #dc3545;
+    }
+    .layer-badge {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <nav class="afs-navbar">
+    <div class="container d-flex justify-content-between align-items-center">
+      <a href="/" class="afs-brand">传家之宝</a>
+      <div>
+        <a href="profile.html" class="nav-link">个人档案</a>
+        <a href="answer-questions.html" class="nav-link active">回答问题</a>
+        <a href="assist.html" class="nav-link">协助亲人/友人</a>
+        <a href="#" class="nav-link" id="logoutBtn">退出登录</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container py-4">
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h3 id="pageTitle">回答问题</h3>
+            <p class="text-muted mb-0" id="pageSubtitle">为自己回答问题</p>
+          </div>
+          <div>
+            <a href="profile.html" class="btn btn-outline-secondary">返回档案</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 进度显示 -->
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <div class="card border-primary">
+          <div class="card-body">
+            <h6 class="text-primary mb-2">基础层面</h6>
+            <div class="progress" style="height: 25px;">
+              <div class="progress-bar" id="basicProgress" style="width: 0%">0%</div>
+            </div>
+            <small class="text-muted mt-2 d-block">
+              已回答 <span id="basicAnswered">0</span> / <span id="basicTotal">0</span> 题
+            </small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card border-info">
+          <div class="card-body">
+            <h6 class="text-info mb-2">情感及行为层面</h6>
+            <div class="progress" style="height: 25px;">
+              <div class="progress-bar bg-info" id="emotionalProgress" style="width: 0%">0%</div>
+            </div>
+            <small class="text-muted mt-2 d-block">
+              已回答 <span id="emotionalAnswered">0</span> / <span id="emotionalTotal">0</span> 题
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 问题列表 -->
+    <div id="questionsContainer">
+      <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">加载中...</span>
+        </div>
+        <p class="mt-3 text-muted">加载问题中...</p>
+      </div>
+    </div>
+
+    <!-- 提交按钮 -->
+    <div class="row mt-4">
+      <div class="col-12 text-center">
+        <button class="btn btn-primary btn-lg px-5" id="submitBtn" style="display: none;">
+          <span id="submitText">提交所有回答</span>
+          <span id="submitLoading" class="d-none">
+            <span class="spinner-border spinner-border-sm me-2"></span>保存中...
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 确认更改弹窗 -->
+  <div class="modal fade" id="confirmModal" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-warning text-dark">
+          <h5 class="modal-title">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>确认更改
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="changesContent">
+          <!-- 动态内容 -->
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">我再想想</button>
+          <button type="button" class="btn btn-primary" id="confirmSaveBtn">
+            <span id="confirmText">确认更改</span>
+            <span id="confirmLoading" class="d-none">
+              <span class="spinner-border spinner-border-sm me-2"></span>保存中...
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 成功提示弹窗 -->
+  <div class="modal fade" id="successModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title">保存成功</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body text-center">
+          <div class="mb-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="currentColor" class="bi bi-check-circle-fill text-success" viewBox="0 0 16 16">
+              <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+            </svg>
+          </div>
+          <p class="mb-0">您的回答已成功保存！</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">知道了</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/answer-questions.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
