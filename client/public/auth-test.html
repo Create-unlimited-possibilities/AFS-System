@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>认证测试页面</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="p-5">
+  <div class="container">
+    <h1>认证状态测试</h1>
+
+    <div class="card mb-3">
+      <div class="card-header">Token 状态</div>
+      <div class="card-body">
+        <h5>token 字段</h5>
+        <p id="tokenStatus" class="mb-3">检查中...</p>
+        <button class="btn btn-primary" onclick="checkToken()">检查 Token</button>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">API 测试</div>
+      <div class="card-body">
+        <button class="btn btn-success me-2" onclick="testGetQuestions()">测试 /api/questions</button>
+        <button class="btn btn-success me-2" onclick="testGetAnswers()">测试 /api/answers/self</button>
+        <button class="btn btn-warning" onclick="testSubmitAnswer()">测试提交答案</button>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">测试结果</div>
+      <div class="card-body">
+        <pre id="testResults" class="bg-light p-3" style="max-height: 400px; overflow-y: auto;"></pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">LocalStorage 内容</div>
+      <div class="card-body">
+        <pre id="localStorageContent" class="bg-light p-3"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE_URL = window.location.origin.replace(':8080', ':3001');
+
+    function log(message) {
+      const results = document.getElementById('testResults');
+      const time = new Date().toLocaleTimeString();
+      results.textContent += `[${time}] ${message}\n`;
+      results.scrollTop = results.scrollHeight;
+    }
+
+    function clearLog() {
+      document.getElementById('testResults').textContent = '';
+    }
+
+    function checkToken() {
+      clearLog();
+      const token = localStorage.getItem('token');
+      const tokenStatus = document.getElementById('tokenStatus');
+
+      if (token) {
+        tokenStatus.innerHTML = `<span class="badge bg-success">找到 Token</span>${token.substring(0, 50)}...`;
+        tokenStatus.parentElement.classList.add('border-success');
+        log(`✓ Token 存在: ${token.substring(0, 30)}...`);
+      } else {
+        tokenStatus.innerHTML = `<span class="badge bg-danger">未找到 Token</span> (请先登录)`;
+        tokenStatus.parentElement.classList.add('border-danger');
+        log(`✗ Token 不存在`);
+      }
+
+      // 显示 localStorage 内容
+      const storage = {};
+      for (let key in localStorage) {
+        if (localStorage.hasOwnProperty(key)) {
+          const value = localStorage.getItem(key);
+          if (key.includes('token') || key.includes('user')) {
+            storage[key] = value.substring(0, 50) + (value.length > 50 ? '...' : '');
+          }
+        }
+      }
+      document.getElementById('localStorageContent').textContent = JSON.stringify(storage, null, 2);
+    }
+
+    async function testGetQuestions() {
+      clearLog();
+      log('测试: GET /api/questions?role=elder');
+
+      const token = localStorage.getItem('token');
+      log(`当前 Token: ${token ? `${token.substring(0, 30)}...` : 'null'}`);
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/questions?role=elder`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          }
+        });
+
+        const data = await response.json();
+        log(`响应状态: ${response.status} ${response.statusText}`);
+        log(`响应数据: ${JSON.stringify(data, null, 2)}`);
+
+        if (!response.ok) {
+          log(`✗ 请求失败: ${data.message}`);
+        } else {
+          log(`✓ 请求成功: 找到 ${data.questions?.length || 0} 个问题`);
+        }
+      } catch (error) {
+        log(`✗ 请求错误: ${error.message}`);
+      }
+    }
+
+    async function testGetAnswers() {
+      clearLog();
+      log('测试: GET /api/answers/self');
+
+      const token = localStorage.getItem('token');
+      log(`当前 Token: ${token ? `${token.substring(0, 30)}...` : 'null'}`);
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/answers/self`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          }
+        });
+
+        const data = await response.json();
+        log(`响应状态: ${response.status} ${response.statusText}`);
+        log(`响应数据: ${JSON.stringify(data, null, 2)}`);
+
+        if (!response.ok) {
+          log(`✗ 请求失败: ${data.message}`);
+        } else {
+          log(`✓ 请求成功: 找到 ${data.answers?.length || 0} 个答案`);
+        }
+      } catch (error) {
+        log(`✗ 请求错误: ${error.message}`);
+      }
+    }
+
+    async function testSubmitAnswer() {
+      clearLog();
+      log('测试: POST /api/answers/batch-self');
+
+      const token = localStorage.getItem('token');
+      log(`当前 Token: ${token ? `${token.substring(0, 30)}...` : 'null'}`);
+
+      // 先获取真实的问题列表
+      log('正在获取问题列表...');
+      try {
+        const questionsResponse = await fetch(`${API_BASE_URL}/api/questions?role=elder`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          }
+        });
+        const questionsData = await questionsResponse.json();
+
+        if (!questionsResponse.ok || !questionsData.success || !questionsData.questions || questionsData.questions.length === 0) {
+          log('✗ 获取问题列表失败，请先确保数据库中有问题数据');
+          return;
+        }
+
+        const firstQuestion = questionsData.questions[0];
+        const testAnswer = [{
+          questionId: firstQuestion._id, // 使用真实的questionId
+          answer: '这是测试答案'
+        }];
+
+        log(`找到 ${questionsData.questions.length} 个问题，使用第一个问题进行测试`);
+        log(`发问ID: ${firstQuestion._id} (${firstQuestion.question.substring(0, 50)}...)`);
+        log(`发送数据: ${JSON.stringify(testAnswer)}`);
+
+        const response = await fetch(`${API_BASE_URL}/api/answers/batch-self`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ answers: testAnswer })
+        });
+
+        const data = await response.json();
+        log(`响应状态: ${response.status} ${response.statusText}`);
+        log(`响应数据: ${JSON.stringify(data, null, 2)}`);
+
+        if (!response.ok) {
+          log(`✗ 请求失败: ${data.message}`);
+        } else {
+          log(`✓ 请求成功`);
+        }
+      } catch (error) {
+        log(`✗ 请求错误: ${error.message}`);
+      }
+    }
+
+    // 页面加载时自动检查
+    window.addEventListener('DOMContentLoaded', checkToken);
+  </script>
+</body>
+</html>

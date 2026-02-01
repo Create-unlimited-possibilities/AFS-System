@@ -27,7 +27,7 @@ COPY train-notebooks/ /app/train-notebooks/
 RUN mkdir -p /app/logs /app/data/jsonl /app/models/adapters /app/models/merged
 
 # 暴露端口
-EXPOSE 11434 8000
+EXPOSE 8888:11434
 
 # 创建启动脚本
 COPY run-server.sh /app/run-server.sh

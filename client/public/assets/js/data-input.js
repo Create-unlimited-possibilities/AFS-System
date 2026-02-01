@@ -19,7 +19,7 @@ if (!currentElderCode || currentElderCode === 'null') {
 // 统一的请求头（自动带 token）
 const authHeaders = {
   'Content-Type': 'application/json',
-  'Authorization': `Bearer ${localStorage.getItem('token') || localStorage.getItem('afs-token') || ''}`
+  'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
 };
 
 

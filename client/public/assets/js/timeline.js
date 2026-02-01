@@ -1,7 +1,7 @@
 // timeline.js - 记忆时间线专用逻辑
 document.addEventListener('DOMContentLoaded', async () => {
   const container = document.getElementById('timeline-container');
-  const token = localStorage.getItem('afs-token');
+  const token = localStorage.getItem('token');
 
   // 模拟记忆数据（真实数据等后端完成）
   const mockMemories = [

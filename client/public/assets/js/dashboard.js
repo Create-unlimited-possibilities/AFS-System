@@ -1,7 +1,7 @@
 // dashboard.js - 档案主页专用逻辑
 document.addEventListener('DOMContentLoaded', async () => {
   const container = document.getElementById('elder-list');
-  const token = localStorage.getItem('afs-token');
+  const token = localStorage.getItem('token');
 
   // 模拟数据（等后端完成后再替换）
   const mockElders = [

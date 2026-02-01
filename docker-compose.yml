@@ -36,7 +36,7 @@ services:
       context: ./modelserver
       dockerfile: Dockerfile-modelserver
     ports:
-      - "11435:11434"
+      - "8000:11434"
     volumes:
      - ./modelserver/models:/root/.ollama/models
     environment:

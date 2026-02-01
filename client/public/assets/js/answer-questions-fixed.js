@@ -40,6 +40,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     localStorage.clear();
     window.location.href = 'login.html';
   });
+
+  // 监听页面滚动，控制浮动提交按钮显示/隐藏
+  window.addEventListener('scroll', () => {
+    handleFloatingButton();
+  });
+
+// 初始检查一次按钮位置
+  setTimeout(() => handleFloatingButton(), 500);
 });
 
 // 加载问题和答案
@@ -50,7 +58,7 @@ async function loadQuestionsAndAnswers() {
     // 确定用户角色
     if (isAssisting) {
       // 协助他人时，需要获取关系类型来确定角色
-      const relationResponse = await fetch(`${API_BASE_URL}/api/auth/assist/relations`, {
+      const relationResponse = await fetch(`${window.API_BASE_URL}/api/auth/assist/relations`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -68,7 +76,7 @@ async function loadQuestionsAndAnswers() {
     }
     
     // 加载问题（根据角色过滤）
-    const questionsResponse = await fetch(`${API_BASE_URL}/api/questions?role=${userRole}`, {
+    const questionsResponse = await fetch(`${window.API_BASE_URL}/api/questions?role=${userRole}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     
@@ -83,11 +91,11 @@ async function loadQuestionsAndAnswers() {
     // 加载已有的答案
     let answersResponse;
     if (isAssisting) {
-      answersResponse = await fetch(`${API_BASE_URL}/api/answers/assist/${targetUserId}`, {
+      answersResponse = await fetch(`${window.API_BASE_URL}/api/answers/assist/${targetUserId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
     } else {
-      answersResponse = await fetch(`${API_BASE_URL}/api/answers/self`, {
+      answersResponse = await fetch(`${window.API_BASE_URL}/api/answers/self`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
     }
@@ -97,8 +105,8 @@ async function loadQuestionsAndAnswers() {
     if (answersResponse.ok && answersData.success) {
       // 将答案转换为以questionId为键的对象
       answersData.answers.forEach(answer => {
-        originalAnswers[answer.id] = answer.answer;
-        currentAnswers[answer.id] = answer.answer;
+        originalAnswers[answer.questionId] = answer.answer;
+        currentAnswers[answer.questionId] = answer.answer;
       });
     }
 
@@ -121,6 +129,58 @@ async function loadQuestionsAndAnswers() {
       </div>
     `;
   }
+}
+
+// 渲染单个问题卡片
+function renderQuestionCard(question, index) {
+  const questionId = question._id.toString();
+  const answer = currentAnswers[questionId] || '';
+  const originalAnswer = originalAnswers[questionId] || '';
+  const hasAnswer = answer.trim() !== '';
+  const isModified = answer !== originalAnswer && hasAnswer;
+  const isModifiedNew = !originalAnswer && hasAnswer;
+  const cardClass = hasAnswer ? 'answered' : 'empty-answer';
+  const layerColor = question.layer === 'basic' ? 'primary' : 'info';
+
+  let badge;
+  if (isModified) {
+    badge = '<span class="badge bg-warning text-dark">修改中</span>';
+  } else if (isModifiedNew) {
+    badge = '<span class="badge bg-warning text-dark">新增</span>';
+  } else if (hasAnswer) {
+    badge = '<span class="badge bg-success">已回答</span>';
+  } else {
+    badge = '<span class="badge bg-secondary text-dark">未回答</span>';
+  }
+
+  return `
+    <div class="col-12">
+      <div class="card question-card ${cardClass} mb-2">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              <span class="badge bg-${layerColor} layer-badge me-2">
+                ${question.layer === 'basic' ? '基础' : '情感'}
+              </span>
+              <span class="badge bg-secondary layer-badge">问题 ${question.order}</span>
+            </div>
+            ${badge}
+          </div>
+          <h6 class="mb-3">${question.question}</h6>
+          <textarea 
+            class="form-control" 
+            rows="4" 
+            data-question-id="${questionId}"
+            data-layer="${question.layer}"
+            placeholder="${question.placeholder || '请输入您的回答...'}"
+          >${answer}</textarea>
+          <small class="text-muted mt-2 d-block">
+            字数: <span id="count-${questionId}">${answer.length}</span>
+          </small>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 // 渲染问题列表
@@ -175,47 +235,129 @@ function renderQuestions() {
   
   container.innerHTML = html;
   
-  // 为所有textarea添加事件监听
+// 为所有textarea添加事件监听
   document.querySelectorAll('textarea[data-question-id]').forEach(textarea => {
+    textarea.addEventListener('input', handleAnswerChange);
+  });
+
+  // 设置层面过滤器
+  setupLayerFilter();
+}
+
+// 设置层面过滤器
+function setupLayerFilter() {
+  const layerFilter = document.getElementById('layerFilter');
+  if (layerFilter) {
+    layerFilter.addEventListener('change', (e) => {
+      const selectedLayer = e.target.value;
+      renderFilteredQuestions(selectedLayer);
+      updateFilteredProgress();
+
+      const description = document.getElementById('layerFilterDescription');
+      if (selectedLayer) {
+        const layerName = selectedLayer === 'basic' ? '基础层面' : '情感及行为层面';
+        description.textContent = `当前显示：${layerName}的问题`;
+      } else {
+        description.textContent = '显示所有层面的问题';
+      }
+    });
+  }
+}
+
+// 渲染筛选后的问题
+function renderFilteredQuestions(selectedLayer) {
+  const container = document.getElementById('questionsContainer');
+  if (!container || !allQuestions || allQuestions.length === 0) {
+    container.innerHTML = '<div class="text-center py-5"><p>没有问题</p></div>';
+    return;
+  }
+
+  let filteredQuestions;
+  if (!selectedLayer) {
+    filteredQuestions = allQuestions;
+  } else {
+    filteredQuestions = allQuestions.filter(q => q.layer === selectedLayer);
+  }
+
+  let html = '';
+
+  const grouped = {};
+  filteredQuestions.forEach(q => {
+    if (!grouped[q.layer]) {
+      grouped[q.layer] = [];
+    }
+    grouped[q.layer].push(q);
+  });
+
+  for (const [layerId, questions] of Object.entries(grouped)) {
+    const layerColor = layerId === 'basic' ? 'primary' : 'info';
+    const layerName = layerId === 'basic' ? '基础' : '情感';
+
+    html += `
+      <div class="mb-4">
+        <h4 class="mb-3">
+          <span class="badge bg-${layerColor}">${layerName}层面</span>
+        </h4>
+        <div class="row g-3">
+    `;
+
+    questions.forEach((q, index) => {
+      html += renderQuestionCard(q, index);
+    });
+
+    html += `
+        </div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
+
+  document.querySelectorAll('textarea[data-question-id]').forEach(textarea => {
+    textarea.removeEventListener('input', handleAnswerChange);
     textarea.addEventListener('input', handleAnswerChange);
   });
 }
 
-// 渲染单个问题卡片
-function renderQuestionCard(question, index) {
-  const answer = currentAnswers[question._id] || '';
-  const hasAnswer = answer.trim() !== '';
-  const cardClass = hasAnswer ? 'answered' : '';
-  const layerColor = question.layer === 'basic' ? 'primary' : 'info';
-  
-  return `
-    <div class="col-12">
-      <div class="card question-card ${cardClass} mb-2">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-start mb-2">
-            <div>
-              <span class="badge bg-${layerColor} layer-badge me-2">
-                ${question.layer === 'basic' ? '基础' : '情感'}
-              </span>
-              <span class="badge bg-secondary layer-badge">问题 ${question.order}</span>
-            </div>
-            ${hasAnswer ? '<span class="badge bg-success">已回答</span>' : '<span class="badge bg-warning text-dark">未回答</span>'}
-          </div>
-          <h6 class="mb-3">${question.question}</h6>
-          <textarea 
-            class="form-control" 
-            rows="4" 
-            data-question-id="${question._id}"
-            data-layer="${question.layer}"
-            placeholder="${question.placeholder || '请输入您的回答...'}"
-          >${answer}</textarea>
-          <small class="text-muted mt-2 d-block">
-            字数: <span id="count-${question._id}">${answer.length}</span>
-          </small>
-        </div>
-      </div>
-    </div>
-  `;
+// 更新筛选层面的进度
+function updateFilteredProgress() {
+  const layerFilter = document.getElementById('layerFilter');
+  const selectedLayer = layerFilter ? layerFilter.value : '';
+
+  let questionsToShow;
+  if (!selectedLayer || selectedLayer === '') {
+    questionsToShow = allQuestions;
+  } else {
+    questionsToShow = allQuestions.filter(q => q.layer === selectedLayer);
+  }
+
+  if (!questionsToShow || questionsToShow.length === 0) {
+    document.getElementById('filteredProgress').classList.add('d-none');
+    return;
+  }
+
+  const answeredCount = questionsToShow.filter(q => {
+    const questionId = q._id.toString();
+    const answer = currentAnswers[questionId];
+    return answer && answer.trim() !== '';
+  }).length;
+
+  const percentage = Math.round((answeredCount / questionsToShow.length) * 100);
+
+  const titleEl = document.getElementById('filteredProgressTitle');
+  if (selectedLayer === 'basic') {
+    titleEl.textContent = '基础层面进度';
+  } else if (selectedLayer === 'emotional') {
+    titleEl.textContent = '情感及行为层面进度';
+  } else {
+    titleEl.textContent = '全部层面进度';
+  }
+
+  document.getElementById('filteredProgress').classList.remove('d-none');
+  document.getElementById('filteredProgressBar').style.width = `${percentage}%`;
+  document.getElementById('filteredProgressBar').textContent = `${percentage}%`;
+  document.getElementById('filteredAnsweredCount').textContent = answeredCount;
+  document.getElementById('filteredTotalCount').textContent = questionsToShow.length;
 }
 
 // 处理答案变化
@@ -223,27 +365,54 @@ function handleAnswerChange(e) {
   const textarea = e.target;
   const questionId = textarea.dataset.questionId;
   const answer = textarea.value;
-  
+
   // 更新当前答案
   currentAnswers[questionId] = answer;
-  
+
   // 更新字数统计
   const countEl = document.getElementById(`count-${questionId}`);
   if (countEl) {
     countEl.textContent = answer.length;
   }
-  
-  // 更新卡片样式
+
+  // 更新卡片样式和标签
   const card = textarea.closest('.question-card');
-  if (answer.trim() !== '') {
+  const original = originalAnswers[questionId] || '';
+  const hasAnswer = answer.trim() !== '';
+
+  if (hasAnswer) {
     card.classList.add('answered');
     card.classList.remove('empty-answer');
   } else {
     card.classList.remove('answered');
+    card.classList.add('empty-answer');
   }
-  
+
+  // 更新卡片标签
+  updateCardBadge(card, original, answer);
+
   // 更新进度
   updateProgress();
+}
+
+// 更新卡片标签
+function updateCardBadge(card, original, current) {
+  let badgesDiv = card.querySelector('.d-flex.justify-content-between');
+  let badge = badgesDiv.querySelector('.badge:last-child');
+
+  if (!current || current.trim() === '') {
+    badge.className = 'badge bg-secondary text-dark';
+    badge.textContent = '未回答';
+  } else if (!original || original.trim() === '') {
+    badge.className = 'badge bg-warning text-dark';
+    badge.textContent = '新增';
+  } else if (current !== original) {
+    badge.className = 'badge bg-warning text-dark';
+    badge.textContent = '修改中';
+  } else {
+    badge.className = 'badge bg-success';
+    badge.textContent = '已回答';
+  }
 }
 
 // 更新进度显示
@@ -253,7 +422,7 @@ function updateProgress() {
   
   // 计算基础层面进度
   const basicAnswered = basicQuestions.filter(q => {
-    const answer = currentAnswers[q._id];
+    const answer = currentAnswers[q._id.toString()];
     return answer && answer.trim() !== '';
   }).length;
   const basicPercentage = basicQuestions.length > 0 
@@ -262,7 +431,7 @@ function updateProgress() {
   
   // 计算情感层面进度
   const emotionalAnswered = emotionalQuestions.filter(q => {
-    const answer = currentAnswers[q._id];
+    const answer = currentAnswers[q._id.toString()];
     return answer && answer.trim() !== '';
   }).length;
   const emotionalPercentage = emotionalQuestions.length > 0 
@@ -300,7 +469,7 @@ function detectChanges() {
   const changes = [];
   
   allQuestions.forEach(question => {
-    const questionId = question._id;
+    const questionId = question._id.toString();
     const originalAnswer = originalAnswers[questionId] || '';
     const currentAnswer = currentAnswers[questionId] || '';
     
@@ -326,6 +495,38 @@ function determineChangeType(original, current) {
   if (original && !current) return 'deleted';
   if (original && current) return 'modified';
   return 'none';
+}
+
+// 检查是否有未保存的更改
+function hasUnsavedChanges() {
+  for (const questionId in currentAnswers) {
+    if (currentAnswers[questionId] !== (originalAnswers[questionId] || '')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// 处理固定提交按钮位置
+function handleFloatingButton() {
+  const submitBtn = document.getElementById('submitBtn');
+  const wrapper = document.getElementById('submitButtonWrapper') || document.querySelector('.submit-button-wrapper');
+
+  if (!submitBtn || submitBtn.style.display === 'none' || !wrapper) return;
+
+  const footer = document.querySelector('.page-footer');
+  if (!footer) return;
+
+  const buttonRect = submitBtn.getBoundingClientRect();
+  const footerRect = footer.getBoundingClientRect();
+
+  // 检查按钮是否遮挡页脚
+  if (buttonRect.bottom >= footerRect.top) {
+    const overlap = buttonRect.bottom - footerRect.top + 20;
+    wrapper.style.bottom = `${30 + overlap}px`;
+  } else {
+    wrapper.style.bottom = '30px';
+  }
 }
 
 // 显示确认弹窗
@@ -472,10 +673,10 @@ async function confirmSave() {
     const answersToSubmit = [];
     
     allQuestions.forEach(question => {
-      const answer = currentAnswers[question._id];
+      const answer = currentAnswers[question._id.toString()];
       if (answer && answer.trim() !== '') {
         answersToSubmit.push({
-          questionId: question._id,
+          questionId: question._id.toString(),
           answer: answer.trim(),
           layer: question.layer
         });
@@ -484,7 +685,7 @@ async function confirmSave() {
     
     // 提交到后端（批量保存）
     const endpoint = isAssisting ? '/api/answers/batch-assist' : '/api/answers/batch-self';
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${window.API_BASE_URL}${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
