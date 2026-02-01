@@ -45,3 +45,5 @@ diagnosis.html
 # 演示数据临时目录
 /demo-data-temp/
 verify-temp/
+.env 
+/opencode_build/
