@@ -1,7 +1,10 @@
 // client/public/assets/js/api.js
 
-// API基础URL配置
-const API_BASE_URL = window.location.origin;
+// API基础URL配置 - 暴露为全局变量供其他JS文件使用
+(function() {
+  const API_BASE_URL = window.location.origin.replace(':8080', ':3001');
+  window.API_BASE_URL = API_BASE_URL;
+})();
 
 class AFS_API {
   constructor() {
@@ -11,13 +14,26 @@ class AFS_API {
 
   // 通用请求封装
   async request(endpoint, options = {}) {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers
+    };
+
+    // 添加认证token
+    const token = localStorage.getItem('token');
+    console.log('[AFS API] Token:', token ? `${token.substring(0, 20)}...` : 'null');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     try {
       const response = await fetch(`${this.baseURL}${endpoint}`, {
-        headers: { 'Content-Type': 'application/json', ...options.headers },
+        headers,
         ...options
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return await response.json();
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || `HTTP ${response.status}`);
+      return data;
     } catch (err) {
       console.error('[AFS API Error]', endpoint, err);
       throw err;

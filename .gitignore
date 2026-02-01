@@ -1,1 +1,47 @@
-.env 
+# 环境配置
+**/.env
+*.env.local
+
+# 构建和临时文件
+opencode_build/
+node_modules/
+dist/
+build/
+*.log
+
+# Docker数据（防止误提交）
+mongo-data/
+*.dump
+dump/
+*.bson
+
+# 数据库备份文件
+/demo-backup/
+*.backup
+
+# 演示用数据备份文件
+/demo-data/
+afs-demo-backup.tar.gz
+
+# 开发工具
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# 测试和临时文件
+test-file.txt
+answer-questions-original.js
+diagnosis.html
+
+# 本地配置
+.local/
+
+# MongoDB数据相关
+/data/db/
+/data/
+/mongodb_data/
+
+# 演示数据临时目录
+/demo-data-temp/
+verify-temp/

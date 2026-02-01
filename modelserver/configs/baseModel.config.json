@@ -1,0 +1,82 @@
+# ModelServer 配置文件
+
+# 基底模型配置
+base_model:
+  # 中文模型
+  chinese:
+    name: "Qwen/Qwen2.5-7B-Instruct"
+    provider: "ollama"
+    
+  # 英文模型
+  english:
+    name: "meta-llama/Llama-3.2-3B-Instruct"
+    provider: "ollama"
+
+# LoRA 微调配置
+lora_config:
+  rank: 8
+  alpha: 16
+  dropout: 0.1
+  target_modules:
+    - q_proj
+    - v_proj
+    - k_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+    - lm_head
+  
+  training:
+    epochs: 3
+    batch_size: 4
+    learning_rate: 2e-4
+    weight_decay: 0.01
+    warmup_steps: 100
+    gradient_accumulation_steps: 1
+    max_grad_norm: 1.0
+    
+  lora_alpha:
+    q_proj: 16
+    v_proj: 16
+    k_proj: 16
+
+# 继续预训练配置
+continue_pretrain_config:
+  base_model: "Qwen/Qwen2.5-14B"
+  epochs: 1
+  batch_size: 2
+  learning_rate: 1e-4
+  weight_decay: 0.01
+  warmup_ratio: 0.03
+  
+  data:
+    block_size: 1024
+    padding: "max_length"
+
+# 硬件要求
+hardware:
+  gpu_memory_min: "8GB"
+  cpu_cores_min: 4
+  disk_space: "20GB"
+
+# 输出配置
+output:
+  save_steps: 500
+  save_total_limit: 3
+  logging_steps: 10
+  
+  gguf:
+    quantization: "Q4_K_M"
+    output_format: "gguf"
+
+# Ollama 集成
+ollama:
+  host: "localhost"
+  port: 11435
+  api_base: "http://localhost:11435/api"
+  
+  model_registration:
+    enable: true
+    auto_register: true
+    alias_prefix: "custom_"

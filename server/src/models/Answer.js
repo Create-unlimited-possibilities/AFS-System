@@ -55,15 +55,21 @@ answerSchema.pre('save', function(next) {
   next();
 });
 
-// 静态方法：获取用户的回答进度
+// 静态方法：获取用户的回答进度（仅统计A套题目：用户回答自己的问题）
 answerSchema.statics.getProgress = async function(userId, targetUserId, layer) {
   const Question = mongoose.model('Question');
   
-  const totalQuestions = await Question.countDocuments({ layer });
+  const totalQuestions = await Question.countDocuments({
+    role: 'elder',
+    layer,
+    active: true
+  });
+  
   const answeredQuestions = await this.countDocuments({
     userId,
-    targetUserId,
-    questionLayer: layer
+    targetUserId: userId,
+    questionLayer: layer,
+    isSelfAnswer: true
   });
   
   return {

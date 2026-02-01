@@ -1,5 +1,8 @@
 // client/public/assets/js/profile.js - 个人档案页面逻辑
 
+// API_BASE_URL已在api.js中定义，直接使用
+const API_BASE_URL = window.API_BASE_URL || window.location.origin.replace(':8080', ':3001');
+
 document.addEventListener('DOMContentLoaded', async () => {
   // 检查登录状态
   const token = localStorage.getItem('token');
@@ -88,19 +91,19 @@ async function loadAnswerProgress() {
 
     if (response.ok && data.success) {
       const { basic, emotional, overall } = data.progress;
-      
+
       // 更新基础层面进度
       document.getElementById('basicProgressBar').style.width = `${basic.percentage}%`;
       document.getElementById('basicProgressBar').textContent = `${basic.percentage}%`;
       document.getElementById('basicAnswered').textContent = basic.answered;
       document.getElementById('basicTotal').textContent = basic.total;
-      
+
       // 更新情感层面进度
       document.getElementById('emotionalProgressBar').style.width = `${emotional.percentage}%`;
       document.getElementById('emotionalProgressBar').textContent = `${emotional.percentage}%`;
       document.getElementById('emotionalAnswered').textContent = emotional.answered;
       document.getElementById('emotionalTotal').textContent = emotional.total;
-      
+
       // 更新总体进度
       document.getElementById('overallProgress').innerHTML = `
         <div class="text-center">
@@ -109,6 +112,21 @@ async function loadAnswerProgress() {
           <small class="text-muted">${overall.answered} / ${overall.total} 题</small>
         </div>
       `;
+
+      // 添加点击事件
+      setTimeout(() => {
+        const cards = document.querySelectorAll('.layer-card');
+        console.log('找到层面卡片:', cards.length);
+        cards.forEach(card => {
+          card.style.cursor = 'pointer';
+          card.addEventListener('click', function(e) {
+            e.preventDefault();
+            const layer = this.getAttribute('data-layer');
+            console.log('点击了层面:', layer);
+            window.location.href = `answer-questions.html?layer=${layer}`;
+          });
+        });
+      }, 100);
     }
   } catch (error) {
     console.error('加载进度失败:', error);

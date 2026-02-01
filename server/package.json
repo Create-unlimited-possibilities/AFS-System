@@ -14,8 +14,9 @@
     "bcrypt": "5.1.1",
     "socket.io": "4.7.5",
     "axios": "1.7.7",
-    "chromadb": "^1.8.1",
-    "uuid": "^9.0.0"
+"chromadb": "^1.8.1",
+    "uuid": "^9.0.0",
+    "prom-client": "^15.1.0"
   },
   "devDependencies": {
     "nodemon": "3.1.7"

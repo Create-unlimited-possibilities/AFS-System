@@ -5,6 +5,7 @@ import Question from '../models/Question.js';
 import User from '../models/User.js';
 import AssistRelation from '../models/AssistRelation.js';
 import { RAGEngine } from '../rag/rag_engine.js';
+import memoryStorage from '../services/memoryStorage.js';
 
 // 初始化RAG引擎
 const ragEngine = new RAGEngine();
@@ -66,7 +67,7 @@ router.post('/answer/self', async (req, res) => {
       });
     }
 
-    // 创建或更新答案
+// 创建或更新答案
     const existingAnswer = await Answer.findOne({
       userId,
       targetUserId: userId,
@@ -97,6 +98,23 @@ router.post('/answer/self', async (req, res) => {
       });
 
       await newAnswer.save();
+
+      // 双重存储：保存到本地记忆库
+      try {
+        const memory = await memoryStorage.storeQuestionAnswer(
+          userId,
+          question,
+          answer,
+          null
+        );
+
+        // 更新用户 token 总量
+        await User.findByIdAndUpdate(userId, {
+          $inc: { 'chatBeta.memoryTokenCount': memory.tokenCount }
+        });
+      } catch (memoryErr) {
+        console.error('保存本地记忆失败（不影响主流程）:', memoryErr);
+      }
 
       res.json({
         success: true,
@@ -152,7 +170,7 @@ router.post('/answer/assist', async (req, res) => {
       });
     }
 
-    // 创建或更新答案
+// 创建或更新答案
     const existingAnswer = await Answer.findOne({
       userId,
       targetUserId,
@@ -181,6 +199,24 @@ router.post('/answer/assist', async (req, res) => {
       });
 
       await newAnswer.save();
+
+      // 双重存储：保存到本地记忆库
+      try {
+        const helper = await User.findById(userId);
+        const memory = await memoryStorage.storeQuestionAnswer(
+          targetUserId,
+          question,
+          answer,
+          helper
+        );
+
+        // 更新目标用户 token 总量
+        await User.findByIdAndUpdate(targetUserId, {
+          $inc: { 'chatBeta.memoryTokenCount': memory.tokenCount }
+        });
+      } catch (memoryErr) {
+        console.error('保存本地记忆失败（不影响主流程）:', memoryErr);
+      }
 
       res.json({
         success: true,
@@ -254,9 +290,10 @@ router.get('/answers/self', async (req, res) => {
       .sort({ createdAt: -1 });
 
     res.json({
-      success: true,
+success: true,
       answers: answers.map(a => ({
         id: a._id,
+        questionId: a.questionId._id,
         question: a.questionId.question,
         questionLayer: a.questionLayer,
         answer: a.answer,
@@ -408,8 +445,10 @@ router.post('/answers/batch-self', async (req, res) => {
     // 删除用户的所有旧答案
     await Answer.deleteMany({ userId, targetUserId: userId });
 
-    // 批量插入新答案
+// 批量插入新答案
     const answerDocs = [];
+    const memoryUpdates = [];
+
     for (const answerData of answers) {
       const question = await Question.findById(answerData.questionId);
       if (!question) continue;
@@ -423,10 +462,36 @@ router.post('/answers/batch-self', async (req, res) => {
         isSelfAnswer: true,
         relationshipType: 'self'
       });
+
+      // 收集用于本地存储的数据
+      memoryUpdates.push({ question, answer: answerData.answer });
     }
 
     if (answerDocs.length > 0) {
       await Answer.insertMany(answerDocs);
+    }
+
+    // 双重存储：批量保存到本地记忆库
+    let totalTokenCount = 0;
+    try {
+      for (const { question, answer } of memoryUpdates) {
+        const memory = await memoryStorage.storeQuestionAnswer(
+          userId,
+          question,
+          answer,
+          null
+        );
+        totalTokenCount += memory.tokenCount;
+      }
+
+      // 更新用户 token 总量
+      if (totalTokenCount > 0) {
+        await User.findByIdAndUpdate(userId, {
+          $inc: { 'chatBeta.memoryTokenCount': totalTokenCount }
+        });
+      }
+    } catch (memoryErr) {
+      console.error('批量保存本地记忆失败（不影响主流程）:', memoryErr);
     }
 
     // 生成JSONL文件
@@ -515,8 +580,35 @@ router.post('/answers/batch-assist', async (req, res) => {
       });
     }
 
-    if (answerDocs.length > 0) {
+if (answerDocs.length > 0) {
       await Answer.insertMany(answerDocs);
+    }
+
+    // 双重存储：批量保存到本地记忆库
+    let totalTokenCount = 0;
+    try {
+      const helper = await User.findById(userId);
+      for (const { questionId, answer } of answers) {
+        const question = await Question.findById(questionId);
+        if (!question) continue;
+
+        const memory = await memoryStorage.storeQuestionAnswer(
+          targetUserId,
+          question,
+          answer,
+          helper
+        );
+        totalTokenCount += memory.tokenCount;
+      }
+
+      // 更新目标用户 token 总量
+      if (totalTokenCount > 0) {
+        await User.findByIdAndUpdate(targetUserId, {
+          $inc: { 'chatBeta.memoryTokenCount': totalTokenCount }
+        });
+      }
+    } catch (memoryErr) {
+      console.error('批量保存本地记忆失败（不影响主流程）:', memoryErr);
     }
 
     // 重新生成目标用户的JSONL文件（包含所有人的答案）

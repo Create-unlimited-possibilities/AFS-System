@@ -21,3 +21,24 @@ papermill>=2.5.0
 # 工具库
 tqdm>=4.66.0
 python-dotenv>=1.0.0
+
+# Chat-Beta 额外依赖
+jsonlines
+numpy
+
+# AI 模型相关
+torch>=2.0.0
+transformers>=4.35.0
+
+# PEFT / LoRA
+peft==0.7.1
+bitsandbytes==0.41.1
+
+# GGUF 导出
+llama-cpp-python
+
+# 监控
+prometheus-client
+
+# 可选：Redis 队列
+redis==5.0.0

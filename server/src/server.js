@@ -10,7 +10,7 @@ import authRouter from './routes/auth.js';
 import answersRouter from './routes/answers.js';
 import chatRouter from './routes/chat.js';
 import trainRouter from './routes/train.js';
-import conversationRouter from './routes/conversation.js';
+import chatbetaRouter from './routes/chatbeta.js';
 import { protect } from './middleware/auth.js';
 
 
@@ -53,7 +53,7 @@ app.use('/api/auth', authRouter);
 app.use('/api', protect, answersRouter);
 app.use('/api/chat', protect, chatRouter);
 app.use('/api/train', protect, trainRouter);
-app.use('/api/conversation', protect, conversationRouter);
+app.use('/api/chatbeta', protect, chatbetaRouter);
 
 
 app.get('/api/health', (req, res) => {
