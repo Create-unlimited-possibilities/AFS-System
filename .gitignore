@@ -51,6 +51,11 @@ server/storage/userdata/
 server/storage/userdata/**/*
 ./server/storage/userdata/
 
+# LLM模型文件
+modelserver/models/blobs/
+modelserver/models/blobs/**/*
+./modelserver/models/blobs/
+
 # 演示数据临时目录
 /demo-data-temp/
 verify-temp/
