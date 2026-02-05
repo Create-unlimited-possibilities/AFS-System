@@ -42,9 +42,13 @@ diagnosis.html
 /data/
 
 # MongoDB数据文件
+mongoserver/mongodb_data/
+mongoserver/mongodb_data/**/*
 ./mongoserver/mongodb_data/
 
 # 文件系统记忆数据
+server/storage/userdata/
+server/storage/userdata/**/*
 ./server/storage/userdata/
 
 # 演示数据临时目录
