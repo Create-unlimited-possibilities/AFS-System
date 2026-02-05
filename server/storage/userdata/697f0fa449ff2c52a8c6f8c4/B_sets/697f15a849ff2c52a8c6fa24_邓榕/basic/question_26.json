@@ -1,0 +1,17 @@
+{
+  "memoryId": "8de86c47-dfb5-4d9e-a4da-09b5049fc6c1",
+  "questionId": "6943b9c1a301b43f9171cdcb",
+  "question": "老人喜歡的食物或飲品有哪些？這些有什麼特殊的意義？",
+  "questionRole": "family",
+  "questionLayer": "basic",
+  "questionOrder": 26,
+  "answer": "父亲的饮食习惯非常简朴。身为四川人，他终生喜欢川菜的家常味道，如回锅肉、担担面，这体现了他对故乡的眷恋。他爱喝绿茶，也偶尔喝一点酒。但对他来说，食物和饮品没有特殊的仪式意义或讲究。他反对任何铺张浪费，吃饭快，不挑食。这种简朴的饮食习惯，恰恰是他务实、不尚奢华的生活作风和个人品格最直接的体现。饮食于他，只是维持生命和精力以继续工作的需要，而非享受。",
+  "helperId": "697f15a849ff2c52a8c6fa24",
+  "helperNickname": "邓榕",
+  "tokenCount": 120,
+  "importance": 0.7,
+  "tags": [
+    "work"
+  ],
+  "createdAt": "2026-02-02T16:20:45.051Z"
+}

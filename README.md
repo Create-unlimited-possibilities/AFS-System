@@ -35,19 +35,44 @@
 
 ## 技术架构
 
+### 当前架构 (重构后)
+
 本系统采用现代化的前后端分离架构，主要技术栈包括：
 
-- **前端**: HTML5 + Bootstrap 5 + Vanilla JS
-- **后端**: Node.js + Express.js
+- **前端**: Next.js 15 + TypeScript + Tailwind CSS + shadcn/ui
+- **后端**: Node.js + Express.js + Controller-Service-Repository 三层架构
 - **AI 服务**: Ollama + Python + LoRA 微调
-- **数据库**: MongoDB
+- **数据库**: MongoDB + 文件系统双重存储
 - **部署**: Docker + Docker Compose
 
 系统由多个服务模块组成：
-- `client`: 用户前端界面
-- `server`: 后端 API 服务
-- `modelserver`: AI 模型训练与推理服务
-- `mongoserver`: MongoDB 数据库服务
+- `web`: Next.js 前端应用 (端口3000)
+- `server`: Express 后端 API 服务 (端口3001)
+- `modelserver`: AI 模型训练与推理服务 (端口8000)
+- `mongoserver`: MongoDB 数据库服务 (端口27018)
+
+### 重构历史
+
+项目从传统 HTML + Bootstrap 前端架构全面迁移到现代 Next.js 框架：
+
+#### 重构目标
+- 从传统 HTML + CSS + 原生 JavaScript 迁移到现代 Next.js 框架
+- 保留现有 Express + MongoDB 后端（三层架构、双重存储、问卷收集逻辑不变）
+- 逐步实现现代化前端：组件化、类型安全、响应式 UI、更好的开发/维护体验
+- 为后续数字人生成、LangGraph + LLM 集成预留良好扩展性
+
+#### 核心技术决策
+- **项目结构**: monorepo 风格统一代码仓库，但保持容器分离部署
+- **类型系统**: 全局启用 TypeScript 提供类型安全和重构可靠性
+- **样式方案**: shadcn/ui + Tailwind CSS 替代 Bootstrap 5
+- **数据获取**: Server Components fetch + Server Actions 混合方式
+- **状态管理**: Zustand 轻量级状态管理替代传统状态管理
+
+#### 架构变化
+1. **后端架构重构**: 实现 Controller-Service-Repository 模式
+2. **前端现代化**: Next.js 15+ App Router + TypeScript + shadcn/ui + Tailwind
+3. **容器分离**: 前后端容器独立部署，保持物理分离
+4. **API 兼容**: 现有后端 API 完全不动，继续使用
 
 ## 快速开始
 
@@ -76,9 +101,10 @@
    ```
 
 4. 访问应用
-   - 前端地址: http://localhost:8080
-   - API 文档: http://localhost:3001/api-docs
-   - Ollama API: http://localhost:11435
+   - 前端地址: http://localhost:3000 (Next.js 应用)
+   - 后端 API: http://localhost:3001 (Express 服务)
+   - AI 模型服务: http://localhost:8000 (Ollama)
+   - MongoDB: localhost:27018
 
 ### 使用流程
 
@@ -94,8 +120,19 @@
 
 ```
 afs-system/
-├── client/          # 前端网页界面
-├── server/          # 后端 API 服务
+├── web/             # Next.js 前端应用
+│   ├── app/         # Next.js App Router 页面
+│   ├── components/   # React 组件和 UI 组件
+│   ├── lib/         # API 客户端和工具函数
+│   └── stores/      # Zustand 状态管理
+├── server/          # Express 后端 API 服务
+│   ├── src/
+│   │   ├── controllers/  # 控制器层
+│   │   ├── services/     # 业务逻辑层
+│   │   ├── repositories/ # 数据访问层
+│   │   ├── models/       # 数据模型
+│   │   ├── routes/       # 路由定义
+│   │   └── middleware/   # 中间件
 ├── modelserver/     # AI 模型训练与推理服务
 ├── mongoserver/     # MongoDB 配置与初始化
 ├── docker-compose.yml  # 容器编排配置
@@ -163,7 +200,38 @@ afs-system/
 
 本项目采用 MIT 许可证。
 
+## 更新日志
+
+### v1.1.0 (2025-02-05)
+
+#### 新增功能
+- ✨ **查看回答功能完全修复**: 解决了协助者回答无法正确显示的问题
+- 🔧 **仪表板统计逻辑优化**: "收到回答"现在只统计真正的协助者回答，不包括用户自己的回答
+- 📊 **协助关系统计修正**: "协助者"统计现在准确反映协助用户回答的真实人数
+
+#### 技术改进
+- 🏗️ **后端API架构优化**: 
+  - 修复了`AnswerController.getAnswersFromOthers()`返回数据结构
+  - 添加了`questionId`字段到返回的answer对象
+  - 创建了专门的`getHelpers()`API获取协助者统计
+- 🎨 **前端显示优化**:
+  - 更新了仪表板"收到回答"显示，显示基础和情感层次回答分布
+  - 修改了"协助者"显示文案，更准确反映功能含义
+  - 添加了详细的协助者回答统计信息
+
+#### 问题修复
+- 🐛 **修复了查看回答页面**: 协助者的回答现在能够正确显示
+- 🐛 **修复了仪表板统计**: 解决了收到回答统计错误的问题
+- 🐛 **修复了TypeScript类型错误**: 添加了正确的类型定义
+
+#### 项目清理
+- 🧹 **删除了17个多余文件**: 清理了约618K的临时和模板文件
+- 📝 **更新了README文档**: 添加了完整的重构历史说明
+- 🗃️ **保留了重要数据**: 保护了MongoDB数据、用户文件存储和环境配置
+
+---
+
 ## 联系方式
 
 - 项目维护者: AFS Team
-- 版本: 1.0.0
+- 版本: 1.1.0

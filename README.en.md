@@ -35,19 +35,44 @@ Artificial Flashlight Simulation System (AFS) is a digital memory heritage syste
 
 ## Technical Architecture
 
+### Current Architecture (Post-Refactoring)
+
 The system adopts a modern front-end and back-end分离 architecture with the following main technology stack:
 
-- **Frontend**: HTML5 + Bootstrap 5 + Vanilla JS
-- **Backend**: Node.js + Express.js
+- **Frontend**: Next.js 15 + TypeScript + Tailwind CSS + shadcn/ui
+- **Backend**: Node.js + Express.js + Controller-Service-Repository Three-tier Architecture
 - **AI Service**: Ollama + Python + LoRA fine-tuning
-- **Database**: MongoDB
+- **Database**: MongoDB + File System Dual Storage
 - **Deployment**: Docker + Docker Compose
 
 The system consists of multiple service modules:
-- `client`: User frontend interface
-- `server`: Backend API service
-- `modelserver`: AI model training and inference service
-- `mongoserver`: MongoDB database service
+- `web`: Next.js frontend application (port 3000)
+- `server`: Express backend API service (port 3001)
+- `modelserver`: AI model training and inference service (port 8000)
+- `mongoserver`: MongoDB database service (port 27018)
+
+### Refactoring History
+
+The project was fully migrated from traditional HTML + Bootstrap frontend architecture to modern Next.js framework:
+
+#### Refactoring Goals
+- Migrate from traditional HTML + CSS + native JavaScript to modern Next.js framework
+- Preserve existing Express + MongoDB backend (three-tier architecture, dual storage, questionnaire collection logic unchanged)
+- Gradually implement modern frontend: componentization, type safety, responsive UI, better development/maintenance experience
+- Reserve good extensibility for future digital life generation, LangGraph + LLM integration
+
+#### Core Technical Decisions
+- **Project Structure**: monorepo style unified code repository, but maintain container-separated deployment
+- **Type System**: Global TypeScript enabled for type safety and refactoring reliability
+- **Style Solution**: shadcn/ui + Tailwind CSS to replace Bootstrap 5
+- **Data Fetching**: Hybrid approach of Server Components fetch + Server Actions
+- **State Management**: Zustand lightweight state management to replace traditional state management
+
+#### Architecture Changes
+1. **Backend Architecture Refactoring**: Implemented Controller-Service-Repository pattern
+2. **Frontend Modernization**: Next.js 15+ App Router + TypeScript + shadcn/ui + Tailwind
+3. **Container Separation**: Frontend and backend containers deployed independently, maintaining physical separation
+4. **API Compatibility**: Existing backend APIs completely unchanged, continue to be used
 
 ## Quick Start
 
@@ -76,9 +101,10 @@ The system consists of multiple service modules:
    ```
 
 4. Access the application
-   - Frontend: http://localhost:8080
-   - API Documentation: http://localhost:3001/api-docs
-   - Ollama API: http://localhost:11435
+   - Frontend: http://localhost:3000 (Next.js application)
+   - Backend API: http://localhost:3001 (Express service)
+   - AI Model Service: http://localhost:8000 (Ollama)
+   - MongoDB: localhost:27018
 
 ### Usage Flow
 
@@ -94,8 +120,19 @@ The system consists of multiple service modules:
 
 ```
 afs-system/
-├── client/          # Frontend web interface
-├── server/          # Backend API service
+├── web/             # Next.js frontend application
+│   ├── app/         # Next.js App Router pages
+│   ├── components/   # React components and UI components
+│   ├── lib/         # API client and utility functions
+│   └── stores/      # Zustand state management
+├── server/          # Express backend API service
+│   ├── src/
+│   │   ├── controllers/  # Controller layer
+│   │   ├── services/     # Business logic layer
+│   │   ├── repositories/ # Data access layer
+│   │   ├── models/       # Data models
+│   │   ├── routes/       # Route definitions
+│   │   └── middleware/   # Middleware
 ├── modelserver/     # AI model training and inference service
 ├── mongoserver/     # MongoDB configuration and initialization
 ├── docker-compose.yml  # Container orchestration configuration
@@ -141,7 +178,38 @@ Issues and Pull Requests are welcome!
 
 This project is licensed under the MIT License.
 
+## Changelog
+
+### v1.1.0 (2025-02-05)
+
+#### New Features
+- ✨ **Complete fix for "View Answers" functionality**: Resolved issue where assistant answers were not displaying correctly
+- 🔧 **Dashboard statistics logic optimization**: "Received Answers" now only counts actual assistant answers, excluding user's own answers
+- 📊 **Assist relations statistics correction**: "Assistants" count now accurately reflects real people assisting users
+
+#### Technical Improvements
+- 🏗️ **Backend API architecture optimization**: 
+  - Fixed `AnswerController.getAnswersFromOthers()` return data structure
+  - Added `questionId` field to returned answer objects
+  - Created dedicated `getHelpers()` API for assistant statistics
+- 🎨 **Frontend display optimization**:
+  - Updated dashboard "Received Answers" display, showing basic and emotional layer answer distribution
+  - Modified "Assistants" display text to accurately reflect functional meaning
+  - Added detailed assistant answer statistics information
+
+#### Bug Fixes
+- 🐛 **Fixed "View Answers" page**: Assistant answers now display correctly
+- 🐛 **Fixed dashboard statistics**: Resolved received answers statistics errors
+- 🐛 **Fixed TypeScript type errors**: Added correct type definitions
+
+#### Project Cleanup
+- 🧹 **Deleted 17 redundant files**: Cleaned up ~618K of temporary and template files
+- 📝 **Updated README documentation**: Added complete refactoring history
+- 🗃️ **Preserved important data**: Protected MongoDB data, user file storage, and environment configuration
+
+---
+
 ## Contact
 
 - Project Maintainer: AFS Team
-- Version: 1.0.0
+- Version: 1.1.0

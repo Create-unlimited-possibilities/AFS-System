@@ -1,0 +1,19 @@
+{
+  "memoryId": "54cfa52d-f96c-4851-92b1-e6eae4f3a21a",
+  "questionId": "6943b9c1a301b43f9171cd9e",
+  "question": "在家庭聚會中，老人經常扮演什麼樣的角色？",
+  "questionRole": "family",
+  "questionLayer": "basic",
+  "questionOrder": 11,
+  "answer": "在家庭聚会中，父亲通常扮演 “安静的倾听者”和“温暖的凝聚者” 。他话不多，喜欢坐在一旁，微笑着听子孙们谈论各自的工作、学习和见闻。他偶尔会插问一句或简短评论，往往能点出要害，引发大家的思考。当聚会气氛有些松散时，他可能会提议“打两把牌吧”，大家便立刻围拢过来，气氛也随之活跃。他不是聚会的“主角”，但却是不可或缺的“灵魂”。他的存在让聚会有了重心和温度，家人因他而聚，也因他的平静而感到安心与快乐。",
+  "helperId": "697f15a849ff2c52a8c6fa24",
+  "helperNickname": "邓榕",
+  "tokenCount": 141,
+  "importance": 0.7,
+  "tags": [
+    "positive",
+    "family",
+    "work"
+  ],
+  "createdAt": "2026-02-02T16:20:44.946Z"
+}

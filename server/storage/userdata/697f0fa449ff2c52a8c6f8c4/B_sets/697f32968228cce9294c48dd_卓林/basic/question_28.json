@@ -1,0 +1,18 @@
+{
+  "memoryId": "8935311e-b4d5-4255-aab5-5c22c85e60c2",
+  "questionId": "6943b9c1a301b43f9171cdd1",
+  "question": "您認為老人最喜歡的季節或節日是什麼？為什麼？",
+  "questionRole": "family",
+  "questionLayer": "basic",
+  "questionOrder": 28,
+  "answer": "我认为他未必有特别偏好的季节或传统节日。如果一定要说，可能更倾向于春天或蕴含“新开始”意味的时刻。这与他“向前看”的乐观性格有关。春天象征着复苏与希望，这符合他一生致力于推动事业“焕发新春”的内在追求。对于传统节日，他注重的是家庭团聚的实质，而非节日形式本身。春节等节日，对他而言最重要的意义在于家人能有机会聚在一起，享受天伦之乐，这比节日本身的仪式感更重要。",
+  "helperId": "697f32968228cce9294c48dd",
+  "helperNickname": "卓林",
+  "tokenCount": 124,
+  "importance": 0.7,
+  "tags": [
+    "family",
+    "work"
+  ],
+  "createdAt": "2026-02-02T16:20:45.288Z"
+}

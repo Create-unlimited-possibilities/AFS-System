@@ -1,0 +1,17 @@
+{
+  "memoryId": "8e478673-3970-44a2-9c25-05c7dff2bf85",
+  "questionId": "6943b9c1a301b43f9171ce94",
+  "question": "老人有沒有固定的問候語或招呼方式？請說明使用場合。",
+  "questionRole": "friend",
+  "questionLayer": "basic",
+  "questionOrder": 25,
+  "answer": "在正式外交场合，他的问候符合标准的外交礼仪，通常是庄重、简洁的。例如，在会见开始时，会有类似“欢迎首相阁下访华”或“很高兴与您再次会面”这样的礼节性开场白。这些问候语是场合规定的，并非其个人独有的固定习惯用语。问候之后，通常会迅速转入会谈正题。",
+  "helperId": "697f34bf8228cce9294c4a14",
+  "helperNickname": "Margaret Hilda Thatcher, Baroness Thatcher",
+  "tokenCount": 85,
+  "importance": 0.7,
+  "tags": [
+    "其他"
+  ],
+  "createdAt": "2026-02-02T16:20:45.483Z"
+}

@@ -1,0 +1,18 @@
+{
+  "memoryId": "f6b1b3b0-dec1-4abb-9836-c287bc1776e6",
+  "questionId": "6943b9c1a301b43f9171cdbf",
+  "question": "在家庭聚會上，老人經常分享哪些故事？這些故事對家庭有什麼影響？",
+  "questionRole": "family",
+  "questionLayer": "basic",
+  "questionOrder": 22,
+  "answer": "父亲很少主动、系统地讲述自己的过去。他偶尔提及的，多是战争年代或工作经历中的一些具体、生动的小事，例如某次战役的战术细节，或处理某个实际问题的思路。他从不渲染艰难，也不标榜功劳。这些零星的故事，潜移默化地向家人传递了几个核心信息：做事务实、注重方法、不畏困难。它们让家人更具体地理解他的思维方式和处事风格，也在无形中塑造了家庭注重实际、不尚空谈、讲求实效的务实风气。",
+  "helperId": "697f15a849ff2c52a8c6fa24",
+  "helperNickname": "邓榕",
+  "tokenCount": 126,
+  "importance": 0.7,
+  "tags": [
+    "family",
+    "work"
+  ],
+  "createdAt": "2026-02-02T16:20:45.030Z"
+}

@@ -1,0 +1,17 @@
+{
+  "memoryId": "f36cce67-f537-43d0-804d-d8b6041a84b0",
+  "questionId": "6943b9c1a301b43f9171ceac",
+  "question": "當聚會臨時改時間或地點時，老人通常的反應與情緒強度如何？請舉例。",
+  "questionRole": "friend",
+  "questionLayer": "emotional",
+  "questionOrder": 3,
+  "answer": "实例：在香港问题谈判的复杂过程中，不可避免地会出现议程外的突发情况或对方提出的临时新方案。根据历史记录和观察，他对这类临时变动的典型反应是 “冷静评估，回归原则” 。他不会因突发变动而慌乱或轻易改变根本立场，而是会迅速评估其与既定核心目标（收回主权、保持繁荣）和基本原则（如“一国两制”）的契合度，然后做出回应。\n反应强度（Likert 1-5分，5为情绪/立场波动最大）：2分。他的反应强度很低，表现为情绪极度稳定，立场具有高度的连贯性和一致性。变动可能引发更深入的讨论或策略微调，但很少能动摇其战略定力和根本决策。他的适应性强，但方向明确，不为临时因素所左右。",
+  "helperId": "697f34bf8228cce9294c4a14",
+  "helperNickname": "Margaret Hilda Thatcher, Baroness Thatcher",
+  "tokenCount": 200,
+  "importance": 1,
+  "tags": [
+    "其他"
+  ],
+  "createdAt": "2026-02-02T16:20:45.355Z"
+}

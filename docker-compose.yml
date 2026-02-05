@@ -1,35 +1,40 @@
 services:
-  client:
+  web:
     build:
-      context: ./client
-      dockerfile: Dockerfile-client
+      context: ./web
+      dockerfile: Dockerfile-web
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:3001
     ports:
-      - "8080:80"
-    volumes:
-      - ./client/public:/usr/share/nginx/html:ro
-      - ./client/public:/app:delegated
+      - "3002:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
     depends_on:
       - server
-    environment:
-      - CHOKIDAR_USEPOLLING=true
     networks:
       - afs-network
+    restart: unless-stopped
 
   server:
     build:
       context: ./server
       dockerfile: Dockerfile-server
     ports:
-      - "3001:3000"  # Map host 3001 to container 3000
+      - "3001:3000"
     volumes:
-      - ./server/src:/app/src:delegated
-    env_file:
-      - .env
+      - ./server/storage:/app/storage
     depends_on:
       - mongoserver
       - modelserver
+    env_file:
+      - .env
+    environment:
+      - PORT=3000
+      - MODEL_SERVER_URL=http://modelserver:8000
+      - WEATHER_API_KEY=your_api_key_here
     networks:
       - afs-network
+    restart: unless-stopped
 
   modelserver:
     build:
@@ -38,7 +43,7 @@ services:
     ports:
       - "8000:11434"
     volumes:
-     - ./modelserver/models:/root/.ollama/models
+      - ./modelserver/models:/root/.ollama/models
     environment:
       - OLLAMA_HOST=0.0.0.0
     deploy:
@@ -50,6 +55,7 @@ services:
               capabilities: [gpu]
     networks:
       - afs-network
+    restart: unless-stopped
 
   mongoserver:
     build:
@@ -58,15 +64,13 @@ services:
     ports:
       - "27018:27017"
     volumes:
-      - mongo-data:/data/db
-      - ./mongoserver:/docker-entrypoint-initdb.d
+      - ./mongoserver/mongodb_data:/data/db
+      - ./mongoserver/init:/docker-entrypoint-initdb.d
     environment:
       MONGO_INITDB_DATABASE: afs_db
     networks:
       - afs-network
-
-volumes:
-  mongo-data:
+    restart: unless-stopped
 
 networks:
   afs-network:

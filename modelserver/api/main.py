@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core import OllamaTrainer
 from utils import logger
-from api.routes import train_routes, chat_routes, model_routes, progress_routes
+from api.routes import train_routes, chat_routes, model_routes, progress_routes, agricultural_routes
 
 # 创建 FastAPI 应用
 app = FastAPI(
@@ -31,6 +31,7 @@ app.include_router(train_routes.router)
 app.include_router(chat_routes.router)
 app.include_router(model_routes.router)
 app.include_router(progress_routes.router)
+app.include_router(agricultural_routes.router)
 
 # 初始化组件
 trainer = OllamaTrainer()

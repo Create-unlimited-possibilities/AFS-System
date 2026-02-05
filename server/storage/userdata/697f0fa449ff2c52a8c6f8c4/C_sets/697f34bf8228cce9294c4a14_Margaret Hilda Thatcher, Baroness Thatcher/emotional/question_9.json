@@ -1,0 +1,17 @@
+{
+  "memoryId": "8253ce39-29e8-4ec7-810c-32cb2af19fbc",
+  "questionId": "6943b9c1a301b43f9171cebe",
+  "question": "朋友有好消息時，老人道賀的方式與熱情程度如何？請舉例。",
+  "questionRole": "friend",
+  "questionLayer": "emotional",
+  "questionOrder": 9,
+  "answer": "在国事层面，他对“朋友”（友好国家）的“道贺”（如对国家成就、领导人连任等）遵循标准外交礼仪，方式正式、庄重。\n示例与强度：可能通过发表贺电或在会见时口头表达祝贺，用语官方、得体。强度（Likert 1-5分，5为情感最热烈）可评为 2分。这种道贺是外交礼节的一部分，情感表达含蓄、克制，重点在于维护和促进双边关系，而非个人情感的热烈宣泄。",
+  "helperId": "697f34bf8228cce9294c4a14",
+  "helperNickname": "Margaret Hilda Thatcher, Baroness Thatcher",
+  "tokenCount": 125,
+  "importance": 1,
+  "tags": [
+    "social"
+  ],
+  "createdAt": "2026-02-02T16:20:45.391Z"
+}

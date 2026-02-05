@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 
 // 确保日志目录存在
-const logDir = path.join(process.cwd(), 'logs', 'chatbeta');
+const logDir = path.join(process.cwd(), 'logs');
 if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir, { recursive: true });
 }
@@ -17,7 +17,7 @@ const logger = winston.createLogger({
     winston.format.errors({ stack: true }),
     winston.format.json()
   ),
-  defaultMeta: { service: 'chatbeta' },
+  defaultMeta: { service: 'afs-system' },
   transports: [
     new winston.transports.Console({
       format: winston.format.combine(
@@ -44,20 +44,20 @@ export const log = (msg, type = 'info') => {
 };
 
 // 新增方法
-logger.chat = (message, meta) => {
-  logger.info(message, { ...meta, type: 'chat' });
+logger.question = (message, meta) => {
+  logger.info(message, { ...meta, type: 'question' });
 };
 
-logger.training = (message, meta) => {
-  logger.info(message, { ...meta, type: 'training' });
+logger.answer = (message, meta) => {
+  logger.info(message, { ...meta, type: 'answer' });
 };
 
-logger.rag = (message, meta) => {
-  logger.info(message, { ...meta, type: 'rag' });
+logger.assist = (message, meta) => {
+  logger.info(message, { ...meta, type: 'assist' });
 };
 
-logger.token = (message, meta) => {
-  logger.warn(message, { ...meta, type: 'token' });
+logger.auth = (message, meta) => {
+  logger.info(message, { ...meta, type: 'auth' });
 };
 
 export default logger;

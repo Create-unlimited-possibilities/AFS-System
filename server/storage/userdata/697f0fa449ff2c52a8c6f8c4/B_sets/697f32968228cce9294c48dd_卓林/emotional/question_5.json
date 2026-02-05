@@ -1,0 +1,17 @@
+{
+  "memoryId": "fef447eb-e68a-4eda-a563-b5bee05ffbc8",
+  "questionId": "6943b9c1a301b43f9171cdf2",
+  "question": "老人常常提到的家庭傳統或價值觀是什麼？",
+  "questionRole": "family",
+  "questionLayer": "emotional",
+  "questionOrder": 5,
+  "answer": "他很少用语言直接地、反复地“提到”某个传统或价值观。他的价值观是通过行动和家庭氛围来传承的。如果总结他身体力行所体现并期望家庭具备的，主要是三点：“实事求是” 的务实精神，即一切从实际出发，不尚空谈；“坚韧不拔” 的意志品质，无论遇到什么困难都要保持乐观和定力；“重视学习与思考” ，要保持对新事物的关注和独立思考能力。这些并非挂在嘴边的口号，而是他一生实践的准则，并以此潜移默化地影响着家庭文化。",
+  "helperId": "697f32968228cce9294c48dd",
+  "helperNickname": "卓林",
+  "tokenCount": 139,
+  "importance": 1,
+  "tags": [
+    "family"
+  ],
+  "createdAt": "2026-02-02T16:20:45.149Z"
+}

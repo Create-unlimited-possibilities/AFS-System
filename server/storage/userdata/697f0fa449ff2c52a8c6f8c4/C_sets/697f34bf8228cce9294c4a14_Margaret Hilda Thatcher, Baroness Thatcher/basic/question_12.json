@@ -1,0 +1,17 @@
+{
+  "memoryId": "62b650d9-456e-407b-81a5-4f8d9b09781f",
+  "questionId": "6943b9c1a301b43f9171ce6d",
+  "question": "請估計老人目前線上與線下與朋友交流的頻率（次/週）。",
+  "questionRole": "friend",
+  "questionLayer": "basic",
+  "questionOrder": 12,
+  "answer": "在我们的交往时代（20世纪80年代），不存在现代的“线上交流”概念（如电子邮件、即时通讯）。所有重要交流均通过线下的正式外交渠道进行，包括面对面高层会谈、外交照会、特使传递信息等。这类线下直接交流的频率极低，以“次/年”甚至“次/关键事件期”为单位计算，不可能达到每周的频率。例如，我们之间的直接面对面会谈，在1982年至1984年的核心谈判期内，总数也仅有数次。",
+  "helperId": "697f34bf8228cce9294c4a14",
+  "helperNickname": "Margaret Hilda Thatcher, Baroness Thatcher",
+  "tokenCount": 132,
+  "importance": 0.7,
+  "tags": [
+    "social"
+  ],
+  "createdAt": "2026-02-02T16:20:45.406Z"
+}

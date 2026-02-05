@@ -1,0 +1,17 @@
+{
+  "memoryId": "c7b80fc2-3944-4dae-9ac8-a3c146a62f21",
+  "questionId": "6943b9c0a301b43f9171ccae",
+  "question": "您认为童年时期最难忘的事件或阶段是什么？请描述相关的年份、地点，以及这些事件如何影响您的成长。",
+  "questionRole": "elder",
+  "questionLayer": "basic",
+  "questionOrder": 1,
+  "answer": "这是测试答案。。。。。。。",
+  "helperId": null,
+  "helperNickname": null,
+  "tokenCount": 11,
+  "importance": 0.565,
+  "tags": [
+    "其他"
+  ],
+  "createdAt": "2026-02-02T16:20:44.612Z"
+}

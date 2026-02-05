@@ -18,6 +18,17 @@ const assistRelationSchema = new mongoose.Schema({
     enum: ['family', 'friend'],
     required: true
   },
+  specificRelation: {
+    type: String,
+    description: '具体关系描述（如：夫妻、母子、同事等）',
+    default: ''
+  },
+  friendLevel: {
+    type: String,
+    enum: ['casual', 'close', 'intimate'],
+    description: '朋友关系级别：casual(普通朋友), close(好朋友), intimate(知心好友)',
+    default: 'casual'
+  },
   createdAt: {
     type: Date,
     default: Date.now

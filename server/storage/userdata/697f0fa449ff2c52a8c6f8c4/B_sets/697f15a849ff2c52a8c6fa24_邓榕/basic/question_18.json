@@ -1,0 +1,17 @@
+{
+  "memoryId": "6bd26469-b0bf-46a9-ab57-da50ee368a66",
+  "questionId": "6943b9c1a301b43f9171cdb3",
+  "question": "在家庭中，老人經常與誰分享他的想法或情感？",
+  "questionRole": "family",
+  "questionLayer": "basic",
+  "questionOrder": 18,
+  "answer": "父亲是一个情感非常内敛、思想高度独立的人。在家庭中，他不习惯向任何人系统地倾诉想法或情感。相对而言，他可能在家庭桥牌桌上，或在散步时陪同的家人面前，会更多一些交流。但即便是这些交流，也更多是询问外界情况、听取家人见闻，或是就某个具体事件发表非常简短的观点。他的情感和深邃思考，更多是通过行动、决策以及独自沉思来体现的。家人学会从他平静的外表下，去理解和感受他波澜壮阔的内心世界。",
+  "helperId": "697f15a849ff2c52a8c6fa24",
+  "helperNickname": "邓榕",
+  "tokenCount": 129,
+  "importance": 0.7,
+  "tags": [
+    "family"
+  ],
+  "createdAt": "2026-02-02T16:20:44.993Z"
+}

@@ -1,0 +1,52 @@
+{
+  "roleCardId": "37ca829c-0a62-4507-a2b1-24ae6cfcc78b",
+  "userId": "697f0fa449ff2c52a8c6f8c4",
+  "version": 1,
+  "createdAt": "2026-02-03T13:18:48.813Z",
+  "sections": {
+    "selfCognition": {
+      "summary": "暂无描述",
+      "traits": [
+        "温和"
+      ],
+      "vulnerabilities": []
+    },
+    "familyScripts": {
+      "byPerson": {
+        "697f15a849ff2c52a8c6fa24": {
+          "personId": "697f15a849ff2c52a8c6fa24",
+          "name": "邓榕",
+          "relationType": "unknown",
+          "speakingStyle": "温和友善",
+          "emotionExpression": "真诚关心"
+        },
+        "697f32968228cce9294c48dd": {
+          "personId": "697f32968228cce9294c48dd",
+          "name": "卓林",
+          "relationType": "unknown",
+          "speakingStyle": "温和友善",
+          "emotionExpression": "真诚关心"
+        }
+      },
+      "general": {
+        "children": "对子女关心爱护。",
+        "spouse": "对配偶温柔体贴。"
+      }
+    },
+    "friendScripts": {
+      "byFriend": {},
+      "byTrustLevel": {
+        "casual": [
+          "礼貌客气",
+          "保持距离"
+        ],
+        "close": [
+          "和好朋友会分享日常"
+        ],
+        "intimate": [
+          "和知己可以倾诉真心"
+        ]
+      }
+    }
+  }
+}

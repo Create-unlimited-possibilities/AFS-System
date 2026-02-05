@@ -4,27 +4,35 @@
 # ====================== 基础模型设置 ======================
 # 添加新模型只需在这里加一行，无需改代码
 base_models:
+  qwen2.5-7b-instruct:
+    name: "Qwen2.5-7B-Instruct"
+    ollama_name: "qwen2.5:7b"
+    hf_path: "{{model_dir}}/qwen2.5-7b-instruct"
+    gguf_path: "{{model_dir}}/qwen2.5-7b-instruct.gguf"
+    description: "推荐：12GB显存友好，中文情感陪伴温暖自然"
+    quantization: "Q4_K_M"
+    vram_requirement: "12GB"
+
   qwen2.5-14b-instruct:
-    name: "Qwen2.5-14B-Instruct"           # 显示名称（前端下拉用）
-    hf_path: "{{model_dir}}/qwen2.5-14b-instruct"  # HF 格式路径模板
-    gguf_path: "{{model_dir}}/qwen2.5-14b-instruct.gguf"  # GGUF 路径模板
-    description: "推荐：中文情感陪伴最强，温暖自然"  # 前端显示描述
+    name: "Qwen2.5-14B-Instruct"
+    ollama_name: "qwen2.5:14b"
+    hf_path: "{{model_dir}}/qwen2.5-14b-instruct"
+    gguf_path: "{{model_dir}}/qwen2.5-14b-instruct.gguf"
+    description: "高配：16GB+显存，更强的推理和记忆能力"
+    quantization: "Q4_K_M"
+    vram_requirement: "16GB+"
 
   deepseek-r1-14b:
     name: "DeepSeek-R1-Distill-Qwen-14B"
+    ollama_name: "deepseek-r1:14b"
     hf_path: "{{model_dir}}/deepseek-r1-14b"
     gguf_path: "{{model_dir}}/deepseek-r1-14b.gguf"
     description: "备选：推理强，适合复杂故事回忆"
+    quantization: "Q4_K_M"
+    vram_requirement: "16GB+"
 
-  # 示例：未来加新模型
-  # llama3.1-8b:
-  #   name: "Llama3.1-8B"
-  #   hf_path: "{{model_dir}}/llama3.1-8b"
-  #   gguf_path: "{{model_dir}}/llama3.1-8b.gguf"
-  #   description: "轻量版：省资源，适合低端设备"
-
-# 当前选中模型（前端下拉会更新这个字段）
-current_model: "qwen2.5-14b-instruct"     # 默认 Qwen（温暖优先）
+# 当前选中模型
+current_model: "qwen2.5-7b-instruct"
 
 # 路径模板变量（动态替换）
 model_dir: "/app/models/base"             # 容器内根路径，所有模型子文件夹在此

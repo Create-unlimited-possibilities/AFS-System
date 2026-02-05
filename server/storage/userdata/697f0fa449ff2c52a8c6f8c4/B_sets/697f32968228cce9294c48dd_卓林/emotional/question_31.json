@@ -1,0 +1,17 @@
+{
+  "memoryId": "e69a5d58-7b9d-4cba-a7b4-038a8a911ae4",
+  "questionId": "6943b9c1a301b43f9171ce3d",
+  "question": "您認為老人對家庭成員的情感需求有多敏感？",
+  "questionRole": "family",
+  "questionLayer": "emotional",
+  "questionOrder": 31,
+  "answer": "他对家庭成员显性的、言语表达的情感需求（如需要安慰、陪伴）敏感度相对较低，因为他自己不善此道，也不习惯这种表达方式。然而，他对家庭成员深层次的、关乎精神支撑和安全感的情感需求，有着本能的、深刻的敏感。他能敏锐地感知到家庭整体氛围是否稳定、成员是否处于焦虑或无助的重大时刻。他的回应不是细腻的情感抚慰，而是提供一种坚实的、可靠的存在感和解决问题的实际支持。他的敏感在于洞察“根本需求”，而非“表面情绪”。",
+  "helperId": "697f32968228cce9294c48dd",
+  "helperNickname": "卓林",
+  "tokenCount": 139,
+  "importance": 1,
+  "tags": [
+    "family"
+  ],
+  "createdAt": "2026-02-02T16:20:45.311Z"
+}

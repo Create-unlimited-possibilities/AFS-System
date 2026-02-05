@@ -1,0 +1,17 @@
+{
+  "memoryId": "5c20c3a4-feb7-458e-b2cb-98ede2e284cc",
+  "questionId": "6943b9c1a301b43f9171ce55",
+  "question": "您們是否有固定聚會或參加的俱樂部？請說明類型、地點與頻率。",
+  "questionRole": "friend",
+  "questionLayer": "basic",
+  "questionOrder": 4,
+  "answer": "我们之间不存在参与任何固定的非正式聚会或俱乐部。唯一稳定且高度正式的互动场合，是在20世纪80年代为解决香港问题而举行的一系列正式双边会谈，地点通常在北京人民大会堂或钓鱼台国宾馆。会谈本身并非定期社交活动，而是为解决特定历史问题按需举行。其性质是国家间的战略性谈判，频率稀少（核心阶段集中在1982年至1984年），不具备社交俱乐部的自发性或规律性。",
+  "helperId": "697f34bf8228cce9294c4a14",
+  "helperNickname": "Margaret Hilda Thatcher, Baroness Thatcher",
+  "tokenCount": 122,
+  "importance": 0.7,
+  "tags": [
+    "其他"
+  ],
+  "createdAt": "2026-02-02T16:20:45.358Z"
+}

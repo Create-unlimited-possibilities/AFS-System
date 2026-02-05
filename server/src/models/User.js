@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
 // 生成16位随机专属编号（大小写字母+数字+标点符号）
@@ -35,6 +35,14 @@ const userSchema = new mongoose.Schema({
     type: String, 
     default: '用户' 
   },
+  role: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Role'
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
 createdAt: { 
     type: Date, 
     default: Date.now 
@@ -42,40 +50,7 @@ createdAt: {
   lastLogin: {
     type: Date
   },
-  chatBeta: {
-    memoryTokenCount: { type: Number, default: 0 },
-    currentMode: { type: String, enum: ['mode1', 'mode2', 'mode3'], default: 'mode1' },
-    relationships: [{
-      userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-      relationType: { type: String, enum: ['stranger', 'family', 'friend', 'intimate', 'lover'] },
-      affinityScore: { type: Number, default: 0, min: -100, max: 100 },
-      specificRelation: { type: String },
-      friendLevel: { type: String, enum: ['casual', 'close', 'intimate'] },
-      lastInteractionDate: Date,
-      isAssisted: { type: Boolean, default: false }
-    }],
-    roleCard: {
-      selfCognition: {
-        summary: String,
-        traits: [String],
-        vulnerabilities: [String]
-      },
-      familyScripts: {
-        children: String,
-        spouse: String
-      },
-      friendScripts: {
-        casual: String,
-        close: String,
-        intimate: String
-      }
-    },
-    modelStatus: {
-      hasCustomModel: { type: Boolean, default: false },
-      modelPath: String,
-      trainingStatus: { type: String, enum: ['none', 'training', 'completed'], default: 'none' }
-    }
-  }
+  
 });
 
 // 静态方法：生成唯一编号

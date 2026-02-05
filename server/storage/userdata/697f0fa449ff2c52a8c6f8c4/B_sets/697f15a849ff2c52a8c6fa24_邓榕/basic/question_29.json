@@ -1,0 +1,18 @@
+{
+  "memoryId": "98e47f84-b86b-4858-b317-46d1b0a67b70",
+  "questionId": "6943b9c1a301b43f9171cdd4",
+  "question": "您與老人一起度過的值得紀念的日子有哪些？請描述一下。",
+  "questionRole": "family",
+  "questionLayer": "basic",
+  "questionOrder": 29,
+  "answer": "值得纪念的日子往往与家庭的重大转折相关。首先是在江西接到通知即将返京的日子（1973年2月），那意味着阴霾即将散去，全家充满希望。其次是我结婚成家的日子，看到他欣慰的笑容。还有他晚年一些重要的生日聚会，家人从各地赶回，他享受着儿孙绕膝的温暖。这些日子共同串联起我们家庭的成长与变迁。每一个日子都因其特定的情感浓度——无论是共度艰难后的希望，还是见证幸福的欣慰——而显得弥足珍贵。",
+  "helperId": "697f15a849ff2c52a8c6fa24",
+  "helperNickname": "邓榕",
+  "tokenCount": 131,
+  "importance": 0.7,
+  "tags": [
+    "positive",
+    "family"
+  ],
+  "createdAt": "2026-02-02T16:20:45.069Z"
+}

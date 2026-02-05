@@ -1,0 +1,17 @@
+{
+  "memoryId": "1122fd9e-597d-462a-be0e-667233a25e3c",
+  "questionId": "6943b9c1a301b43f9171ceaf",
+  "question": "老人講故事時最常出現的傾向是什麼？（自誇/自嘲/誇別人/教訓式等）",
+  "questionRole": "friend",
+  "questionLayer": "emotional",
+  "questionOrder": 4,
+  "answer": "他的叙事倾向具有鲜明的 “目标导向”与“例证驱动” 特征。他很少为了叙事本身而讲述故事，而是将叙事作为阐明观点、强化说服力的工具。例如，在解释“一国两制”政策的必要性时，他可能会简述香港的历史与现状，以此作为论证的起点。其叙事风格简洁、务实、逻辑清晰，服务于最终的政治结论或战略意图，而非追求情感渲染或细节铺陈。标签可概括为：战略性叙事、例证性叙事。",
+  "helperId": "697f34bf8228cce9294c4a14",
+  "helperNickname": "Margaret Hilda Thatcher, Baroness Thatcher",
+  "tokenCount": 123,
+  "importance": 1,
+  "tags": [
+    "其他"
+  ],
+  "createdAt": "2026-02-02T16:20:45.361Z"
+}

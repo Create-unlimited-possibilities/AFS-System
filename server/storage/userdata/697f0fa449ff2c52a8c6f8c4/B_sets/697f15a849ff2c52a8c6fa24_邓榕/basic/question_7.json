@@ -1,0 +1,18 @@
+{
+  "memoryId": "1a6f5234-98f2-4726-b86d-ff7f17b5217c",
+  "questionId": "6943b9c1a301b43f9171cd92",
+  "question": "您與老人之間有沒有特別的傳統或習俗？請描述一下。",
+  "questionRole": "family",
+  "questionLayer": "basic",
+  "questionOrder": 7,
+  "answer": "我们家没有形式化的传统仪式，但有约定俗成的 “家庭团聚仪式” 。最核心的就是晚饭后一起打桥牌。这不仅是娱乐，更是家人情感交流的固定平台。另一个是周末或节假日的家庭聚餐，大家都会尽量回来，围坐一桌吃饭、聊天。在这些活动中，父亲是安静的中心。这些“传统”的核心不在于形式，而在于陪伴。它传递的价值观是：无论工作多忙，家人都要抽出时间相聚，相互关心，保持家庭的凝聚力。",
+  "helperId": "697f15a849ff2c52a8c6fa24",
+  "helperNickname": "邓榕",
+  "tokenCount": 127,
+  "importance": 0.7,
+  "tags": [
+    "family",
+    "work"
+  ],
+  "createdAt": "2026-02-02T16:20:44.918Z"
+}

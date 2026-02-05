@@ -1,0 +1,17 @@
+{
+  "memoryId": "679ba628-d562-4c01-83cd-86844b1439d6",
+  "questionId": "6943b9c1a301b43f9171cdda",
+  "question": "您與老人有哪些共同的興趣或愛好？請描述一下。",
+  "questionRole": "family",
+  "questionLayer": "basic",
+  "questionOrder": 31,
+  "answer": "我们最持久的共同兴趣是阅读。无论是在江西的煤油灯下，还是在北京的家中，读书是我们共同的精神生活。我们会读不同的书，但分享着对知识和信息的尊重。打桥牌是重要的家庭集体活动，我们都参与其中，享受其乐融融的氛围。此外，散步也是一个共同的日常习惯，我常陪他一起走走。这些兴趣都不张扬，却构成了我们精神世界和日常生活紧密联结的重要部分，是平淡生活中温暖的陪伴。",
+  "helperId": "697f15a849ff2c52a8c6fa24",
+  "helperNickname": "邓榕",
+  "tokenCount": 119,
+  "importance": 0.7,
+  "tags": [
+    "family"
+  ],
+  "createdAt": "2026-02-02T16:20:45.082Z"
+}

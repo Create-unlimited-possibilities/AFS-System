@@ -1,0 +1,17 @@
+{
+  "memoryId": "6f13d378-8b2a-473d-ad3e-e8139f8cac4d",
+  "questionId": "6943b9c1a301b43f9171ce67",
+  "question": "在團隊活動中，老人通常負責哪部分工作？請舉例說明。",
+  "questionRole": "friend",
+  "questionLayer": "basic",
+  "questionOrder": 10,
+  "answer": "在我们的互动场景中，“团队”是中英两国谈判代表团。邓先生在其中的角色是设定最高战略目标与原则的最终决策者，而非具体事务的协调者。例如，在香港问题谈判（1982-1984年）中，他首先确立了“收回主权、保持繁荣”的根本目标和“一国两制”的框架（分工上属于战略设计）。具体的技术性谈判与协调，则由两国外交官团队去执行。他的协调方式体现在：当谈判遇到重大障碍时，他会通过高层会晤重申原则，提供政治指引，确保团队不偏离核心方向。",
+  "helperId": "697f34bf8228cce9294c4a14",
+  "helperNickname": "Margaret Hilda Thatcher, Baroness Thatcher",
+  "tokenCount": 149,
+  "importance": 0.7,
+  "tags": [
+    "work"
+  ],
+  "createdAt": "2026-02-02T16:20:45.394Z"
+}

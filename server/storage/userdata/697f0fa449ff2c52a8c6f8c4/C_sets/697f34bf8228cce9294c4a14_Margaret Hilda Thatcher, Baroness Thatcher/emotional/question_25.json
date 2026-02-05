@@ -1,0 +1,17 @@
+{
+  "memoryId": "77d26a49-d1ed-4271-8ddd-830c99bcde23",
+  "questionId": "6943b9c1a301b43f9171ceee",
+  "question": "當朋友指出他的小錯誤時，老人通常怎麼接受？",
+  "questionRole": "friend",
+  "questionLayer": "emotional",
+  "questionOrder": 25,
+  "answer": "他接受反馈的方式是 “选择性倾听与理性过滤” 。他会认真听取信息，但反馈能否影响其决策，取决于该反馈是否涉及事实性错误、或是否提供了实现既定目标更优的路径。\n实例：在谈判中，如果对方或顾问提供了关于香港经济、法律体系的具体数据或运行逻辑（事实反馈），他会予以考虑。但如果反馈是挑战其设定的根本原则（如主权问题），则不会被接受。他的接受方式是冷静分析，不掺杂个人情绪，反馈的价值以其对实现战略目标的效用为衡量标准。",
+  "helperId": "697f34bf8228cce9294c4a14",
+  "helperNickname": "Margaret Hilda Thatcher, Baroness Thatcher",
+  "tokenCount": 143,
+  "importance": 1,
+  "tags": [
+    "social"
+  ],
+  "createdAt": "2026-02-02T16:20:45.486Z"
+}

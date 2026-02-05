@@ -40,10 +40,44 @@ diagnosis.html
 # MongoDB数据相关
 /data/db/
 /data/
-/mongodb_data/
+
+# MongoDB数据文件
+./mongoserver/mongodb_data/
+
+# 文件系统记忆数据
+./server/storage/userdata/
 
 # 演示数据临时目录
 /demo-data-temp/
 verify-temp/
 .env 
 /opencode_build/
+
+# Docusaurus generated files
+.docusaurus
+.cache-loader
+
+# Environment files
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js build files
+web/.next/
+web/out/
+web/.docusaurus
+web/.cache-loader
+
+# Next.js log files
+web/npm-debug.log*
+web/yarn-debug.log*
+web/yarn-error.log*
+
+# Next.js typescript
+web/*.tsbuildinfo
+web/next-env.d.ts

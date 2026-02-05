@@ -1,10 +1,12 @@
-// server/src/routes/questions.js
 import express from 'express';
 import Question from '../models/Question.js';
-import Memory from '../models/Memory.js';
+import Answer from '../models/Answer.js';
+import User from '../models/User.js';
 import { protect } from '../middleware/auth.js';
+import StorageService from '../services/storageService.js';
 
 const router = express.Router();
+const storageService = new StorageService();
 
 // 1. 获取所有层次的进度（用于左侧面板）
 router.get('/progress', protect, async (req, res) => {
@@ -17,7 +19,7 @@ router.get('/progress', protect, async (req, res) => {
 
     for (const layer of layers) {
       const questions = await Question.countDocuments({ role, layer, active: true });
-      const answered = await Memory.countDocuments({
+      const answered = await Answer.countDocuments({
         elderCode,
         contributorId: userId,
         layer
@@ -47,7 +49,7 @@ router.get('/', protect, async (req, res) => {
       .sort({ order: 1 })
       .lean();
 
-    const memories = await Memory.find({
+    const memories = await Answer.find({
       elderCode,
       contributorId: userId,
       layer
@@ -82,22 +84,68 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
-// 3. 保存/更新单条答案
+// 3. 保存/更新单条答案（支持批量保存）
 router.post('/answer', protect, async (req, res) => {
   try {
-    const { questionOrder, answer, layer, elderCode } = req.body;
-    const contributorId = req.user.id;
+    const { questionOrder, answer, layer, targetCode, targetEmail, relationshipType } = req.body;
+    const userId = req.user.id;
 
-    await Memory.findOneAndUpdate(
-      { elderCode, contributorId, questionOrder, layer },
-      { answer, updatedAt: new Date() },
-      { upsert: true, new: true }
-    );
+    // 验证目标用户
+    const targetUser = await User.findOne({ 
+      uniqueCode: targetCode,
+      email: targetEmail.toLowerCase()
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ success: false, error: '用户不存在' });
+    }
+
+    // 不能为自己回答
+    if (targetUser._id.toString() === userId.toString()) {
+      return res.status(400).json({ success: false, error: '不能为自己回答问题' });
+    }
+
+    // 查找问题
+    const question = await Question.findOne({
+      order: questionOrder,
+      layer,
+      active: true
+    });
+
+    if (!question) {
+      return res.status(404).json({ success: false, error: '问题不存在' });
+    }
+
+    const isSelfAnswer = false;
+    const targetUserId = targetUser._id;
+
+    const answerData = {
+      userId,
+      targetUserId,
+      questionId: question._id,
+      question,
+      answer,
+      layer,
+      isSelfAnswer,
+      relationshipType: relationshipType || 'friend',
+      helper: req.user
+    };
+
+    const result = await storageService.saveAnswer(answerData);
+
+    if (!result.success) {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+
+    const tokenCount = result.answer.question?.length || answer.length;
+    await User.findByIdAndUpdate(targetUserId, {
+      $inc: { 'chatBeta.memoryTokenCount': Math.ceil(tokenCount * 0.7) }
+    });
 
     res.json({ success: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ success: false });
+    res.status(500).json({ success: false, error: '保存答案失败' });
   }
 });
 

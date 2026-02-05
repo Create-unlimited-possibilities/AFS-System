@@ -1,0 +1,33 @@
+# 环境变量文件 - Docker 环境下应该由 docker-compose.yml 管理
+.env
+.env.local
+.env.local.backup
+.env.development
+.env.production
+
+# Node modules
+node_modules
+
+# Next.js build output
+.next
+out
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+.DS_Store
+*.pem

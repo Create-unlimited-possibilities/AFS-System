@@ -1,0 +1,18 @@
+{
+  "memoryId": "39c67402-fb6f-4191-afbb-1d63deb1fff5",
+  "questionId": "6943b9c1a301b43f9171cdc5",
+  "question": "您認為老人最希望家人記住他的什麼？",
+  "questionRole": "family",
+  "questionLayer": "basic",
+  "questionOrder": 24,
+  "answer": "我认为父亲最希望家人记住的，不是他的职位或具体功绩，而是他作为 “一个忠诚的共产党员和人民的儿子”所体现的精神。他希望后人记住他“实事求是”、“实践是检验真理的唯一标准”的思想精髓，记住他为国家富强、人民幸福而奋斗终生的信念。在家庭层面，他更希望家人记住他那种在逆境中坚韧不拔、在重任前勇于担当、对家庭虽不宣于口却始终如一的深沉责任感。他的一生是“向前看”的生动注脚，这或许是他最根本的精神遗产。",
+  "helperId": "697f15a849ff2c52a8c6fa24",
+  "helperNickname": "邓榕",
+  "tokenCount": 137,
+  "importance": 0.7,
+  "tags": [
+    "positive",
+    "family"
+  ],
+  "createdAt": "2026-02-02T16:20:45.042Z"
+}

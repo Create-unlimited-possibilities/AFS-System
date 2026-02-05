@@ -1,0 +1,43 @@
+db.answers.countDocuments()
+db.users.countDocuments()
+use afs_db
+--help
+ads
+dbs
+db.user.countDocuments()
+db.users.find().pretty()
+db.user.find().pretty()
+db.Questions.find()
+db.Questions.findOne()
+db.questions.findOne()
+db.question.find().pretty().limit(10)
+db.Question.find().pretty().limite(10)
+db.Question.find().pretty().limit(10)
+db.getCollectionNames()
+db.showcollection
+db.showcollection()
+show collection
+dbs
+db.find().pretty()
+db.afs_db.find().pretty().limit(10)
+use afs_db
+show dbs
+db.showcollection()
+db.questions.find().limit(20)
+db.questions.countDocuments()
+db.questions.countDoccuments()
+db.questions.countDocuments()
+db.questions.deleteMany({})
+db.questions.countDocuments()
+use afs_db
+db.questions.find().limit(20)
+db.questions.find().limi(20)
+db.questions.find().limite(20)
+db.questions.findOne()
+use afs_db
+db.questions.find().limit(20)
+db.questions.find({role: "elder"}).count()
+db.questions.find({role:"elder"}).count()
+db.questions.countDocuments()
+db.questions.find({role:"elder"}).count()
+use afs_db

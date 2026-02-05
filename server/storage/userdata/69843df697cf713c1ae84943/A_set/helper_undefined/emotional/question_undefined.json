@@ -1,0 +1,23 @@
+{
+  "memoryId": "52072672-a4a4-4c6f-843d-793f89185f88",
+  "questionId": "6943b9c0a301b43f9171cd17",
+  "question": {
+    "_id": "6943b9c0a301b43f9171cd17",
+    "role": "elder",
+    "layer": "emotional",
+    "order": 1,
+    "question": "您在家庭聚會中通常如何表達對家人的關心？請舉例說明您會做的事情或說的話。",
+    "placeholder": "例如：每次過節我都會親自下廚做大家最愛吃的菜，並且挨個給晚輩夾菜，說「多吃點，身體才好」……",
+    "type": "textarea",
+    "active": true,
+    "__v": 0
+  },
+  "questionLayer": "emotional",
+  "answer": "��в�β��Դ�",
+  "tokenCount": 9,
+  "importance": 0.8450000000000001,
+  "tags": [
+    "family"
+  ],
+  "createdAt": "2026-02-05T07:00:48.913Z"
+}

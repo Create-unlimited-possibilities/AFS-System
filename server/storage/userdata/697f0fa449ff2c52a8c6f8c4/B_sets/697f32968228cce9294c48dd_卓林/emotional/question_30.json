@@ -1,0 +1,18 @@
+{
+  "memoryId": "fdfd1ac1-6cbf-4a1c-94e4-86c077d683cf",
+  "questionId": "6943b9c1a301b43f9171ce3a",
+  "question": "老人如何慶祝家庭成員的生日或特殊日子？",
+  "questionRole": "family",
+  "questionLayer": "emotional",
+  "questionOrder": 30,
+  "answer": "他没有为庆祝家庭成员生日或特殊日子而设定特定的隆重仪式。庆祝方式非常朴素、家常。通常就是在当天，家庭晚餐会比平时稍微丰盛一点，大家围坐在一起吃饭、聊天。他可能会在这个氛围下，对过生日的成员说一两句简单的祝福或肯定的话，例如“又长大一岁，要更努力工作/学习”。庆祝的意义完全融入了家庭团聚和日常关怀之中，没有任何外在的形式主义。他强调的是亲人之间的陪伴与心意，而非礼物或排场。",
+  "helperId": "697f32968228cce9294c48dd",
+  "helperNickname": "卓林",
+  "tokenCount": 128,
+  "importance": 1,
+  "tags": [
+    "family",
+    "work"
+  ],
+  "createdAt": "2026-02-02T16:20:45.305Z"
+}
