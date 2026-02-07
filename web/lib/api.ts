@@ -19,6 +19,16 @@ export interface AuthResponse {
   status?: number;
 }
 
+// 导入AI陪伴功能所需的类型
+import type {
+  RoleCardExtended,
+  ChatSession,
+  Message,
+  StrangerSentiment,
+  SentimentRecord,
+  SentimentHistoryItem
+} from '@/types';
+
 // 从 localStorage 获取 token 的辅助函数
 const getToken = (): string | undefined => {
   if (typeof window === 'undefined') return undefined;
@@ -160,12 +170,110 @@ export async function put<T = any>(endpoint: string, body: any, token?: string):
 
 export async function del<T = any>(endpoint: string, token?: string): Promise<ApiResponse<T>> {
   const headers: HeadersInit = {};
-
+  
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-
+  
   return apiRequest<T>(endpoint, { method: 'DELETE', headers });
+}
+
+// ============================================
+// AI陪伴功能 - 角色卡相关API
+// ============================================
+
+export async function getRoleCard(token?: string): Promise<ApiResponse<{ roleCard: RoleCardExtended }>> {
+  return get<{ roleCard: RoleCardExtended }>('/rolecard', token);
+}
+
+export async function generateRoleCard(token?: string): Promise<ApiResponse<{
+  roleCard: RoleCardExtended;
+  tokenCount: number;
+  assistantsProcessed: number;
+  processingTime: number;
+}>> {
+  return post<{ roleCard: RoleCardExtended; tokenCount: number; assistantsProcessed: number; processingTime: number }>('/rolecard/generate', {}, token);
+}
+
+export async function updateRoleCard(roleCard: Partial<RoleCardExtended>, token?: string): Promise<ApiResponse<RoleCardExtended>> {
+  return put<RoleCardExtended>('/rolecard', roleCard, token);
+}
+
+export async function regenerateAssistantGuidelines(assistantId: string, token?: string): Promise<ApiResponse<{ success: boolean }>> {
+  return post<{ success: boolean }>(`/rolecard/assistants/${assistantId}/regenerate`, {}, token);
+}
+
+// ============================================
+// AI陪伴功能 - 对话相关API
+// ============================================
+
+export async function createChatSessionByCode(targetUniqueCode: string, token?: string): Promise<ApiResponse<ChatSession>> {
+  return post<ChatSession>('/chat/sessions/by-code', { targetUniqueCode }, token);
+}
+
+export async function sendMessage(sessionId: string, message: string, token?: string): Promise<ApiResponse<{
+  message: string;
+  sessionId: string;
+  metadata: {
+    retrievedMemoriesCount: number;
+    modelUsed: string;
+    relationType: string;
+    sentimentScore: number;
+  };
+}>> {
+  return post<{ message: string; sessionId: string; metadata: any }>(`/chat/sessions/${sessionId}/messages`, { message }, token);
+}
+
+export async function getChatMessages(sessionId: string, token?: string): Promise<ApiResponse<{ messages: Message[] }>> {
+  return get<{ messages: Message[] }>(`/chat/sessions/${sessionId}/messages`, token);
+}
+
+export async function endChatSession(sessionId: string, token?: string): Promise<ApiResponse<{ success: boolean }>> {
+  return post<{ success: boolean }>(`/chat/sessions/${sessionId}/end`, {}, token);
+}
+
+export async function getActiveSessions(token?: string): Promise<ApiResponse<{ sessions: ChatSession[] }>> {
+  return get<{ sessions: ChatSession[] }>('/chat/sessions/active', token);
+}
+
+export async function getChatStats(token?: string): Promise<ApiResponse<{
+  totalSessions: number;
+  totalMessages: number;
+  averageMessagesPerSession: number;
+}>> {
+  return get<{ totalSessions: number; totalMessages: number; averageMessagesPerSession: number }>('/chat/stats', token);
+}
+
+// ============================================
+// AI陪伴功能 - 好感度相关API
+// ============================================
+
+export async function getSentiment(targetUserId: string, strangerId: string, token?: string): Promise<ApiResponse<StrangerSentiment>> {
+  return get<StrangerSentiment>(`/sentiment/${targetUserId}/${strangerId}`, token);
+}
+
+export async function updateSentiment(targetUserId: string, strangerId: string, data: {
+  message: string;
+  conversationHistory?: Message[];
+}, token?: string): Promise<ApiResponse<SentimentRecord>> {
+  return put<SentimentRecord>(`/sentiment/${targetUserId}/${strangerId}`, data, token);
+}
+
+export async function getSentimentStats(targetUserId: string, token?: string): Promise<ApiResponse<{
+  totalStrangers: number;
+  averageScore: number;
+  scoreDistribution: Record<string, number>;
+  recentUpdates: Array<{
+    strangerId: string;
+    timestamp: string;
+    score: number;
+  }>;
+}>> {
+  return get(`/sentiment/${targetUserId}/stats`, token);
+}
+
+export async function getSentimentHistory(targetUserId: string, strangerId: string, token?: string): Promise<ApiResponse<{ history: SentimentHistoryItem[] }>> {
+  return get<{ history: SentimentHistoryItem[] }>(`/sentiment/${targetUserId}/${strangerId}/history`, token);
 }
 
 // 导出 api 对象以兼容 import { api } from '@/lib/api'
