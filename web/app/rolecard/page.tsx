@@ -7,25 +7,24 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
-import type { RoleCardExtended, AssistantGuideline, Answer } from '@/types'
+import type { RoleCardExtended, AssistantGuideline } from '@/types'
 import { Sparkles, Copy, CheckCircle, AlertCircle, User, Loader2 } from 'lucide-react'
 import CloudPattern from '@/components/decorations/CloudPattern'
 import GenerateButton from './components/GenerateButton'
 import RoleCardEditor from './components/RoleCardEditor'
-import MemoryPreview from './components/MemoryPreview'
 import GuidelinesViewer from './components/GuidelinesViewer'
 
 interface Stats {
   basicProgress: { total: number; answered: number }
   emotionalProgress: { total: number; answered: number }
   totalAnswers: number
+  memoryTokenCount: number
 }
 
 export default function RolecardPage() {
   const { user, hasHydrated } = useAuthStore()
   const [roleCard, setRoleCard] = useState<RoleCardExtended | undefined>(undefined)
   const [guidelines, setGuidelines] = useState<AssistantGuideline[] | undefined>(undefined)
-  const [answers, setAnswers] = useState<Answer[] | undefined>(undefined)
   const [stats, setStats] = useState<Stats | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
@@ -43,11 +42,12 @@ export default function RolecardPage() {
     try {
       setLoading(true)
 
-      // 并行获取角色卡、对话准则和A套答案
-      const [roleCardRes, guidelinesRes, answersRes] = await Promise.all([
+      // 使用与 dashboard 相同的统计方法
+      const [roleCardRes, guidelinesRes, basicRes, emotionalRes] = await Promise.all([
         api.get<{ roleCard: RoleCardExtended }>('/rolecard'),
         api.get<{ user: { companionChat: { assistantsGuidelines: AssistantGuideline[] } } }>('/auth/me'),
-        api.get('/answers/self'),
+        api.get('/questions?layer=basic&role=elder'),
+        api.get('/questions?layer=emotional&role=elder'),
       ])
 
       if (roleCardRes.success && roleCardRes.data?.roleCard) {
@@ -58,24 +58,19 @@ export default function RolecardPage() {
         setGuidelines(guidelinesRes.data.user.companionChat.assistantsGuidelines)
       }
 
-      if (answersRes.success && answersRes.data) {
-        setAnswers(answersRes.data)
+      // 使用后端返回的准确数据
+      const basicTotal = basicRes.data?.questions?.length || 0
+      const basicAnswered = basicRes.data?.answered || 0
+      const emotionalTotal = emotionalRes.data?.questions?.length || 0
+      const emotionalAnswered = emotionalRes.data?.answered || 0
+      const memoryTokenCount = user?.companionChat?.memoryTokenCount || 0
 
-        // 计算进度
-        const basicAnswers = answersRes.data.filter((a: Answer) => a.questionLayer === 'basic')
-        const emotionalAnswers = answersRes.data.filter((a: Answer) => a.questionLayer === 'emotional')
-        setStats({
-          basicProgress: {
-            total: 20, // 假设基础层有20个问题
-            answered: basicAnswers.length,
-          },
-          emotionalProgress: {
-            total: 15, // 假设情感层有15个问题
-            answered: emotionalAnswers.length,
-          },
-          totalAnswers: answersRes.data.length,
-        })
-      }
+      setStats({
+        basicProgress: { total: basicTotal, answered: basicAnswered },
+        emotionalProgress: { total: emotionalTotal, answered: emotionalAnswered },
+        totalAnswers: basicAnswered + emotionalAnswered,
+        memoryTokenCount,
+      })
     } catch (error) {
       console.error('获取角色卡数据失败:', error)
     } finally {
@@ -215,14 +210,14 @@ export default function RolecardPage() {
                   <CardDescription>完成A套问题是生成角色卡的前提</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
                       <div className="text-sm text-gray-600 mb-1">基础层</div>
                       <div className="text-2xl font-bold text-blue-600">
                         {stats.basicProgress.answered} / {stats.basicProgress.total}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
-                        {Math.round((stats.basicProgress.answered / stats.basicProgress.total) * 100)}%
+                        {stats.basicProgress.total > 0 ? Math.round((stats.basicProgress.answered / stats.basicProgress.total) * 100) : 0}%
                       </div>
                     </div>
                     <div className="p-4 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl border border-pink-100">
@@ -231,7 +226,16 @@ export default function RolecardPage() {
                         {stats.emotionalProgress.answered} / {stats.emotionalProgress.total}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
-                        {Math.round((stats.emotionalProgress.answered / stats.emotionalProgress.total) * 100)}%
+                        {stats.emotionalProgress.total > 0 ? Math.round((stats.emotionalProgress.answered / stats.emotionalProgress.total) * 100) : 0}%
+                      </div>
+                    </div>
+                    <div className="p-4 bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl border border-orange-100">
+                      <div className="text-sm text-gray-600 mb-1">记忆Token数</div>
+                      <div className="text-2xl font-bold text-orange-600">
+                        {stats.memoryTokenCount}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        累计记忆量
                       </div>
                     </div>
                     <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100">
@@ -314,15 +318,6 @@ export default function RolecardPage() {
                     onSave={() => {}}
                     onCancel={() => {}}
                     readOnly={true}
-                  />
-                )}
-
-                {/* 记忆预览 */}
-                {answers && stats && (
-                  <MemoryPreview
-                    answers={answers}
-                    basicProgress={stats.basicProgress}
-                    emotionalProgress={stats.emotionalProgress}
                   />
                 )}
 
