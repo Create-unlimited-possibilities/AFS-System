@@ -15,6 +15,20 @@ export interface User {
     roleCard?: RoleCard;
     modelStatus?: ModelStatus;
   };
+  companionChat?: {
+    roleCard?: RoleCardExtended;
+    assistantsGuidelines?: AssistantGuideline[];
+    currentMode?: string;
+    modelStatus?: {
+      hasBaseModel?: boolean;
+      hasSFTModel?: boolean;
+      hasFullModel?: boolean;
+      lastTrainedAt?: string;
+      trainingInProgress?: boolean;
+    };
+    strangerSentiments?: StrangerSentiment[];
+    conversationsAsTarget?: ChatSessionSummary[];
+  };
 }
 
 // 统一获取用户ID的辅助函数，优先使用 _id，如果没有则使用 id
@@ -48,6 +62,22 @@ export interface RoleCard {
     close?: string;
     intimate?: string;
   };
+}
+
+export interface RoleCardExtended {
+  personality?: string;
+  background?: string;
+  interests?: string[];
+  communicationStyle?: string;
+  values?: string[];
+  emotionalNeeds?: string[];
+  lifeMilestones?: string[];
+  preferences?: string[];
+  memories?: string[];
+  strangerInitialSentiment?: number;
+  generatedAt?: string;
+  updatedAt?: string;
+  memoryTokenCount?: number;
 }
 
 export interface ModelStatus {
@@ -182,6 +212,111 @@ export interface SystemInfo {
   diskUsage: number;
 }
 
+export interface AssistantGuideline {
+  assistantId: string;
+  assistantName: string;
+  assistantUniqueCode: string;
+  assistRelationId: string;
+  relationType: 'family' | 'friend';
+  specificRelation: string;
+  conversationGuidelines: string;
+  compressedAnswers: CompressedAnswer[];
+  generatedAt: string;
+  updatedAt: string;
+  isValid: boolean;
+}
 
+export interface CompressedAnswer {
+  questionId: string;
+  question: string;
+  originalAnswer: string;
+  compressed: string;
+  questionLayer: 'basic' | 'emotional';
+  compressedAt: string;
+}
 
+export interface ChatSession {
+  sessionId: string;
+  targetUser: {
+    id: string;
+    name: string;
+    uniqueCode: string;
+  };
+  relation: {
+    type: 'family' | 'friend' | 'stranger';
+    assistRelationId?: string;
+    specificRelation?: string;
+    assistantName?: string;
+  };
+  messages: Message[];
+  isActive: boolean;
+  startedAt: string;
+  endedAt?: string;
+  lastMessageAt?: string;
+}
+
+export interface Message {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: string;
+  metadata?: {
+    ragUsed?: boolean;
+    retrievedMemories?: any[];
+    modelUsed?: string;
+    tokenCount?: number;
+    sentimentSnapshot?: number;
+  };
+}
+
+export interface StrangerSentiment {
+  strangerId: string;
+  currentScore: number;
+  initialScore?: number;
+  history: SentimentHistoryItem[];
+  totalConversations?: number;
+  totalMessages?: number;
+  lastConversationAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SentimentHistoryItem {
+  score: number;
+  change: number;
+  reason: string;
+  factors?: {
+    sentiment: number;
+    frequency: number;
+    quality: number;
+    decay: number;
+  };
+  timestamp: string;
+}
+
+export interface SentimentRecord {
+  currentScore: number;
+  change: number;
+  reason: string;
+  factors: {
+    sentiment: number;
+    frequency: number;
+    quality: number;
+    decay: number;
+  };
+  history: SentimentHistoryItem[];
+}
+
+export interface ChatSessionSummary {
+  sessionId: string;
+  interlocutorId: string;
+  interlocutorName?: string;
+  relationType: 'family' | 'friend' | 'stranger';
+  assistRelationId?: string;
+  specificRelation?: string;
+  sentimentSnapshot?: number;
+  startedAt: string;
+  endedAt?: string;
+  lastMessageAt?: string;
+  isActive: boolean;
+}
 

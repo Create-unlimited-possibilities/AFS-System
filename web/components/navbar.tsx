@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, MessageSquare, Users, FileText, LogOut, User } from 'lucide-react'
+import { Home, MessageSquare, Users, FileText, LogOut, User, Sparkles, MessageCircle } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
 import { useEffect } from 'react'
@@ -13,6 +13,8 @@ const navItems = [
   { href: '/questions', label: '回答问题', icon: MessageSquare },
   { href: '/answers', label: '查看回答', icon: FileText },
   { href: '/assist', label: '协助关系', icon: Users },
+  { href: '/rolecard', label: '角色卡', icon: Sparkles },
+  { href: '/chat', label: 'AI对话', icon: MessageCircle },
 ]
 
 export default function Navbar() {
