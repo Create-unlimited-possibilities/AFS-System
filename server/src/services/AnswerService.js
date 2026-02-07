@@ -54,7 +54,7 @@ export default class AnswerService {
 
     const tokenCount = answer.length;
     await this.userRepository.findByIdAndUpdate(userId, {
-      $inc: { 'chatBeta.memoryTokenCount': Math.ceil(tokenCount * 0.7) }
+      $inc: { 'companionChat.memoryTokenCount': Math.ceil(tokenCount * 0.7) }
     });
 
     return newAnswer;
@@ -113,7 +113,7 @@ export default class AnswerService {
 
     const tokenCount = answer.length;
     await this.userRepository.findByIdAndUpdate(targetUserId, {
-      $inc: { 'chatBeta.memoryTokenCount': Math.ceil(tokenCount * 0.7) }
+      $inc: { 'companionChat.memoryTokenCount': Math.ceil(tokenCount * 0.7) }
     });
 
     return newAnswer;
@@ -260,7 +260,7 @@ export default class AnswerService {
 
     if (totalTokenCount > 0) {
       await this.userRepository.findByIdAndUpdate(userId, {
-        $inc: { 'chatBeta.memoryTokenCount': Math.ceil(totalTokenCount * 0.7) }
+        $inc: { 'companionChat.memoryTokenCount': Math.ceil(totalTokenCount * 0.7) }
       });
     }
 
@@ -321,7 +321,7 @@ export default class AnswerService {
 
     if (totalTokenCount > 0) {
       await this.userRepository.findByIdAndUpdate(targetUserId, {
-        $inc: { 'chatBeta.memoryTokenCount': Math.ceil(totalTokenCount * 0.7) }
+        $inc: { 'companionChat.memoryTokenCount': Math.ceil(totalTokenCount * 0.7) }
       });
     }
 

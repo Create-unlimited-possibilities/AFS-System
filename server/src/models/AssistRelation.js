@@ -36,6 +36,20 @@ const assistRelationSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  
+  // 答案摘要
+  answerSummary: {
+    hasAnswers: Boolean,
+    basicAnswersCount: Number,
+    emotionalAnswersCount: Number,
+    lastAnswerUpdatedAt: Date
+  },
+  
+  // 对话准则生成状态
+  guidelinesGenerated: {
+    type: Boolean,
+    default: false
   }
 });
 

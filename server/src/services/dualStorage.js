@@ -152,6 +152,134 @@ export default class DualStorage {
   }
 
   /**
+   * 双重存储协助者对话准则
+   * @param {string} userId - 用户ID
+   * @param {Array} guidelines - 协助者对话准则数组
+   */
+  async saveAssistantsGuidelines(userId, guidelines) {
+    await this.initialize();
+
+    const userPath = path.join(this.basePath, String(userId));
+    await fs.mkdir(userPath, { recursive: true });
+
+    const filePath = path.join(userPath, 'assistants-guidelines.json');
+
+    try {
+      const dataToSave = {
+        userId,
+        guidelines,
+        updatedAt: new Date().toISOString(),
+        version: '1.0.0'
+      };
+
+      await fs.writeFile(filePath, JSON.stringify(dataToSave, null, 2), 'utf-8');
+      console.log(`[DualStorage] 协助者对话准则已保存到文件系统: ${filePath}`);
+      return { success: true, filePath, count: guidelines.length };
+    } catch (error) {
+      console.error(`[DualStorage] 协助者对话准则保存到文件系统失败:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 从文件系统加载协助者对话准则
+   * @param {string} userId - 用户ID
+   */
+  async loadAssistantsGuidelines(userId) {
+    const filePath = path.join(this.basePath, String(userId), 'assistants-guidelines.json');
+
+    try {
+      const data = await fs.readFile(filePath, 'utf-8');
+      const parsed = JSON.parse(data);
+      console.log(`[DualStorage] 协助者对话准则已从文件系统加载: ${filePath}`);
+      return parsed.guidelines || [];
+    } catch (error) {
+      console.warn(`[DualStorage] 协助者对话准则从文件系统加载失败: ${userId}:`, error.message);
+      return [];
+    }
+  }
+
+  /**
+   * 更新单个协助者的对话准则（增量更新）
+   * @param {string} userId - 用户ID
+   * @param {string} assistantId - 协助者ID
+   * @param {Object} guideline - 协助者对话准则
+   */
+  async updateOneAssistantGuideline(userId, assistantId, guideline) {
+    await this.initialize();
+
+    try {
+      // 先加载现有的准则
+      const existingGuidelines = await this.loadAssistantsGuidelines(userId);
+      
+      // 查找并更新或添加新的准则
+      const index = existingGuidelines.findIndex(g => g.assistantId === assistantId);
+      
+      if (index >= 0) {
+        existingGuidelines[index] = {
+          ...existingGuidelines[index],
+          ...guideline,
+          updatedAt: new Date().toISOString()
+        };
+      } else {
+        existingGuidelines.push({
+          ...guideline,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      // 保存更新后的准则
+      return await this.saveAssistantsGuidelines(userId, existingGuidelines);
+    } catch (error) {
+      console.error(`[DualStorage] 更新协助者对话准则失败:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 删除指定协助者的对话准则
+   * @param {string} userId - 用户ID
+   * @param {string} assistantId - 协助者ID
+   */
+  async removeAssistantGuideline(userId, assistantId) {
+    await this.initialize();
+
+    try {
+      const existingGuidelines = await this.loadAssistantsGuidelines(userId);
+      const filteredGuidelines = existingGuidelines.filter(g => g.assistantId !== assistantId);
+      
+      return await this.saveAssistantsGuidelines(userId, filteredGuidelines);
+    } catch (error) {
+      console.error(`[DualStorage] 删除协助者对话准则失败:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取协助者对话准则统计信息
+   * @param {string} userId - 用户ID
+   */
+  getAssistantsGuidelinesStats(userId) {
+    const filePath = path.join(this.basePath, String(userId), 'assistants-guidelines.json');
+
+    try {
+      const stats = fs.stat(filePath);
+      return {
+        exists: true,
+        size: stats.size,
+        modified: stats.mtime,
+        filePath
+      };
+    } catch (error) {
+      return {
+        exists: false,
+        filePath
+      };
+    }
+  }
+
+  /**
    * 删除用户的所有文件系统数据
    * @param {string} userId - 用户ID
    */
@@ -166,5 +294,15 @@ export default class DualStorage {
       console.error(`[DualStorage] 用户文件系统数据删除失败:`, error);
       throw error;
     }
+  }
+
+  /**
+   * 备份用户数据（导出为压缩文件）
+   * @param {string} userId - 用户ID
+   * @param {string} backupPath - 备份路径
+   */
+  async backupUserData(userId, backupPath) {
+    // 这是一个预留方法，后续可以实现数据备份功能
+    throw new Error('备份功能尚未实现');
   }
 }

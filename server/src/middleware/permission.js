@@ -3,7 +3,7 @@ import User from '../models/User.js';
 export const requirePermission = (permissionName) => {
   return async (req, res, next) => {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?._id;
       if (!userId) {
         return res.status(401).json({ 
           success: false,
@@ -61,7 +61,7 @@ export const requirePermission = (permissionName) => {
 export const requireRole = (roleName) => {
   return async (req, res, next) => {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?._id;
       if (!userId) {
         return res.status(401).json({ 
           success: false,
@@ -106,7 +106,7 @@ export const requireRole = (roleName) => {
 export const requireAnyPermission = (permissionNames) => {
   return async (req, res, next) => {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?._id;
       if (!userId) {
         return res.status(401).json({ 
           success: false,

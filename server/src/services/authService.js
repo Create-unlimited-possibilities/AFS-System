@@ -43,7 +43,7 @@ class AuthService {
       name: user.name,
       createdAt: user.createdAt,
       lastLogin: user.lastLogin,
-      chatBeta: user.chatBeta || {
+      companionChat: user.companionChat || {
         memoryTokenCount: 0,
         currentMode: 'mode1',
         relationships: [],

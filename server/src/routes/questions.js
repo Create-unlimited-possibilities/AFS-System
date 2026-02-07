@@ -139,7 +139,7 @@ router.post('/answer', protect, async (req, res) => {
 
     const tokenCount = result.answer.question?.length || answer.length;
     await User.findByIdAndUpdate(targetUserId, {
-      $inc: { 'chatBeta.memoryTokenCount': Math.ceil(tokenCount * 0.7) }
+      $inc: { 'companionChat.memoryTokenCount': Math.ceil(tokenCount * 0.7) }
     });
 
     res.json({ success: true });
