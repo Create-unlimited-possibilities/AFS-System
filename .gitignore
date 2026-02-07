@@ -9,6 +9,10 @@ dist/
 build/
 *.log
 
+# Git worktrees
+.worktrees/
+worktrees/
+
 # Docker数据（防止误提交）
 mongo-data/
 *.dump
