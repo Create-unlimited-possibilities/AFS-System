@@ -9,7 +9,9 @@ import usersRouter from './routes/users.js';
 import rolesRouter from './routes/roles.js';
 import settingsRouter from './routes/settings.js';
 import questionsRouter from './routes/questions.js';
-import companionshipRouter from './routes/companionship.js';
+import chatRouter from './routes/chat.js';
+import rolecardRouter from './routes/rolecard.js';
+import sentimentRouter from './routes/sentiment.js';
 import { protect } from './middleware/auth.js';
 
 dotenv.config();
@@ -40,7 +42,9 @@ app.use('/api/users', usersRouter);
 app.use('/api/roles', rolesRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/questions', protect, questionsRouter);
-app.use('/api/companionship', companionshipRouter);
+app.use('/api/chat', protect, chatRouter);
+app.use('/api/rolecard', protect, rolecardRouter);
+app.use('/api/sentiment', protect, sentimentRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {

@@ -4,6 +4,7 @@ import Answer from '../models/Answer.js';
 import User from '../models/User.js';
 import { protect } from '../middleware/auth.js';
 import StorageService from '../services/storageService.js';
+import { countTokens } from '../utils/tokenCounter.js';
 
 const router = express.Router();
 const storageService = new StorageService();
@@ -137,9 +138,9 @@ router.post('/answer', protect, async (req, res) => {
       return res.status(500).json({ success: false, error: result.error });
     }
 
-    const tokenCount = result.answer.question?.length || answer.length;
+    const tokenCount = countTokens(answer);
     await User.findByIdAndUpdate(targetUserId, {
-      $inc: { 'companionChat.memoryTokenCount': Math.ceil(tokenCount * 0.7) }
+      $inc: { 'companionChat.roleCard.memoryTokenCount': tokenCount }
     });
 
     res.json({ success: true });

@@ -63,7 +63,7 @@ export default function RolecardPage() {
       const basicAnswered = basicRes.data?.answered || 0
       const emotionalTotal = emotionalRes.data?.questions?.length || 0
       const emotionalAnswered = emotionalRes.data?.answered || 0
-      const memoryTokenCount = user?.companionChat?.memoryTokenCount || 0
+      const memoryTokenCount = user?.companionChat?.roleCard?.memoryTokenCount || 0
 
       setStats({
         basicProgress: { total: basicTotal, answered: basicAnswered },

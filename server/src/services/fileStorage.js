@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
+import { countTokens } from '../utils/tokenCounter.js';
 
 export default class FileStorage {
   constructor() {
@@ -121,9 +122,7 @@ export default class FileStorage {
   }
 
   calculateTokens(text) {
-    const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
-    const otherChars = text.length - chineseChars;
-    return Math.ceil(chineseChars * 0.65 + otherChars * 1.0);
+    return countTokens(text);
   }
 
   assessImportance(answer, layer) {

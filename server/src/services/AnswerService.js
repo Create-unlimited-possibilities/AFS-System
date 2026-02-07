@@ -3,6 +3,7 @@ import QuestionRepository from '../repositories/QuestionRepository.js';
 import UserRepository from '../repositories/UserRepository.js';
 import AssistRelationRepository from '../repositories/AssistRelationRepository.js';
 import StorageService from './storageService.js';
+import { countTokens } from '../utils/tokenCounter.js';
 
 export default class AnswerService {
   constructor() {
@@ -26,9 +27,21 @@ export default class AnswerService {
     });
 
     if (existingAnswer) {
+      const oldTokenCount = countTokens(existingAnswer.answer);
+      const newTokenCount = countTokens(answer);
+      const tokenDiff = newTokenCount - oldTokenCount;
+
       existingAnswer.answer = answer;
       existingAnswer.updatedAt = new Date();
       await existingAnswer.save();
+
+      // 更新 token 数（如果答案长度改变）
+      if (tokenDiff !== 0) {
+        await this.userRepository.findByIdAndUpdate(userId, {
+          $inc: { 'companionChat.roleCard.memoryTokenCount': tokenDiff }
+        });
+      }
+
       return existingAnswer;
     }
 
@@ -52,9 +65,9 @@ export default class AnswerService {
       relationshipType: 'self'
     });
 
-    const tokenCount = answer.length;
+    const tokenCount = countTokens(answer);
     await this.userRepository.findByIdAndUpdate(userId, {
-      $inc: { 'companionChat.memoryTokenCount': Math.ceil(tokenCount * 0.7) }
+      $inc: { 'companionChat.roleCard.memoryTokenCount': tokenCount }
     });
 
     return newAnswer;
@@ -83,9 +96,21 @@ export default class AnswerService {
     });
 
     if (existingAnswer) {
+      const oldTokenCount = countTokens(existingAnswer.answer);
+      const newTokenCount = countTokens(answer);
+      const tokenDiff = newTokenCount - oldTokenCount;
+
       existingAnswer.answer = answer;
       existingAnswer.updatedAt = new Date();
       await existingAnswer.save();
+
+      // 更新 token 数（如果答案长度改变）
+      if (tokenDiff !== 0) {
+        await this.userRepository.findByIdAndUpdate(targetUserId, {
+          $inc: { 'companionChat.roleCard.memoryTokenCount': tokenDiff }
+        });
+      }
+
       return existingAnswer;
     }
 
@@ -111,9 +136,9 @@ export default class AnswerService {
       helper
     });
 
-    const tokenCount = answer.length;
+    const tokenCount = countTokens(answer);
     await this.userRepository.findByIdAndUpdate(targetUserId, {
-      $inc: { 'companionChat.memoryTokenCount': Math.ceil(tokenCount * 0.7) }
+      $inc: { 'companionChat.roleCard.memoryTokenCount': tokenCount }
     });
 
     return newAnswer;
@@ -255,12 +280,12 @@ export default class AnswerService {
         layer: question.layer,
         relationshipType: 'self'
       });
-      totalTokenCount += answer.length;
+      totalTokenCount += countTokens(answer);
     }
 
     if (totalTokenCount > 0) {
       await this.userRepository.findByIdAndUpdate(userId, {
-        $inc: { 'companionChat.memoryTokenCount': Math.ceil(totalTokenCount * 0.7) }
+        $inc: { 'companionChat.roleCard.memoryTokenCount': totalTokenCount }
       });
     }
 
@@ -316,12 +341,12 @@ export default class AnswerService {
         relationshipType: relation.relationshipType,
         helper
       });
-      totalTokenCount += answer.length;
+      totalTokenCount += countTokens(answer);
     }
 
     if (totalTokenCount > 0) {
       await this.userRepository.findByIdAndUpdate(targetUserId, {
-        $inc: { 'companionChat.memoryTokenCount': Math.ceil(totalTokenCount * 0.7) }
+        $inc: { 'companionChat.roleCard.memoryTokenCount': totalTokenCount }
       });
     }
 

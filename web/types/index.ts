@@ -28,7 +28,6 @@ export interface User {
     };
     strangerSentiments?: StrangerSentiment[];
     conversationsAsTarget?: ChatSessionSummary[];
-    memoryTokenCount?: number;
   };
 }
 
