@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PermissionGate } from '@/components/PermissionGate';
 import type { SystemSettings, SystemInfo } from '@/types';
+import { Server, Globe, Zap, Sliders, Cpu, HardDrive, Clock, CheckCircle } from 'lucide-react';
+import CloudPattern from '@/components/decorations/CloudPattern'
 
 export default function SystemPage() {
   const [settings, setSettings] = useState<SystemSettings | null>(null);
@@ -239,78 +241,194 @@ export default function SystemPage() {
   };
 
   if (loading) {
-    return <div className="container mx-auto py-6">加载中...</div>;
+    return (
+      <div className="min-h-screen gradient-bg">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">加载中...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <h1 className="text-3xl font-bold mb-6">系统设置</h1>
+    <div className="min-h-screen gradient-bg">
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto relative">
+          <div className="absolute top-10 left-10 opacity-10 animate-float">
+            <CloudPattern className="w-32 h-16 text-orange-500" />
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div>
-          <Card className="p-4">
-            <nav className="space-y-2">
-              <button
-                onClick={() => setActiveTab('site')}
-                className={`w-full text-left px-4 py-2 rounded ${activeTab === 'site' ? 'bg-blue-100' : ''}`}
-              >
-                网站设置
-              </button>
-              <button
-                onClick={() => setActiveTab('features')}
-                className={`w-full text-left px-4 py-2 rounded ${activeTab === 'features' ? 'bg-blue-100' : ''}`}
-              >
-                功能设置
-              </button>
-              <button
-                onClick={() => setActiveTab('limits')}
-                className={`w-full text-left px-4 py-2 rounded ${activeTab === 'limits' ? 'bg-blue-100' : ''}`}
-              >
-                限制设置
-              </button>
-              <button
-                onClick={() => setActiveTab('model')}
-                className={`w-full text-left px-4 py-2 rounded ${activeTab === 'model' ? 'bg-blue-100' : ''}`}
-              >
-                模型设置
-              </button>
-            </nav>
-          </Card>
-
-          {systemInfo && (
-            <Card className="p-4 mt-4">
-              <h3 className="font-semibold mb-4">系统信息</h3>
-              <div className="space-y-2 text-sm">
-                <div><span className="text-gray-600">用户数:</span> {systemInfo.users}</div>
-                <div><span className="text-gray-600">问题数:</span> {systemInfo.questions}</div>
-                <div><span className="text-gray-600">回答数:</span> {systemInfo.answers}</div>
-                <div><span className="text-gray-600">运行时间:</span> {Math.floor(systemInfo.uptime / 3600)} 小时</div>
-                <div><span className="text-gray-600">内存使用:</span> {systemInfo.memory.used} MB / {systemInfo.memory.total} MB</div>
-                <div><span className="text-gray-600">平台:</span> {systemInfo.platform}</div>
-                <div><span className="text-gray-600">Node 版本:</span> {systemInfo.nodeVersion}</div>
+          <div className="mb-8 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Server className="w-6 h-6 text-white" />
               </div>
-            </Card>
-          )}
-        </div>
-
-        <Card className="lg:col-span-2 p-6">
-          <h2 className="text-xl font-semibold mb-4">
-            {activeTab === 'site' && '网站设置'}
-            {activeTab === 'features' && '功能设置'}
-            {activeTab === 'limits' && '限制设置'}
-            {activeTab === 'model' && '模型设置'}
-          </h2>
-
-          {renderForm()}
-
-          <PermissionGate permissions={['system:update']}>
-            <div className="mt-6">
-              <Button onClick={handleSave} disabled={saving}>
-                {saving ? '保存中...' : '保存设置'}
-              </Button>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">系统设置</h1>
+                <p className="text-gray-600 mt-1">配置系统参数和选项</p>
+              </div>
             </div>
-          </PermissionGate>
-        </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="space-y-6 animate-slide-up">
+              <Card className="hover:shadow-xl transition-all duration-300">
+                <CardContent className="p-4">
+                  <nav className="space-y-2">
+                    <button
+                      onClick={() => setActiveTab('site')}
+                      className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 transition-all duration-300 ${
+                        activeTab === 'site'
+                          ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg'
+                          : 'hover:bg-purple-50 text-gray-700'
+                      }`}
+                    >
+                      <Globe className="h-5 w-5" />
+                      网站设置
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('features')}
+                      className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 transition-all duration-300 ${
+                        activeTab === 'features'
+                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
+                          : 'hover:bg-blue-50 text-gray-700'
+                      }`}
+                    >
+                      <Zap className="h-5 w-5" />
+                      功能设置
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('limits')}
+                      className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 transition-all duration-300 ${
+                        activeTab === 'limits'
+                          ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg'
+                          : 'hover:bg-green-50 text-gray-700'
+                      }`}
+                    >
+                      <Sliders className="h-5 w-5" />
+                      限制设置
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('model')}
+                      className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 transition-all duration-300 ${
+                        activeTab === 'model'
+                          ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg'
+                          : 'hover:bg-orange-50 text-gray-700'
+                      }`}
+                    >
+                      <Cpu className="h-5 w-5" />
+                      模型设置
+                    </button>
+                  </nav>
+                </CardContent>
+              </Card>
+
+              {systemInfo && (
+                <Card className="hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                        <Server className="h-5 w-5 text-white" />
+                      </div>
+                      <h3 className="font-bold text-xl text-gray-900">系统信息</h3>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-white rounded-xl border-2 border-purple-100">
+                        <span className="text-gray-600">用户数</span>
+                        <span className="font-bold text-purple-700">{systemInfo.users}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-white rounded-xl border-2 border-purple-100">
+                        <span className="text-gray-600">问题数</span>
+                        <span className="font-bold text-purple-700">{systemInfo.questions}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-white rounded-xl border-2 border-purple-100">
+                        <span className="text-gray-600">回答数</span>
+                        <span className="font-bold text-purple-700">{systemInfo.answers}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-white rounded-xl border-2 border-purple-100">
+                        <span className="text-gray-600 flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          运行时间
+                        </span>
+                        <span className="font-bold text-purple-700">{Math.floor(systemInfo.uptime / 3600)} 小时</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-white rounded-xl border-2 border-purple-100">
+                        <span className="text-gray-600 flex items-center gap-2">
+                          <HardDrive className="h-4 w-4" />
+                          内存使用
+                        </span>
+                        <span className="font-bold text-purple-700">
+                          {systemInfo.memory.used} MB / {systemInfo.memory.total} MB
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-white rounded-xl border-2 border-purple-100">
+                        <span className="text-gray-600">平台</span>
+                        <span className="font-bold text-purple-700">{systemInfo.platform}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-white rounded-xl border-2 border-purple-100">
+                        <span className="text-gray-600">Node 版本</span>
+                        <span className="font-bold text-purple-700">{systemInfo.nodeVersion}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            <Card className="lg:col-span-2 hover:shadow-xl transition-all duration-300 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className={`w-10 h-10 bg-gradient-to-br ${
+                    activeTab === 'site' ? 'from-purple-500 to-purple-600' :
+                    activeTab === 'features' ? 'from-blue-500 to-blue-600' :
+                    activeTab === 'limits' ? 'from-green-500 to-green-600' :
+                    'from-orange-500 to-orange-600'
+                  } rounded-lg flex items-center justify-center`}>
+                    {activeTab === 'site' && <Globe className="h-5 w-5 text-white" />}
+                    {activeTab === 'features' && <Zap className="h-5 w-5 text-white" />}
+                    {activeTab === 'limits' && <Sliders className="h-5 w-5 text-white" />}
+                    {activeTab === 'model' && <Cpu className="h-5 w-5 text-white" />}
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    {activeTab === 'site' && '网站设置'}
+                    {activeTab === 'features' && '功能设置'}
+                    {activeTab === 'limits' && '限制设置'}
+                    {activeTab === 'model' && '模型设置'}
+                  </h2>
+                </div>
+
+                <div className="space-y-4">
+                  {renderForm()}
+                </div>
+
+                <PermissionGate permissions={['system:update']}>
+                  <div className="mt-8 pt-6 border-t-2 border-gray-200">
+                    <Button
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="gap-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-300"
+                    >
+                      {saving ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          保存中...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-5 w-5" />
+                          保存设置
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </PermissionGate>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
