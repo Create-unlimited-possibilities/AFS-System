@@ -18,13 +18,18 @@ const questionSchema = new mongoose.Schema({
     required: true, 
     min: 1 
   },
-  question: { 
-    type: String, 
-    required: true 
+  question: {
+    type: String,
+    required: true
   },
-  placeholder: { 
-    type: String, 
-    default: '' 
+  significance: {
+    type: String,
+    default: '',
+    description: '问题的意义说明，用于角色卡生成（最大200字）'
+  },
+  placeholder: {
+    type: String,
+    default: ''
   },
   type: { 
     type: String, 
