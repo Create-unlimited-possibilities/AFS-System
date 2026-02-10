@@ -16,6 +16,13 @@ import logger from '../../../utils/logger.js';
  */
 export async function sentimentAnalyzerNode(state) {
   try {
+    const { roleCardMode } = state;
+
+    if (roleCardMode === 'static') {
+      logger.info('[SentimentAnalyzer] 方法B：跳过好感度分析');
+      return state;
+    }
+
     logger.info('[SentimentAnalyzer] 分析情感和好感度');
 
     const { userId, interlocutor, currentInput, messages } = state;
