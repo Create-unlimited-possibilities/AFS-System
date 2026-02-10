@@ -13,6 +13,9 @@ import chatRouter from './routes/chat.js';
 import rolecardRouter from './routes/rolecard.js';
 import sentimentRouter from './routes/sentiment.js';
 import { protect } from './middleware/auth.js';
+import AutoHookRegistry from './services/autoHookRegistry.js';
+import SimpleSyncQueue from './services/simpleSyncQueue.js';
+import dualStorage from './services/dualStorage.js';
 
 dotenv.config();
 
@@ -23,8 +26,19 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB 已连接'))
   .catch(err => console.error('MongoDB 连接失败:', err));
+
+mongoose.connection.once('open', async () => {
+  console.log('MongoDB 已连接');
+  
+  const syncQueue = new SimpleSyncQueue(dualStorage);
+  SimpleSyncQueue.instance = syncQueue;
+  
+  const hookRegistry = new AutoHookRegistry(syncQueue);
+  hookRegistry.registerAll();
+  
+  console.log('自动挂钩已注册');
+});
 
 app.use('/api/auth', authRouter);
 
