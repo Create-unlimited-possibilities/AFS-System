@@ -14,9 +14,36 @@ export function useSyncPermissions() {
   const clearPermissions = usePermissionStore((state) => state.clearPermissions);
 
   useEffect(() => {
+    console.log('[useSyncPermissions] User state changed:', {
+      hasUser: !!user,
+      hasRole: !!user?.role,
+      userId: user?._id || user?.id,
+      roleName: user?.role?.name
+    });
+
     if (user && user.role) {
-      initializePermissions(user);
+      const role = user.role;
+
+      if (!role.permissions || !Array.isArray(role.permissions)) {
+        console.warn('[useSyncPermissions] Role exists but permissions is missing or invalid:', {
+          userId: user._id || user.id,
+          roleName: role.name,
+          permissions: role.permissions
+        });
+        clearPermissions();
+        return;
+      }
+
+      const hasValidPermissions = role.permissions.length > 0;
+      if (hasValidPermissions) {
+        console.log('[useSyncPermissions] Initializing permissions for role:', role.name);
+        initializePermissions(user);
+      } else {
+        console.log('[useSyncPermissions] Role has no permissions, clearing');
+        clearPermissions();
+      }
     } else {
+      console.log('[useSyncPermissions] No user or no role, clearing permissions');
       clearPermissions();
     }
   }, [user, initializePermissions, clearPermissions]);

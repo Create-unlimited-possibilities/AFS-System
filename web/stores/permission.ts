@@ -21,12 +21,29 @@ export const usePermissionStore = create<PermissionState>()(
       isLoading: false,
 
       initializePermissions: (user: User) => {
-        const permissions = (user.role?.permissions || []).map((p) => p.name);
-        const role = user.role?.name || null;
+        const role = user?.role;
+        if (!role) {
+          console.log('[PermissionStore] No role found, clearing permissions');
+          set({
+            userPermissions: [],
+            userRole: null,
+            isLoading: false,
+          });
+          return;
+        }
+
+        const permissions = Array.isArray(role.permissions) ? role.permissions : [];
+        const roleName = role.name || null;
+
+        console.log('[PermissionStore] Initializing permissions:', {
+          roleName,
+          permissionsCount: permissions.length,
+          permissionNames: permissions.map(p => p.name)
+        });
 
         set({
-          userPermissions: permissions,
-          userRole: role,
+          userPermissions: permissions.map((p) => p.name),
+          userRole: roleName,
           isLoading: false,
         });
       },

@@ -5,8 +5,47 @@ export const hasPermission = (user: User | null, permissionName: string): boolea
     return false;
   }
 
-  return user.role?.permissions?.some(
+  if (!user.role.permissions || !Array.isArray(user.role.permissions)) {
+    console.warn('[hasPermission] Invalid permissions:', {
+      userId: user._id || user.id,
+      roleName: user.role.name,
+      permissions: user.role.permissions
+    });
+    return false;
+  }
+
+  return user.role.permissions.some(
     (permission) => permission.name === permissionName
+  );
+};
+
+export const hasAnyPermission = (user: User | null, permissionNames: string[]): boolean => {
+  if (!user || !user.role) {
+    return false;
+  }
+
+  if (!user.role.permissions || !Array.isArray(user.role.permissions)) {
+    console.warn('[hasAnyPermission] Invalid permissions');
+    return false;
+  }
+
+  return permissionNames.some((permissionName) =>
+    user.role!.permissions.some((permission) => permission.name === permissionName)
+  );
+};
+
+export const hasAllPermissions = (user: User | null, permissionNames: string[]): boolean => {
+  if (!user || !user.role) {
+    return false;
+  }
+
+  if (!user.role.permissions || !Array.isArray(user.role.permissions)) {
+    console.warn('[hasAllPermissions] Invalid permissions');
+    return false;
+  }
+
+  return permissionNames.every((permissionName) =>
+    user.role!.permissions.some((permission) => permission.name === permissionName)
   );
 };
 

@@ -4,7 +4,15 @@ export interface User {
   uniqueCode: string;
   email: string;
   name: string;
-  role?: Role;
+  role?: {
+    _id?: string;
+    name?: string;
+    description?: string;
+    permissions?: Permission[];
+    isSystem?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+  } | null;  // 明确role可以是完整对象或null
   isActive?: boolean;
   createdAt: string;
   lastLogin?: string;
