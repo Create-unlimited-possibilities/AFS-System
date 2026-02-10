@@ -21,7 +21,19 @@ class ChatController {
   async createSessionByCode(req, res) {
     try {
       const { targetUniqueCode } = req.body;
+      const { roleCardMode = 'dynamic', systemPrompt } = req.body;
       const interlocutorUserId = req.user.id;
+
+      if (!['dynamic', 'static'].includes(roleCardMode)) {
+        return res.status(400).json({
+          success: false,
+          error: 'roleCardMode必须是dynamic或static'
+        });
+      }
+
+      if (roleCardMode === 'static' && !systemPrompt) {
+        logger.info('[ChatController] 方法B模式未提供systemPrompt，将尝试从文件加载');
+      }
 
       if (!targetUniqueCode) {
         return res.status(400).json({
@@ -48,7 +60,9 @@ class ChatController {
       const session = await orchestrator.createSession({
         targetUserId,
         interlocutorUserId,
-        targetUniqueCode
+        targetUniqueCode,
+        roleCardMode,
+        systemPrompt
       });
 
       if (assistRelation) {
