@@ -25,16 +25,13 @@ export default function RootLayout({
     <html lang="zh-CN" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          {/* Temporarily disabled PermissionProvider for debugging */}
-          {/* <PermissionProvider>
+          <PermissionProvider>
             <NavbarWrapper>
               {children}
             </NavbarWrapper>
-          </PermissionProvider> */}
-          <NavbarWrapper>
-            {children}
-          </NavbarWrapper>
+          </PermissionProvider>
         </ThemeProvider>
+       </body>
       </body>
     </html>
   )
