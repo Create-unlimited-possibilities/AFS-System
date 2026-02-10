@@ -399,4 +399,407 @@ expect(result).toEqual({
       expect(result).toEqual(emptyGuidelines);
     });
   });
+
+  describe('saveSentiments', () => {
+    const testSentiments = {
+      strangerId: 'stranger_123',
+      sentiment: 0.8,
+      interactions: 5,
+      lastUpdated: new Date('2026-01-01').toISOString()
+    };
+
+    test('should save sentiments to file system', async () => {
+      const result = await dualStorage.saveSentiments(testUserId, testSentiments);
+
+      expect(mockFs.mkdir).toHaveBeenCalledWith(
+        path.join('/app/storage/userdata', testUserId),
+        { recursive: true }
+      );
+
+      expect(mockFs.writeFile).toHaveBeenCalledWith(
+        path.join('/app/storage/userdata', testUserId, 'strangerSentiments.json'),
+        JSON.stringify(testSentiments, null, 2),
+        'utf-8'
+      );
+
+      expect(result).toEqual({
+        success: true,
+        filePath: path.join('/app/storage/userdata', testUserId, 'strangerSentiments.json')
+      });
+    });
+
+    test('should handle write errors', async () => {
+      const errorMessage = 'Write failed';
+      mockFs.writeFile.mockRejectedValue(new Error(errorMessage));
+
+      await expect(dualStorage.saveSentiments(testUserId, testSentiments))
+        .rejects.toThrow(errorMessage);
+    });
+  });
+
+  describe('loadSentiments', () => {
+    const testSentiments = {
+      strangerId: 'stranger_123',
+      sentiment: 0.8,
+      interactions: 5,
+      lastUpdated: new Date('2026-01-01').toISOString()
+    };
+
+    test('should load sentiments from file system', async () => {
+      mockFs.readFile.mockResolvedValue(JSON.stringify(testSentiments));
+
+      const result = await dualStorage.loadSentiments(testUserId);
+
+      expect(mockFs.readFile).toHaveBeenCalledWith(
+        path.join('/app/storage/userdata', testUserId, 'strangerSentiments.json'),
+        'utf-8'
+      );
+
+      expect(result).toEqual(testSentiments);
+    });
+
+    test('should return null when file does not exist', async () => {
+      const errorMessage = 'File not found';
+      mockFs.readFile.mockRejectedValue(new Error(errorMessage));
+
+      const result = await dualStorage.loadSentiments(testUserId);
+
+      expect(result).toBeNull();
+    });
+
+    test('should return null for invalid JSON', async () => {
+      mockFs.readFile.mockResolvedValue('invalid json');
+
+      const result = await dualStorage.loadSentiments(testUserId);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('saveConversations', () => {
+    const testConversations = [
+      {
+        conversationId: 'conv_123',
+        targetId: 'target_456',
+        messages: [
+          { role: 'user', content: 'Hello', timestamp: new Date('2026-01-01').toISOString() },
+          { role: 'assistant', content: 'Hi there!', timestamp: new Date('2026-01-01').toISOString() }
+        ],
+        lastUpdated: new Date('2026-01-01').toISOString()
+      }
+    ];
+
+    test('should save conversations to file system', async () => {
+      const result = await dualStorage.saveConversations(testUserId, testConversations);
+
+      expect(mockFs.mkdir).toHaveBeenCalledWith(
+        path.join('/app/storage/userdata', testUserId),
+        { recursive: true }
+      );
+
+      expect(mockFs.writeFile).toHaveBeenCalledWith(
+        path.join('/app/storage/userdata', testUserId, 'conversationsAsTarget.json'),
+        JSON.stringify(testConversations, null, 2),
+        'utf-8'
+      );
+
+      expect(result).toEqual({
+        success: true,
+        filePath: path.join('/app/storage/userdata', testUserId, 'conversationsAsTarget.json')
+      });
+    });
+
+    test('should handle write errors', async () => {
+      const errorMessage = 'Write failed';
+      mockFs.writeFile.mockRejectedValue(new Error(errorMessage));
+
+      await expect(dualStorage.saveConversations(testUserId, testConversations))
+        .rejects.toThrow(errorMessage);
+    });
+  });
+
+  describe('loadConversations', () => {
+    const testConversations = [
+      {
+        conversationId: 'conv_123',
+        targetId: 'target_456',
+        messages: [
+          { role: 'user', content: 'Hello', timestamp: new Date('2026-01-01').toISOString() },
+          { role: 'assistant', content: 'Hi there!', timestamp: new Date('2026-01-01').toISOString() }
+        ],
+        lastUpdated: new Date('2026-01-01').toISOString()
+      }
+    ];
+
+    test('should load conversations from file system', async () => {
+      mockFs.readFile.mockResolvedValue(JSON.stringify(testConversations));
+
+      const result = await dualStorage.loadConversations(testUserId);
+
+      expect(mockFs.readFile).toHaveBeenCalledWith(
+        path.join('/app/storage/userdata', testUserId, 'conversationsAsTarget.json'),
+        'utf-8'
+      );
+
+      expect(result).toEqual(testConversations);
+    });
+
+    test('should return null when file does not exist', async () => {
+      const errorMessage = 'File not found';
+      mockFs.readFile.mockRejectedValue(new Error(errorMessage));
+
+      const result = await dualStorage.loadConversations(testUserId);
+
+      expect(result).toBeNull();
+    });
+
+    test('should return null for invalid JSON', async () => {
+      mockFs.readFile.mockResolvedValue('invalid json');
+
+      const result = await dualStorage.loadConversations(testUserId);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('saveAnswer', () => {
+    const testAnswer = {
+      answerId: 'answer_123',
+      questionId: 'question_456',
+      question: 'Test question?',
+      answer: 'Test answer',
+      userId: 'user_789',
+      createdAt: new Date('2026-01-01').toISOString()
+    };
+
+    test('should save answer to file system', async () => {
+      const result = await dualStorage.saveAnswer(testAnswer.answerId, testAnswer);
+
+      expect(mockFs.mkdir).toHaveBeenCalledWith(
+        path.join('/app/storage/userdata', 'answers', testAnswer.answerId),
+        { recursive: true }
+      );
+
+      expect(mockFs.writeFile).toHaveBeenCalledWith(
+        path.join('/app/storage/userdata', 'answers', testAnswer.answerId, 'answer.json'),
+        JSON.stringify(testAnswer, null, 2),
+        'utf-8'
+      );
+
+      expect(result).toEqual({
+        success: true,
+        filePath: path.join('/app/storage/userdata', 'answers', testAnswer.answerId, 'answer.json')
+      });
+    });
+
+    test('should handle write errors', async () => {
+      const errorMessage = 'Write failed';
+      mockFs.writeFile.mockRejectedValue(new Error(errorMessage));
+
+      await expect(dualStorage.saveAnswer(testAnswer.answerId, testAnswer))
+        .rejects.toThrow(errorMessage);
+    });
+  });
+
+  describe('loadAnswer', () => {
+    const testAnswer = {
+      answerId: 'answer_123',
+      questionId: 'question_456',
+      question: 'Test question?',
+      answer: 'Test answer',
+      userId: 'user_789',
+      createdAt: new Date('2026-01-01').toISOString()
+    };
+
+    test('should load answer from file system', async () => {
+      mockFs.readFile.mockResolvedValue(JSON.stringify(testAnswer));
+
+      const result = await dualStorage.loadAnswer(testAnswer.answerId);
+
+      expect(mockFs.readFile).toHaveBeenCalledWith(
+        path.join('/app/storage/userdata', 'answers', testAnswer.answerId, 'answer.json'),
+        'utf-8'
+      );
+
+      expect(result).toEqual(testAnswer);
+    });
+
+    test('should return null when file does not exist', async () => {
+      const errorMessage = 'File not found';
+      mockFs.readFile.mockRejectedValue(new Error(errorMessage));
+
+      const result = await dualStorage.loadAnswer('non_existent_id');
+
+      expect(result).toBeNull();
+    });
+
+    test('should return null for invalid JSON', async () => {
+      mockFs.readFile.mockResolvedValue('invalid json');
+
+      const result = await dualStorage.loadAnswer('answer_123');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('saveChatSession', () => {
+    const testSession = {
+      sessionId: 'session_123',
+      userId: 'user_456',
+      messages: [
+        { role: 'user', content: 'Hello', timestamp: new Date('2026-01-01').toISOString() },
+        { role: 'assistant', content: 'Hi!', timestamp: new Date('2026-01-01').toISOString() }
+      ],
+      createdAt: new Date('2026-01-01').toISOString(),
+      lastUpdated: new Date('2026-01-01').toISOString()
+    };
+
+    test('should save chat session to file system', async () => {
+      const result = await dualStorage.saveChatSession(testSession.sessionId, testSession);
+
+      expect(mockFs.mkdir).toHaveBeenCalledWith(
+        path.join('/app/storage/userdata', 'chatSessions', testSession.sessionId),
+        { recursive: true }
+      );
+
+      expect(mockFs.writeFile).toHaveBeenCalledWith(
+        path.join('/app/storage/userdata', 'chatSessions', testSession.sessionId, 'session.json'),
+        JSON.stringify(testSession, null, 2),
+        'utf-8'
+      );
+
+      expect(result).toEqual({
+        success: true,
+        filePath: path.join('/app/storage/userdata', 'chatSessions', testSession.sessionId, 'session.json')
+      });
+    });
+
+    test('should handle write errors', async () => {
+      const errorMessage = 'Write failed';
+      mockFs.writeFile.mockRejectedValue(new Error(errorMessage));
+
+      await expect(dualStorage.saveChatSession(testSession.sessionId, testSession))
+        .rejects.toThrow(errorMessage);
+    });
+  });
+
+  describe('loadChatSession', () => {
+    const testSession = {
+      sessionId: 'session_123',
+      userId: 'user_456',
+      messages: [
+        { role: 'user', content: 'Hello', timestamp: new Date('2026-01-01').toISOString() },
+        { role: 'assistant', content: 'Hi!', timestamp: new Date('2026-01-01').toISOString() }
+      ],
+      createdAt: new Date('2026-01-01').toISOString(),
+      lastUpdated: new Date('2026-01-01').toISOString()
+    };
+
+    test('should load chat session from file system', async () => {
+      mockFs.readFile.mockResolvedValue(JSON.stringify(testSession));
+
+      const result = await dualStorage.loadChatSession(testSession.sessionId);
+
+      expect(mockFs.readFile).toHaveBeenCalledWith(
+        path.join('/app/storage/userdata', 'chatSessions', testSession.sessionId, 'session.json'),
+        'utf-8'
+      );
+
+      expect(result).toEqual(testSession);
+    });
+
+    test('should return null when file does not exist', async () => {
+      const errorMessage = 'File not found';
+      mockFs.readFile.mockRejectedValue(new Error(errorMessage));
+
+      const result = await dualStorage.loadChatSession('non_existent_id');
+
+      expect(result).toBeNull();
+    });
+
+    test('should return null for invalid JSON', async () => {
+      mockFs.readFile.mockResolvedValue('invalid json');
+
+      const result = await dualStorage.loadChatSession('session_123');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('Integration tests for new methods', () => {
+    test('should handle complete save and load cycle for sentiments', async () => {
+      const testSentiments = {
+        strangerId: 'stranger_123',
+        sentiment: 0.8,
+        interactions: 5
+      };
+
+      const saveResult = await dualStorage.saveSentiments(testUserId, testSentiments);
+      expect(saveResult.success).toBe(true);
+
+      mockFs.readFile.mockResolvedValue(JSON.stringify(testSentiments));
+      const loadResult = await dualStorage.loadSentiments(testUserId);
+      expect(loadResult).toEqual(testSentiments);
+    });
+
+    test('should handle complete save and load cycle for conversations', async () => {
+      const testConversations = [
+        {
+          conversationId: 'conv_123',
+          targetId: 'target_456',
+          messages: []
+        }
+      ];
+
+      const saveResult = await dualStorage.saveConversations(testUserId, testConversations);
+      expect(saveResult.success).toBe(true);
+
+      mockFs.readFile.mockResolvedValue(JSON.stringify(testConversations));
+      const loadResult = await dualStorage.loadConversations(testUserId);
+      expect(loadResult).toEqual(testConversations);
+    });
+
+    test('should handle complete save and load cycle for answer', async () => {
+      const testAnswer = {
+        answerId: 'answer_123',
+        question: 'Test question?',
+        answer: 'Test answer'
+      };
+
+      const saveResult = await dualStorage.saveAnswer(testAnswer.answerId, testAnswer);
+      expect(saveResult.success).toBe(true);
+
+      mockFs.readFile.mockResolvedValue(JSON.stringify(testAnswer));
+      const loadResult = await dualStorage.loadAnswer(testAnswer.answerId);
+      expect(loadResult).toEqual(testAnswer);
+    });
+
+    test('should handle complete save and load cycle for chat session', async () => {
+      const testSession = {
+        sessionId: 'session_123',
+        userId: 'user_456',
+        messages: []
+      };
+
+      const saveResult = await dualStorage.saveChatSession(testSession.sessionId, testSession);
+      expect(saveResult.success).toBe(true);
+
+      mockFs.readFile.mockResolvedValue(JSON.stringify(testSession));
+      const loadResult = await dualStorage.loadChatSession(testSession.sessionId);
+      expect(loadResult).toEqual(testSession);
+    });
+
+    test('should handle multiple saves of the same resource', async () => {
+      const initialSentiments = { strangerId: 'stranger_123', sentiment: 0.5 };
+      const updatedSentiments = { strangerId: 'stranger_123', sentiment: 0.9 };
+
+      await dualStorage.saveSentiments(testUserId, initialSentiments);
+      
+      mockFs.readFile.mockResolvedValue(JSON.stringify(updatedSentiments));
+      await dualStorage.saveSentiments(testUserId, updatedSentiments);
+      
+      const loadResult = await dualStorage.loadSentiments(testUserId);
+      expect(loadResult).toEqual(updatedSentiments);
+    });
+  });
 });

@@ -365,4 +365,56 @@ export default class DualStorage {
       throw error;
     }
   }
+
+  async loadSentiments(userId) {
+    const filePath = path.join(this.basePath, String(userId), 'strangerSentiments.json');
+    try {
+      const data = await fs.readFile(filePath, 'utf-8');
+      const sentiments = JSON.parse(data);
+      console.log(`[DualStorage] 陌生人好感度已从文件系统加载: ${filePath}`);
+      return sentiments;
+    } catch (error) {
+      console.warn(`[DualStorage] 陌生人好感度从文件系统加载失败: ${userId}:`, error.message);
+      return null;
+    }
+  }
+
+  async loadConversations(userId) {
+    const filePath = path.join(this.basePath, String(userId), 'conversationsAsTarget.json');
+    try {
+      const data = await fs.readFile(filePath, 'utf-8');
+      const conversations = JSON.parse(data);
+      console.log(`[DualStorage] 对话历史已从文件系统加载: ${filePath}`);
+      return conversations;
+    } catch (error) {
+      console.warn(`[DualStorage] 对话历史从文件系统加载失败: ${userId}:`, error.message);
+      return null;
+    }
+  }
+
+  async loadAnswer(answerId) {
+    const filePath = path.join(this.basePath, 'answers', String(answerId), 'answer.json');
+    try {
+      const data = await fs.readFile(filePath, 'utf-8');
+      const answer = JSON.parse(data);
+      console.log(`[DualStorage] 答案已从文件系统加载: ${filePath}`);
+      return answer;
+    } catch (error) {
+      console.warn(`[DualStorage] 答案从文件系统加载失败: ${answerId}:`, error.message);
+      return null;
+    }
+  }
+
+  async loadChatSession(sessionId) {
+    const filePath = path.join(this.basePath, 'chatSessions', String(sessionId), 'session.json');
+    try {
+      const data = await fs.readFile(filePath, 'utf-8');
+      const session = JSON.parse(data);
+      console.log(`[DualStorage] 会话已从文件系统加载: ${filePath}`);
+      return session;
+    } catch (error) {
+      console.warn(`[DualStorage] 会话从文件系统加载失败: ${sessionId}:`, error.message);
+      return null;
+    }
+  }
 }
