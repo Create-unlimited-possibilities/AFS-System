@@ -30,6 +30,9 @@ class ConversationState {
       communicationStyle: ''
     };
     
+    this.systemPrompt = initialData.systemPrompt || '';
+    this.roleCardMode = initialData.roleCardMode || 'dynamic';
+    
     this.currentInput = initialData.currentInput || '';
     this.generatedResponse = initialData.generatedResponse || '';
     
@@ -50,6 +53,8 @@ class ConversationState {
       messages: this.messages,
       retrievedMemories: this.retrievedMemories,
       roleCard: this.roleCard,
+      systemPrompt: this.systemPrompt,
+      roleCardMode: this.roleCardMode,
       currentInput: this.currentInput,
       generatedResponse: this.generatedResponse,
       metadata: this.metadata,
