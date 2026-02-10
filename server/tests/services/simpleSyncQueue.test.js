@@ -377,27 +377,27 @@ describe('SimpleSyncQueue', () => {
 
       const user = {
         _id: 'user123',
-        profile: {
-          uniqueCode: 'CODE123',
-          email: 'test@test.com',
-          name: 'Test User',
-          isActive: true
-        },
-        roleCard: { personality: 'friendly' },
-        strangerSentiments: [{ strangerId: 's1', currentScore: 50 }],
-        conversationsAsTarget: [{ sessionId: 'sess1' }],
-        assistantsGuidelines: [{ assistantId: 'a1' }]
+        uniqueCode: 'CODE123',
+        email: 'test@test.com',
+        name: 'Test User',
+        isActive: true,
+        companionChat: {
+          roleCard: { personality: 'friendly' },
+          strangerSentiments: [{ strangerId: 's1', currentScore: 50 }],
+          conversationsAsTarget: [{ sessionId: 'sess1' }],
+          assistantsGuidelines: [{ assistantId: 'a1' }]
+        }
       };
 
       mockUser.findById.mockReturnValue({ lean: vi.fn().mockResolvedValue(user) });
 
       await syncQueue.syncUser('user123', 'update', null);
 
-      expect(mockDualStorage.saveUserProfile).toHaveBeenCalledWith('user123', user.profile);
-      expect(mockDualStorage.saveRoleCard).toHaveBeenCalledWith('user123', user.roleCard);
-      expect(mockDualStorage.saveSentiments).toHaveBeenCalledWith('user123', user.strangerSentiments);
-      expect(mockDualStorage.saveConversations).toHaveBeenCalledWith('user123', user.conversationsAsTarget);
-      expect(mockDualStorage.saveAssistantsGuidelines).toHaveBeenCalledWith('user123', user.assistantsGuidelines);
+      expect(mockDualStorage.saveUserProfile).toHaveBeenCalledWith('user123', user);
+      expect(mockDualStorage.saveRoleCard).toHaveBeenCalledWith('user123', user.companionChat.roleCard);
+      expect(mockDualStorage.saveSentiments).toHaveBeenCalledWith('user123', user.companionChat.strangerSentiments);
+      expect(mockDualStorage.saveConversations).toHaveBeenCalledWith('user123', user.companionChat.conversationsAsTarget);
+      expect(mockDualStorage.saveAssistantsGuidelines).toHaveBeenCalledWith('user123', user.companionChat.assistantsGuidelines);
     });
 
     it('should do nothing if user not found', async () => {
@@ -535,16 +535,16 @@ describe('SimpleSyncQueue', () => {
 
       const user = {
         _id: 'user123',
-        profile: {
-          uniqueCode: 'CODE123',
-          email: 'test@test.com',
-          name: 'Test User',
-          isActive: true
-        },
-        roleCard: { personality: 'friendly' },
-        strangerSentiments: [],
-        conversationsAsTarget: [],
-        assistantsGuidelines: []
+        uniqueCode: 'CODE123',
+        email: 'test@test.com',
+        name: 'Test User',
+        isActive: true,
+        companionChat: {
+          roleCard: { personality: 'friendly' },
+          strangerSentiments: [],
+          conversationsAsTarget: [],
+          assistantsGuidelines: []
+        }
       };
 
       mockUser.findById.mockReturnValue({ lean: vi.fn().mockResolvedValue(user) });
@@ -566,7 +566,7 @@ describe('SimpleSyncQueue', () => {
       const mockRelease = vi.fn();
       mockAcquireLock.mockResolvedValue(mockRelease);
 
-      mockUser.findById.mockReturnValue({ lean: vi.fn().mockResolvedValue({ _id: 'user123', profile: {}, roleCard: null, strangerSentiments: [], conversationsAsTarget: [], assistantsGuidelines: [] }) });
+      mockUser.findById.mockReturnValue({ lean: vi.fn().mockResolvedValue({ _id: 'user123', uniqueCode: 'U1', email: 'u@test.com', name: 'U', isActive: true, companionChat: {} }) });
       mockAnswer.findById.mockReturnValue({ lean: vi.fn().mockResolvedValue({ _id: 'answer123', content: 'A' }) });
       mockAssistRelation.findById.mockReturnValue({ lean: vi.fn().mockResolvedValue({ _id: 'rel123', relationType: 'family' }) });
 
@@ -586,7 +586,7 @@ describe('SimpleSyncQueue', () => {
       const mockRelease = vi.fn();
       mockAcquireLock.mockResolvedValue(mockRelease);
 
-      mockUser.findById.mockReturnValue({ lean: vi.fn().mockResolvedValue({ _id: 'user123', profile: {}, roleCard: null, strangerSentiments: [], conversationsAsTarget: [], assistantsGuidelines: [] }) });
+      mockUser.findById.mockReturnValue({ lean: vi.fn().mockResolvedValue({ _id: 'user123', uniqueCode: 'U1', email: 'u@test.com', name: 'U', isActive: true, companionChat: {} }) });
 
       syncQueue.enqueue('User', 'user123', 'update');
       syncQueue.enqueue('User', 'user123', 'update');

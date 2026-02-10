@@ -69,11 +69,11 @@ export default class SimpleSyncQueue {
     const User = await import('../models/User.js');
     const user = await User.default.findById(id).lean();
     if (user) {
-      await this.dualStorage.saveUserProfile(id, user.profile);
-      await this.dualStorage.saveRoleCard(id, user.roleCard);
-      await this.dualStorage.saveSentiments(id, user.strangerSentiments);
-      await this.dualStorage.saveConversations(id, user.conversationsAsTarget);
-      await this.dualStorage.saveAssistantsGuidelines(id, user.assistantsGuidelines);
+      await this.dualStorage.saveUserProfile(id, user);
+      await this.dualStorage.saveRoleCard(id, user.companionChat?.roleCard);
+      await this.dualStorage.saveSentiments(id, user.companionChat?.strangerSentiments);
+      await this.dualStorage.saveConversations(id, user.companionChat?.conversationsAsTarget);
+      await this.dualStorage.saveAssistantsGuidelines(id, user.companionChat?.assistantsGuidelines);
     }
   }
 

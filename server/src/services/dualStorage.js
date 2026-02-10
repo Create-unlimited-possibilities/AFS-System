@@ -305,4 +305,64 @@ export default class DualStorage {
     // 这是一个预留方法，后续可以实现数据备份功能
     throw new Error('备份功能尚未实现');
   }
+
+  async saveSentiments(userId, sentiments) {
+    await this.initialize();
+    const userPath = path.join(this.basePath, String(userId));
+    await fs.mkdir(userPath, { recursive: true });
+    const filePath = path.join(userPath, 'strangerSentiments.json');
+    try {
+      await fs.writeFile(filePath, JSON.stringify(sentiments, null, 2), 'utf-8');
+      console.log(`[DualStorage] 陌生人好感度已保存: ${filePath}`);
+      return { success: true, filePath };
+    } catch (error) {
+      console.error(`[DualStorage] 陌生人好感度保存失败:`, error);
+      throw error;
+    }
+  }
+
+  async saveConversations(userId, conversations) {
+    await this.initialize();
+    const userPath = path.join(this.basePath, String(userId));
+    await fs.mkdir(userPath, { recursive: true });
+    const filePath = path.join(userPath, 'conversationsAsTarget.json');
+    try {
+      await fs.writeFile(filePath, JSON.stringify(conversations, null, 2), 'utf-8');
+      console.log(`[DualStorage] 对话历史已保存: ${filePath}`);
+      return { success: true, filePath };
+    } catch (error) {
+      console.error(`[DualStorage] 对话历史保存失败:`, error);
+      throw error;
+    }
+  }
+
+  async saveAnswer(answerId, answer) {
+    await this.initialize();
+    const answerPath = path.join(this.basePath, 'answers', String(answerId));
+    await fs.mkdir(answerPath, { recursive: true });
+    const filePath = path.join(answerPath, 'answer.json');
+    try {
+      await fs.writeFile(filePath, JSON.stringify(answer, null, 2), 'utf-8');
+      console.log(`[DualStorage] 答案已保存: ${filePath}`);
+      return { success: true, filePath };
+    } catch (error) {
+      console.error(`[DualStorage] 答案保存失败:`, error);
+      throw error;
+    }
+  }
+
+  async saveChatSession(sessionId, session) {
+    await this.initialize();
+    const sessionPath = path.join(this.basePath, 'chatSessions', String(sessionId));
+    await fs.mkdir(sessionPath, { recursive: true });
+    const filePath = path.join(sessionPath, 'session.json');
+    try {
+      await fs.writeFile(filePath, JSON.stringify(session, null, 2), 'utf-8');
+      console.log(`[DualStorage] 会话已保存: ${filePath}`);
+      return { success: true, filePath };
+    } catch (error) {
+      console.error(`[DualStorage] 会话保存失败:`, error);
+      throw error;
+    }
+  }
 }
