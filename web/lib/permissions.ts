@@ -5,7 +5,7 @@ export const hasPermission = (user: User | null, permissionName: string): boolea
     return false;
   }
 
-  return user.role.permissions.some(
+  return user.role?.permissions?.some(
     (permission) => permission.name === permissionName
   );
 };

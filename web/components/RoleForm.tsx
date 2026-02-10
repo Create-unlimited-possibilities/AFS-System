@@ -18,7 +18,7 @@ export function RoleForm({ role, permissions, onSubmit, onCancel }: RoleFormProp
   const [name, setName] = useState(role?.name || '');
   const [description, setDescription] = useState(role?.description || '');
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>(
-    role?.permissions.map((p) => p._id) || []
+    (role?.permissions || []).map((p) => p._id)
   );
 
   const groupedPermissions = permissions.reduce((acc, perm) => {

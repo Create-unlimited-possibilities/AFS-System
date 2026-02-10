@@ -186,7 +186,7 @@ export default function RolesPage() {
                         <h4 className="font-medium text-gray-900">权限 ({role.permissions.length})</h4>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {role.permissions.map((perm) => (
+                        {(role?.permissions || []).map((perm) => (
                           <span key={perm._id} className="px-3 py-1.5 bg-gradient-to-br from-gray-50 to-orange-50 border-2 border-orange-100 rounded-lg text-sm text-gray-700">
                             {perm.name}
                           </span>

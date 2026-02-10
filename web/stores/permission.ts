@@ -21,7 +21,7 @@ export const usePermissionStore = create<PermissionState>()(
       isLoading: false,
 
       initializePermissions: (user: User) => {
-        const permissions = user.role?.permissions.map((p) => p.name) || [];
+        const permissions = (user.role?.permissions || []).map((p) => p.name);
         const role = user.role?.name || null;
 
         set({
