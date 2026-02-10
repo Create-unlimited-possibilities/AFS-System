@@ -21,6 +21,7 @@ import ChatSession from '../../models/ChatSession.js';
 import User from '../../models/User.js';
 import AssistRelation from '../../models/AssistRelation.js';
 import logger from '../../utils/logger.js';
+import RolecardStorage from '../../utils/rolecardStorage.js';
 
 class ChatGraphOrchestrator {
   constructor() {
@@ -49,9 +50,19 @@ class ChatGraphOrchestrator {
    */
   async createSession(options) {
     try {
-      const { targetUserId, interlocutorUserId, targetUniqueCode } = options;
+      const {
+        targetUserId,
+        interlocutorUserId,
+        targetUniqueCode,
+        roleCardMode = 'dynamic',
+        systemPrompt: providedSystemPrompt
+      } = options;
 
       logger.info(`[ChatGraphOrchestrator] 创建会话 - Target: ${targetUserId}, Interlocutor: ${interlocutorUserId}`);
+
+      if (!['dynamic', 'static'].includes(roleCardMode)) {
+        throw new Error('roleCardMode必须是dynamic或static');
+      }
 
       const targetUser = await User.findById(targetUserId);
       const interlocutorUser = await User.findById(interlocutorUserId);
@@ -62,11 +73,27 @@ class ChatGraphOrchestrator {
 
       const sessionId = this.generateSessionId();
 
+      let finalSystemPrompt = providedSystemPrompt;
+
+      if (roleCardMode === 'static' && !finalSystemPrompt) {
+        const rolecardStorage = new RolecardStorage();
+        const rolecard = await rolecardStorage.getLatestRolecard(targetUserId);
+
+        if (!rolecard) {
+          throw new Error(`方法B模式：未提供systemPrompt，且未找到该用户的角色卡文件 - User: ${targetUserId}`);
+        }
+
+        finalSystemPrompt = rolecard.systemPrompt;
+        logger.info(`[ChatGraphOrchestrator] 从文件加载角色卡 - User: ${targetUserId}, Version: ${rolecard.version}`);
+      }
+
       const session = new ChatSession({
         sessionId,
         targetUserId,
         interlocutorUserId,
         relation: 'stranger',
+        roleCardMode,
+        systemPrompt: finalSystemPrompt,
         sentimentScore: 50,
         startedAt: new Date(),
         lastMessageAt: new Date(),
@@ -84,6 +111,8 @@ class ChatGraphOrchestrator {
             relationType: 'stranger'
           },
           messages: [],
+          roleCardMode,
+          systemPrompt: finalSystemPrompt,
           metadata: {
             sessionId
           }
@@ -105,7 +134,8 @@ class ChatGraphOrchestrator {
           name: interlocutorUser.name
         },
         relation: {
-          type: 'stranger'
+          type: 'stranger',
+          roleCardMode
         }
       };
     } catch (error) {
