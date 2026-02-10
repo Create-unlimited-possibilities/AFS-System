@@ -52,6 +52,10 @@ export async function relationConfirmNode(state) {
       logger.info('[RelationConfirm] 未找到协助关系，确认为陌生人');
     }
 
+    if (state.roleCardMode === 'static' && (!assistRelation || (relationType === 'stranger'))) {
+      throw new Error('方法B模式仅支持协助者关系，当前为陌生人或未建立协助关系');
+    }
+
     state.interlocutor.relationType = relationType;
     state.interlocutor.specificId = assistRelationId?.toString();
     state.interlocutor.specificRelation = specificRelation;
