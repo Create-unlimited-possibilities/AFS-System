@@ -18,7 +18,8 @@ export async function roleCardAssembleNode(state) {
   try {
     logger.info('[RoleCardAssemble] 组装角色卡');
 
-    const { roleCardMode, userId, interlocutor, sessionId, systemPrompt: providedSystemPrompt } = state;
+    const { roleCardMode, userId, interlocutor, systemPrompt: providedSystemPrompt } = state;
+    const sessionId = state.metadata?.sessionId || '';
 
     if (roleCardMode === 'dynamic') {
       logger.info('[RoleCardAssemble] 方法A：使用DynamicRoleCardAssembler');
