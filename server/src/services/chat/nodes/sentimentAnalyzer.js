@@ -18,12 +18,20 @@ export async function sentimentAnalyzerNode(state) {
   try {
     const { roleCardMode } = state;
 
+    if (!roleCardMode) {
+      throw new Error('roleCardMode not defined in state');
+    }
+
     if (roleCardMode === 'static') {
       logger.info('[SentimentAnalyzer] 方法B：跳过好感度分析');
       return state;
     }
 
-    logger.info('[SentimentAnalyzer] 分析情感和好感度');
+    if (roleCardMode !== 'dynamic') {
+      throw new Error(`未知的roleCardMode: ${roleCardMode}`);
+    }
+
+    logger.info('[SentimentAnalyzer] 方法A：分析情感和好感度');
 
     const { userId, interlocutor, currentInput, messages } = state;
     const sentimentManager = new SentimentManager();
