@@ -26,19 +26,22 @@ export default class FileStorage {
 
     const userPath = path.join(this.basePath, String(targetUserId));
 
+    // 修正文件夹命名以匹配文档规范
     const roleMap = {
       'elder': 'A_set',
-      'family': 'B_sets',
-      'friend': 'C_sets'
+      'family': 'Bste',
+      'friend': 'Cste'
     };
 
     const dirName = roleMap[questionRole] || 'A_set';
-    
+
     let folderPath;
     if (questionRole === 'elder') {
-      folderPath = path.join(userPath, dirName, 'self');
+      // elder: A_set/basic|emotional （无self子目录）
+      folderPath = path.join(userPath, dirName);
     } else {
-      const helperFolder = helperNickname ? `${helperId}_${helperNickname}` : `helper_${helperId}`;
+      // 协助回答：使用 helperId 创建文件夹
+      const helperFolder = helperId ? `helper_${helperId}` : `helper_${userId}`;
       folderPath = path.join(userPath, dirName, helperFolder);
     }
 
@@ -77,30 +80,38 @@ export default class FileStorage {
   async loadUserMemories(userId) {
     const memories = {
       A_set: [],
-      B_sets: [],
-      C_sets: []
+      Bste: [],
+      Cste: []
     };
 
     const userPath = path.join(this.basePath, String(userId));
 
     try {
-      await this.loadMemoriesFromFolder(path.join(userPath, 'A_set', 'self'), memories.A_set);
+      // 加载 A_set (elder) - 直接从A_set/basic和A_set/emotional加载（无self子目录）
+      const asetPath = path.join(userPath, 'A_set');
+      const basicPath = path.join(asetPath, 'basic');
+      const emotionalPath = path.join(asetPath, 'emotional');
       
-      const B_setsPath = path.join(userPath, 'B_sets');
-      const B_folders = await fs.readdir(B_setsPath).catch(() => []);
+      await this.loadMemoriesFromFolder(basicPath, memories.A_set);
+      await this.loadMemoriesFromFolder(emotionalPath, memories.A_set);
+
+      // 加载 Bste (family) - 从所有 helper 文件夹中加载
+      const BstePath = path.join(userPath, 'Bste');
+      const B_folders = await fs.readdir(BstePath).catch(() => []);
       for (const folder of B_folders) {
         if (folder.startsWith('.')) continue;
-        await this.loadMemoriesFromFolder(path.join(B_setsPath, folder), memories.B_sets);
+        await this.loadMemoriesFromFolder(path.join(BstePath, folder), memories.Bste);
       }
 
-      const C_setsPath = path.join(userPath, 'C_sets');
-      const C_folders = await fs.readdir(C_setsPath).catch(() => []);
+      // 加载 Cste (friend) - 从所有 helper 文件夹中加载
+      const CstePath = path.join(userPath, 'Cste');
+      const C_folders = await fs.readdir(CstePath).catch(() => []);
       for (const folder of C_folders) {
         if (folder.startsWith('.')) continue;
-        await this.loadMemoriesFromFolder(path.join(C_setsPath, folder), memories.C_sets);
+        await this.loadMemoriesFromFolder(path.join(CstePath, folder), memories.Cste);
       }
 
-      console.log(`[FileStorage] 加载用户记忆: ${userId}, A:${memories.A_set.length}, B:${memories.B_sets.length}, C:${memories.C_sets.length}`);
+      console.log(`[FileStorage] 加载用户记忆: ${userId}, A:${memories.A_set.length}, B:${memories.Bste.length}, C:${memories.Cste.length}`);
     } catch (err) {
       console.warn(`[FileStorage] 加载用户记忆失败: ${userId}:`, err.message);
     }
