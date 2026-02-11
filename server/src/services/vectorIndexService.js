@@ -19,10 +19,14 @@ class VectorIndexService {
 
   /**
    * 初始化ChromaDB客户端和embeddings
-   * @throws {Error} If ChromaDB or OpenAI initialization fails
+   * @throws {Error} If OPENAI_API_KEY is not set or initialization fails
    */
   async initialize() {
     if (this.client) return;
+
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY environment variable is required');
+    }
 
     try {
       this.client = new ChromaClient({
@@ -44,7 +48,7 @@ class VectorIndexService {
   /**
    * 获取或创建用户collection
    * @param {string} userId - 用户ID
-   * @returns {Promise} ChromaDB collection
+   * @returns {Promise<Collection>} ChromaDB collection
    * @throws {Error} If userId is invalid or initialization fails
    */
   async getCollection(userId) {
