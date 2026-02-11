@@ -499,4 +499,25 @@ export default class AnswerService {
 
     return { savedCount: allSavedAnswers.length };
   }
+
+  async getAssistAnswers(userId, targetUserId) {
+    return await this.answerRepository.find({
+      userId,
+      targetUserId,
+      isSelfAnswer: false
+    }).populate('questionId');
+  }
+
+  async getAssistQuestions(userId, targetUserId, relationType) {
+    return await Question.find({
+      role: relationType,
+      active: true
+    }).sort({ layer: 1, order: 1 });
+  }
+
+  async deleteAssistAnswers(assistRelationId) {
+    return await this.answerRepository.deleteMany({
+      assistRelationId: assistRelationId
+    });
+  }
 }

@@ -1,4 +1,5 @@
 import assistService from '../services/assistService.js';
+import AnswerService from '../services/AnswerService.js';
 import User from '../models/User.js';
 import AssistRelation from '../models/AssistRelation.js';
 
@@ -67,6 +68,8 @@ class AssistController {
         });
       }
 
+      const answerService = new AnswerService();
+      await answerService.deleteAssistAnswers(relation._id);
       await AssistRelation.findByIdAndDelete(relationId);
 
       res.json({
