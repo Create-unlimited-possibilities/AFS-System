@@ -1,10 +1,17 @@
 // 双重存储系统 - 所有资料同时存储在MongoDB和本地文件系统
 import fs from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// 获取项目根目录
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, '../../..');
 
 export default class DualStorage {
   constructor() {
-    this.basePath = '/app/storage/userdata';
+    // 使用相对于项目根目录的路径，兼容 Windows 和 Linux/Mac
+    this.basePath = path.join(projectRoot, 'server', 'storage', 'userdata');
   }
 
   async initialize() {

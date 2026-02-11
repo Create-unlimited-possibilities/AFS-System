@@ -1,11 +1,18 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { countTokens } from '../utils/tokenCounter.js';
 
+// 获取项目根目录
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, '../../..');
+
 export default class FileStorage {
   constructor() {
-    this.basePath = '/app/storage/userdata';
+    // 使用相对于项目根目录的路径，兼容 Windows 和 Linux/Mac
+    this.basePath = path.join(projectRoot, 'server', 'storage', 'userdata');
   }
 
   async initialize() {
@@ -16,6 +23,7 @@ export default class FileStorage {
     await this.initialize();
 
     const { targetUserId, questionId, question, answer: text, questionLayer, questionRole, questionOrder, helperId, helperNickname } = answer;
+
     const userPath = path.join(this.basePath, String(targetUserId));
 
     const roleMap = {
@@ -54,6 +62,7 @@ export default class FileStorage {
       answer: text,
       helperId,
       helperNickname,
+      significance: question?.significance || '',
       tokenCount,
       importance,
       tags,
