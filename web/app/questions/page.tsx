@@ -60,12 +60,12 @@ export default function QuestionsPage() {
       setLoading(true)
       const res = await api.get(`/questions?layer=${currentLayer}&role=elder`)
 
-      if (res && res.success && res.questions) {
-        setQuestions(res.questions || [])
+      if (res && res.success && res.data?.questions) {
+        setQuestions(res.data.questions || [])
 
         // 直接从 res.questions 中提取答案
         const answersMap: { [key: string]: string } = {}
-        res.questions.forEach((q: any) => {
+        res.data.questions.forEach((q: any) => {
           if (q.answer && q._id) {
             answersMap[q._id] = q.answer
           }
