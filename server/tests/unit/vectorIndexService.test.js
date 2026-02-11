@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import VectorIndexService from '../../src/services/vectorIndexService.js';
 
 describe('VectorIndexService', () => {
@@ -6,6 +6,10 @@ describe('VectorIndexService', () => {
 
   beforeEach(() => {
     vectorService = new VectorIndexService();
+  });
+
+  afterEach(() => {
+    vectorService = null;
   });
 
   it('should throw error when trying to use uninitialized service', async () => {

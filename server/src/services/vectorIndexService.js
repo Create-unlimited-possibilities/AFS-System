@@ -19,6 +19,7 @@ class VectorIndexService {
 
   /**
    * 初始化ChromaDB客户端和embeddings
+   * @throws {Error} If ChromaDB or OpenAI initialization fails
    */
   async initialize() {
     if (this.client) return;
@@ -44,8 +45,13 @@ class VectorIndexService {
    * 获取或创建用户collection
    * @param {string} userId - 用户ID
    * @returns {Promise} ChromaDB collection
+   * @throws {Error} If userId is invalid or initialization fails
    */
   async getCollection(userId) {
+    if (!userId || typeof userId !== 'string') {
+      throw new Error('Invalid userId: must be a non-empty string');
+    }
+
     await this.initialize();
 
     const collectionName = `user_${userId}`;
@@ -73,6 +79,18 @@ class VectorIndexService {
       } else {
         throw error;
       }
+    }
+  }
+
+  /**
+   * 清理collection缓存
+   * @param {string|null} userId - 可选，指定要清理的用户ID。如果为null，则清理所有缓存
+   */
+  clearCollectionCache(userId = null) {
+    if (userId) {
+      this.collections.delete(`user_${userId}`);
+    } else {
+      this.collections.clear();
     }
   }
 }
