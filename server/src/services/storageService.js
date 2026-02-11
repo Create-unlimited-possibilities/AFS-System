@@ -7,7 +7,7 @@ export default class StorageService {
   }
 
   async saveAnswer(answerData) {
-    const { userId, targetUserId, questionId, question, answer, layer, relationshipType, helper } = answerData;
+    const { userId, targetUserId, questionId, question, answer, layer, relationshipType, questionRole, questionOrder, helperId, helperNickname } = answerData;
 
     try {
       const dbAnswer = await Answer.findOneAndUpdate(
@@ -22,8 +22,14 @@ export default class StorageService {
         { upsert: true, new: true }
       );
 
-      this.syncToFileSystem({ ...dbAnswer.toObject(), question }).catch(err => {
-        console.error('[StorageService] 文件同步失败:', err);
+      // 等待文件系统操作完成，并传播错误
+      await this.syncToFileSystem({
+        ...dbAnswer.toObject(),
+        question,
+        questionRole,
+        questionOrder,
+        helperId: helperId || null,
+        helperNickname: helperNickname || null
       });
 
       return { success: true, answer: dbAnswer };
@@ -34,13 +40,20 @@ export default class StorageService {
   }
 
   async syncToFileSystem(answer) {
-    await this.fileStorage.saveMemoryFile(answer);
+    try {
+      await this.fileStorage.saveMemoryFile(answer);
+      console.log('[StorageService] 文件同步成功:', answer.questionOrder);
+    } catch (err) {
+      console.error('[StorageService] 文件同步失败:', err);
+      // 不再静默失败，将错误向上传播
+      throw err;
+    }
   }
 
   async loadMemories(userId) {
     try {
       const fileMemories = await this.fileStorage.loadUserMemories(userId);
-      if (fileMemories && fileMemories.length > 0) {
+      if (fileMemories && (fileMemories.A_set?.length > 0 || fileMemories.Bste?.length > 0 || fileMemories.Cste?.length > 0)) {
         return fileMemories;
       }
 
