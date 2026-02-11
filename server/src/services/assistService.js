@@ -4,6 +4,23 @@ import User from '../models/User.js';
 
 class AssistService {
   /**
+   * 检查协助关系是否已存在
+   */
+  async checkDuplicateRelation(assistantId, targetId) {
+    const existingRelation = await AssistRelation.findOne({
+      assistantId,
+      targetId,
+      isActive: true
+    });
+
+    if (existingRelation) {
+      throw new Error('该用户已在您的协助列表中');
+    }
+
+    return false;
+  }
+
+  /**
    * 验证并创建协助关系
    */
   async createRelation({ assistantId, targetCode, targetEmail, relationshipType, specificRelation, friendLevel }) {
@@ -28,14 +45,7 @@ class AssistService {
     }
 
     // 检查是否已存在协助关系
-    const existingRelation = await AssistRelation.findOne({
-      assistantId,
-      targetId: targetUser._id
-    });
-
-    if (existingRelation) {
-      throw new Error('已经建立了协助关系');
-    }
+    await this.checkDuplicateRelation(assistantId, targetUser._id);
 
     // 创建协助关系
     const relationData = {
