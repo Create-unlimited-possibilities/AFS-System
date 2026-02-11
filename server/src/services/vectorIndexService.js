@@ -116,6 +116,178 @@ class VectorIndexService {
       this.collections.clear();
     }
   }
+
+  async rebuildIndex(userId, progressCallback) {
+    await this.initialize();
+
+    const startTime = Date.now();
+    const collection = await this.getCollection(userId);
+
+    try {
+      logger.info(`[VectorIndexService] 开始重建索引 - User: ${userId}`);
+
+      await collection.delete({ where: {} });
+      logger.info('[VectorIndexService] 旧索引已清空');
+
+      const FileStorage = (await import('./fileStorage.js')).default;
+      const fileStorageInstance = new FileStorage();
+
+      const memories = await fileStorageInstance.loadUserMemories(userId);
+      const allMemories = [
+        ...memories.A_set,
+        ...memories.Bste,
+        ...memories.Cste
+      ];
+
+      if (allMemories.length === 0) {
+        throw new Error('用户没有任何记忆文件');
+      }
+
+      const total = allMemories.length;
+      logger.info(`[VectorIndexService] 加载到 ${total} 条记忆`);
+
+      const batchSize = 50;
+      const processedMemories = [];
+
+      for (let i = 0; i < allMemories.length; i += batchSize) {
+        const batch = allMemories.slice(i, i + batchSize);
+
+        for (const memory of batch) {
+          const text = this.buildMemoryText(memory);
+
+          const embedding = await this.embeddings.embedQuery(text);
+
+          const metadata = this.buildMetadata(memory);
+
+          processedMemories.push({
+            id: memory.memoryId,
+            embedding,
+            document: text,
+            metadata
+          });
+
+          const current = processedMemories.length + (i);
+          if (progressCallback) {
+            progressCallback({
+              current: Math.min(current, total),
+              total,
+              message: `正在处理记忆 ${Math.min(current, total)}/${total}...`
+            });
+          }
+        }
+
+        if (processedMemories.length > 0) {
+          await this.batchInsert(collection, processedMemories);
+          processedMemories.length = 0;
+        }
+      }
+
+      const duration = Date.now() - startTime;
+
+      const stats = await this.getStats(userId);
+
+      logger.info(`[VectorIndexService] 索引重建完成 - User: ${userId}, Count: ${total}, Duration: ${duration}ms`);
+
+      return {
+        success: true,
+        userId,
+        memoryCount: total,
+        categories: {
+          self: memories.A_set.length,
+          family: memories.Bste.length,
+          friend: memories.Cste.length
+        },
+        duration
+      };
+    } catch (error) {
+      logger.error('[VectorIndexService] 索引重建失败:', error);
+      throw error;
+    }
+  }
+
+  buildMemoryText(memory) {
+    const parts = [];
+
+    if (memory.question) {
+      parts.push(`问题: ${memory.question}`);
+    }
+
+    if (memory.answer) {
+      parts.push(`回答: ${memory.answer}`);
+    }
+
+    return parts.join('\n');
+  }
+
+  buildMetadata(memory) {
+    const metadata = {
+      userId: memory.targetUserId,
+      memoryId: memory.memoryId,
+      questionId: memory.questionId,
+      questionRole: memory.questionRole,
+      questionLayer: memory.questionLayer,
+      questionOrder: memory.questionOrder,
+      source: 'questionnaire',
+      createdAt: memory.createdAt
+    };
+
+    if (memory.questionRole === 'elder') {
+      metadata.category = 'self';
+    } else if (memory.questionRole === 'family') {
+      metadata.category = 'family';
+      metadata.helperId = memory.helperId;
+      metadata.helperNickname = memory.helperNickname;
+    } else if (memory.questionRole === 'friend') {
+      metadata.category = 'friend';
+      metadata.helperId = memory.helperId;
+      metadata.helperNickname = memory.helperNickname;
+    }
+
+    if (memory.importance !== undefined) {
+      metadata.importance = memory.importance;
+    }
+
+    if (memory.tags && Array.isArray(memory.tags)) {
+      metadata.tags = memory.tags.join(',');
+    }
+
+    return metadata;
+  }
+
+  async batchInsert(collection, documents) {
+    try {
+      await collection.add({
+        ids: documents.map(d => d.id),
+        embeddings: documents.map(d => d.embedding),
+        documents: documents.map(d => d.document),
+        metadatas: documents.map(d => d.metadata)
+      });
+    } catch (error) {
+      logger.error('[VectorIndexService] 批量插入失败:', error);
+      throw error;
+    }
+  }
+
+  async getStats(userId) {
+    const collection = await this.getCollection(userId);
+    const result = await collection.count();
+
+    return {
+      totalDocuments: result,
+      collectionName: `user_${userId}`
+    };
+  }
+
+  async indexExists(userId) {
+    try {
+      const collection = await this.getCollection(userId);
+      const count = await collection.count();
+      return count > 0;
+    } catch (error) {
+      logger.warn(`[VectorIndexService] 检查索引失败: ${userId}`, error.message);
+      return false;
+    }
+  }
 }
 
 export default VectorIndexService;
