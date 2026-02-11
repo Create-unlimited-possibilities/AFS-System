@@ -25,6 +25,10 @@ export default class AnswerRepository {
     return await Answer.deleteMany(query);
   }
 
+  async insertMany(documents) {
+    return await Answer.insertMany(documents);
+  }
+
   async countDocuments(query) {
     return await Answer.countDocuments(query);
   }
