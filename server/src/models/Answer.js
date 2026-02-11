@@ -31,10 +31,14 @@ const answerSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  relationshipType: {
+  assistRelationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AssistRelation',
+    required: false
+  },
+  specificRelation: {
     type: String,
-    enum: ['self', 'family', 'friend'],
-    default: 'self'
+    default: ''
   },
   createdAt: {
     type: Date,
@@ -83,6 +87,31 @@ answerSchema.statics.getProgress = async function(userId, targetUserId, layer) {
 answerSchema.statics.getAnswerStats = async function(targetUserId) {
   const stats = await this.aggregate([
     { $match: { targetUserId: new mongoose.Types.ObjectId(targetUserId) } },
+    {
+      $lookup: {
+        from: 'assistrelations',
+        localField: 'assistRelationId',
+        foreignField: '_id',
+        as: 'relation'
+      }
+    },
+    {
+      $unwind: {
+        path: '$relation',
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $addFields: {
+        relationshipType: {
+          $cond: {
+            if: '$assistRelationId',
+            then: '$relation.relationshipType',
+            else: 'self'
+          }
+        }
+      }
+    },
     {
       $group: {
         _id: {
