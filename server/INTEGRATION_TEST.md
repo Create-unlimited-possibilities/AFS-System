@@ -4,27 +4,28 @@
 
 1. **Ollama服务运行中**
    ```bash
-   # 检查Ollama是否运行
-   curl http://localhost:11434/api/tags
+   # 检查Docker容器是否运行
+   docker ps | grep modelserver
    
-   # 如果未运行，启动Docker容器
-   docker start <ollama_container_name>
+   # 如果未运行，启动所有容器
+   docker-compose up -d
    ```
 
 2. **bge-m3模型已加载**
    ```bash
-   # 检查模型列表
-   curl http://localhost:11434/api/tags | grep bge-m3
+   # 检查模型列表（在宿主机执行）
+   docker exec afs-system-modelserver-1 ollama list
    
    # 如果未加载，下载模型
-   docker exec -it <ollama_container_name> ollama pull bge-m3
+   docker exec afs-system-modelserver-1 ollama pull bge-m3
+   # 等待下载完成（约2.2GB）
    ```
 
 3. **环境变量已配置**
    ```bash
    # .env 文件中包含:
    EMBEDDING_BACKEND=ollama
-   OLLAMA_BASE_URL=http://localhost:11434
+   OLLAMA_BASE_URL=http://modelserver:11434
    EMBEDDING_MODEL=bge-m3
    ```
 
@@ -33,8 +34,11 @@
 ### 1. 启动后端服务
 
 ```bash
-cd server
-npm run dev
+# 启动所有Docker容器（如果未启动）
+docker-compose up -d
+
+# 查看server容器日志
+docker-compose logs -f server
 ```
 
 预期输出：
@@ -43,7 +47,7 @@ npm run dev
 [VectorIndexService] ChromaDB客户端初始化成功
 ```
 
-### 2. 测试EmbeddingService
+### 2. 测试EmbeddingService（可选）
 
 ```javascript
 // 创建测试脚本 test-embedding.js
@@ -66,15 +70,17 @@ console.log('✓ 健康检查通过:', isHealthy);
 
 运行：
 ```bash
-node test-embedding.js
+# 进入server容器执行（或在宿主机运行如果node_modules已挂载）
+docker exec -it afs-system-server-1 node /app/test-embedding.js
 ```
 
 ### 3. 测试向量索引构建
 
 ```bash
-# 使用API构建索引
-curl -X POST http://localhost:3000/api/rolecard/vector-index/build \
+# 使用API构建索引（在宿主机执行）
+curl -X POST http://localhost:3001/api/rolecard/vector-index/build \
   -H "Authorization: Bearer <your_token>" \
+  -H "Content-Type: application/json" \
   --no-buffer
 ```
 
@@ -92,7 +98,7 @@ data: {"success":true,"memoryCount":100}
 
 ### 4. 测试RAG检索
 
-创建对话会话（家人/朋友关系），发送消息，验证：
+通过前端创建对话会话（家人/朋友关系），发送消息，验证：
 
 1. 日志中显示向量搜索：
    ```
@@ -126,9 +132,15 @@ data: {"success":true,"memoryCount":100}
 **症状**: `[EmbeddingService] 初始化失败: ECONNREFUSED`
 
 **解决方案**:
-1. 检查Ollama服务是否运行
-2. 检查OLLAMA_BASE_URL是否正确
-3. 检查端口映射（Docker: 11434 -> 11437）
+1. 检查modelserver容器是否运行
+   ```bash
+   docker ps | grep modelserver
+   ```
+2. 检查OLLAMA_BASE_URL是否正确（应该是 http://modelserver:11434）
+3. 查看server容器日志:
+   ```bash
+   docker-compose logs server
+   ```
 
 ### 模型不支持embedding
 
@@ -136,16 +148,36 @@ data: {"success":true,"memoryCount":100}
 
 **解决方案**:
 1. 确认使用bge-m3模型
-2. 下载bge-m3: `ollama pull bge-m3`
+   ```bash
+   docker exec afs-system-modelserver-1 ollama list
+   ```
+2. 下载bge-m3模型:
+   ```bash
+   docker exec afs-system-modelserver-1 ollama pull bge-m3
+   ```
 
 ### 向量索引构建失败
 
 **症状**: `[VectorIndexService] 索引重建失败: embedding generation failed`
 
 **解决方案**:
-1. 检查Ollama是否有足够的内存
-2. 检查模型是否正确加载
-3. 查看Ollama日志: `docker logs <ollama_container>`
+1. 检查modelserver容器是否有足够的内存/GPU
+2. 检查bge-m3模型是否正确加载
+3. 查看modelserver容器日志:
+   ```bash
+   docker-compose logs modelserver
+   ```
+
+### Ollama命令失败
+
+**症状**: `Error: No such container` 或 `command not found`
+
+**解决方案**:
+1. 确认容器名称:
+   ```bash
+   docker ps --format "{{.Names}}"
+   ```
+2. 确认modelserver容器正在运行
 
 ## 性能基准
 
@@ -159,6 +191,8 @@ data: {"success":true,"memoryCount":100}
 
 ## 成功标准
 
+- ✓ modelserver容器正常运行
+- ✓ bge-m3模型已加载到Ollama
 - ✓ EmbeddingService成功初始化（无OPENAI_API_KEY）
 - ✓ 向量索引成功构建
 - ✓ RAG检索返回相关记忆

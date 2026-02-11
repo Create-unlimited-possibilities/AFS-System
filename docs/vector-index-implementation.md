@@ -102,14 +102,15 @@ const results = await vectorService.search(
 
 ### 模型下载
 
-首次使用前，需要下载BAAI/bge-m3模型：
+首次使用前，需要下载BAAI/bge-m3模型到modelserver容器：
 
 ```bash
-cd server
-npm run download:embedding-model
-```
+# 在宿主机执行，下载模型到modelserver容器
+docker exec afs-system-modelserver-1 ollama pull bge-m3
 
-模型将下载到：`server/models/embedding_model/bge-m3.gguf`
+# 模型将保存在: modelserver/models/ (Docker自动挂载)
+# 模型大小: 约2.2GB
+```
 
 ### 环境配置
 
@@ -119,62 +120,76 @@ npm run download:embedding-model
 # Embedding后端选择: ollama | openai
 EMBEDDING_BACKEND=ollama
 
-# Ollama配置
-OLLAMA_BASE_URL=http://localhost:11434
+# Ollama配置（Docker网络内部访问）
+OLLAMA_BASE_URL=http://modelserver:11434
 EMBEDDING_MODEL=bge-m3
 
 # OpenAI配置（备用）
 # OPENAI_API_KEY=your-api-key-here
 ```
 
+**注意**: OLLAMA_BASE_URL使用Docker网络内部地址 `http://modelserver:11434`，而不是外部地址。
+
 ### 启动Ollama服务
 
-Ollama服务需要独立启动：
-
-#### Docker方式（推荐）
+Ollama服务通过Docker Compose统一管理：
 
 ```bash
-# 启动Ollama容器
-docker run -d -p 11434:11434 \
-  -v ${PWD}/server/models:/models \
-  ollama/ollama
+# 启动所有容器（包括modelserver）
+docker-compose up -d
 
-# 加载bge-m3模型
-docker exec -it <container_id> ollama pull bge-m3
-```
+# 查看容器状态
+docker-compose ps
 
-#### 本地安装方式
-
-```bash
-# 安装Ollama（如果未安装）
-curl -fsSL https://ollama.com/install.sh | sh
-
-# 启动Ollama服务
-ollama serve
-
-# 在另一个终端加载模型
-ollama pull bge-m3
+# 查看modelserver日志
+docker-compose logs -f modelserver
 ```
 
 ### 验证配置
 
-1. 检查Ollama服务状态：
+1. 检查modelserver容器状态：
    ```bash
-   curl http://localhost:11434/api/tags
+   docker ps | grep modelserver
    ```
 
-2. 测试embedding生成：
+2. 检查已加载的模型：
    ```bash
-   curl http://localhost:11434/api/embed -d '{
+   docker exec afs-system-modelserver-1 ollama list
+   # 应该看到: bge-m3:latest
+   ```
+
+3. 测试embedding生成（外部访问）：
+   ```bash
+   curl http://localhost:8000/api/embed -d '{
      "model": "bge-m3",
      "input": "测试文本"
    }'
    ```
 
-3. 查看后端日志，确认EmbeddingService初始化成功：
+4. 查看server容器日志，确认EmbeddingService初始化成功：
    ```
    [EmbeddingService] Ollama embedding客户端初始化成功
    ```
+
+### Docker配置说明
+
+#### 端口映射
+- `modelserver`: 8000:11434 (外部8000 → 内部11434)
+- `server`: 3001:3000 (外部3001 → 内部3000)
+- `web`: 3002:3000 (外部3002 → 内部3000)
+
+#### Volume挂载
+```yaml
+modelserver:
+  volumes:
+    - ./modelserver/models:/root/.ollama/models
+```
+- **容器内**: `/root/.ollama/models`
+- **宿主机**: `modelserver/models/`
+
+#### Docker网络访问
+- **server容器**（Docker网络内部）: `http://modelserver:11434`
+- **宿主机**: `http://localhost:8000`
 
 ## 故障排查
 
@@ -184,44 +199,49 @@ ollama pull bge-m3
 
 **解决方案**:
 
-1. 检查Ollama服务是否启动
+1. 检查modelserver容器是否运行
    ```bash
-   curl http://localhost:11434/api/tags
+   docker ps | grep modelserver
    ```
 
-2. 检查环境变量
+2. 检查环境变量（应该使用Docker网络地址）
    ```bash
-   echo $OLLAMA_BASE_URL
-   echo $EMBEDDING_MODEL
+   # .env中应该包含:
+   OLLAMA_BASE_URL=http://modelserver:11434
    ```
 
-3. 查看服务器日志
+3. 查看server容器日志
+   ```bash
+   docker-compose logs server
    ```
-   [EmbeddingService] 初始化失败: ECONNREFUSED
+
+4. 确保modelserver容器正常启动
+   ```bash
+   docker-compose logs modelserver
    ```
 
-4. 确保Ollama在正确的端口运行（默认11434）
+### 模型未加载
 
-### 模型文件不存在
-
-**症状**: `[EmbeddingService] 健康检查失败: model not found`
+**症状**: `{"error":"this model does not support embeddings"}`
+或 `[EmbeddingService] 健康检查失败: model not found`
 
 **解决方案**:
 
-1. 检查模型路径
+1. 检查已加载的模型
    ```bash
-   ls -la server/models/embedding_model/
+   docker exec afs-system-modelserver-1 ollama list
    ```
 
-2. 重新下载模型
+2. 如果没有bge-m3，下载模型
    ```bash
-   npm run download:embedding-model
+   docker exec afs-system-modelserver-1 ollama pull bge-m3
    ```
 
-3. 确保Ollama已加载模型
+3. 验证模型下载成功
    ```bash
-   ollama list
-   # 应该看到 bge-m3
+   # 查看宿主机目录
+   ls -la modelserver/models/blobs/
+   # 应该看到bge-m3相关的文件
    ```
 
 ### 索引构建失败

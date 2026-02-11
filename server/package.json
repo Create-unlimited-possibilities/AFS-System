@@ -10,8 +10,7 @@
     "test:unit": "vitest tests/unit",
     "test:integration": "vitest tests/integration",
     "test:ci": "vitest --ci --coverage",
-    "test:jest": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "download:embedding-model": "node scripts/download-model.js"
+    "test:jest": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "dependencies": {
     "@langchain/community": "^1.1.11",

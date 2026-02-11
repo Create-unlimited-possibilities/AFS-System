@@ -19,18 +19,16 @@
 
 **测试结果:** 12/12 通过 ✓
 
-### Task 2: 下载BAAI/bge-m3模型 ✅
+### Task 2: 环境配置和说明 ✅
 
 **文件:**
-- `server/scripts/download-model.js` - 模型下载脚本
-- `server/package.json` - 添加 `download:embedding-model` npm script
 - `server/.env.example` - 添加Embedding配置说明
-- `server/.gitignore` - 排除models/目录
+- `server/.gitignore` - 排除modelserver/models/目录
 
 **功能:**
-- 自动下载BAAI/bge-m3模型（~2.2GB）
-- 支持多个下载源（ModelScope, Hugging Face）
-- 进度显示和错误处理
+- 配置环境变量
+- 提供模型下载说明
+- 排除大文件目录
 
 ### Task 3: 更新VectorIndexService ✅
 
@@ -77,10 +75,11 @@
 - 使用BAAI/bge-m3模型
 - 支持中文语义
 - ~2.2GB模型文件
+- 存储位置: `modelserver/models/`
 
 ### ✅ 灵活的配置
 - 通过环境变量选择后端
-- 支持Docker和本地安装
+- 使用Docker Compose统一管理所有容器
 - 向后兼容OpenAI
 
 ### ✅ 完整的测试覆盖
@@ -108,48 +107,61 @@ a209672 feat: add model download script and environment configuration
 
 ## 使用方法
 
-### 1. 下载模型
+### 1. 启动所有容器
 
 ```bash
-cd server
-npm run download:embedding-model
+# 启动所有Docker容器
+docker-compose up -d
+
+# 查看容器状态
+docker-compose ps
+
+# 应该看到4个容器运行: web, server, modelserver, mongoserver
 ```
 
-### 2. 配置环境变量
+### 2. 下载bge-m3模型
+
+```bash
+# 在宿主机执行，下载bge-m3模型到modelserver容器
+docker exec afs-system-modelserver-1 ollama pull bge-m3
+
+# 模型将保存在: modelserver/models/ (Docker自动挂载)
+# 模型大小: 约2.2GB
+# 等待下载完成（根据网络速度）
+```
+
+### 3. 验证模型已加载
+
+```bash
+# 查看已加载的模型
+docker exec afs-system-modelserver-1 ollama list
+
+# 应该看到:
+# NAME                ID              SIZE      MODIFIED
+# bge-m3:latest       xxx             2.2 GB    just now
+```
+
+### 4. 配置环境变量
 
 在 `.env` 文件中设置：
 ```bash
 EMBEDDING_BACKEND=ollama
-OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_BASE_URL=http://modelserver:11434
 EMBEDDING_MODEL=bge-m3
 ```
 
-### 3. 启动Ollama服务
+### 5. 查看服务日志
 
 ```bash
-# Docker方式
-docker run -d -p 11434:11434 \
-  -v ${PWD}/server/models:/models \
-  ollama/ollama
+# 查看server容器日志
+docker-compose logs -f server
 
-# 加载模型
-docker exec -it <container_id> ollama pull bge-m3
+# 预期输出:
+# [EmbeddingService] Ollama embedding客户端初始化成功
+# [VectorIndexService] ChromaDB客户端初始化成功
 ```
 
-### 4. 启动后端服务
-
-```bash
-cd server
-npm run dev
-```
-
-预期输出：
-```
-[EmbeddingService] Ollama embedding客户端初始化成功
-[VectorIndexService] ChromaDB客户端初始化成功
-```
-
-### 5. 构建向量索引
+### 6. 构建向量索引
 
 通过前端或API构建向量索引，系统将使用本地bge-m3模型生成embeddings。
 
@@ -162,12 +174,32 @@ npm run dev
 | 成本 | ~$0.0001/1K tokens | 免费 | 本地模型 |
 | 延迟 | 网络延迟 | 本地计算 | 无需网络 |
 
+## Docker配置说明
+
+### 端口映射
+- `modelserver`: 8000:11434 (外部8000 → 内部11434)
+- `server`: 3001:3000 (外部3001 → 内部3000)
+- `web`: 3002:3000 (外部3002 → 内部3000)
+
+### Docker网络访问
+- server容器通过Docker网络访问modelserver: `http://modelserver:11434`
+- 外部访问通过宿主机端口: `http://localhost:8000`
+
+### Volume挂载
+```yaml
+modelserver:
+  volumes:
+    - ./modelserver/models:/root/.ollama/models
+```
+- 容器内: `/root/.ollama/models`
+- 宿主机: `modelserver/models/`
+
 ## 下一步
 
 ### 短期
-1. 在生产环境部署Ollama服务
-2. 下载并加载bge-m3模型
-3. 执行完整的集成测试（INTEGRATION_TEST.md）
+1. 下载并加载bge-m3模型
+2. 执行完整的集成测试（INTEGRATION_TEST.md）
+3. 验证RAG检索功能正常工作
 
 ### 中期
 1. 监控embedding生成性能
@@ -185,6 +217,7 @@ npm run dev
 ✅ 移除OpenAI依赖，降低运营成本
 ✅ 完整的测试覆盖和文档
 ✅ 向后兼容，灵活的配置选项
+✅ 使用Docker Compose统一管理所有服务
 ✅ 提供详细的集成测试指南
 
 **所有目标已达成，可以进行生产部署！**
