@@ -147,7 +147,8 @@ export default function RolecardPage() {
       }, 2000)
     } catch (error) {
       console.error('构建向量索引失败:', error)
-      alert(error.message || '构建失败，请重试')
+      const errorMessage = error instanceof Error ? error.message : '构建失败，请重试'
+      alert(errorMessage)
       setBuildProgress(undefined)
     } finally {
       setBuildingIndex(false)
