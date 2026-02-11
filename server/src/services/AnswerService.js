@@ -377,62 +377,94 @@ export default class AnswerService {
       throw new Error('您没有协助该用户的权限');
     }
 
-    await this.answerRepository.deleteMany({ userId, targetUserId });
-
-    const answerDocs = [];
+    // 首先获取所有问题的 layer 信息
+    const answerDataWithLayers = [];
     for (const answerData of answers) {
       const question = await this.questionRepository.findById(answerData.questionId);
       if (!question) continue;
-
-      answerDocs.push({
-        userId,
-        targetUserId,
-        questionId: answerData.questionId,
-        questionLayer: question.layer,
-        answer: answerData.answer,
-        isSelfAnswer: false,
-        relationshipType: relation.relationshipType
+      answerDataWithLayers.push({
+        ...answerData,
+        layer: question.layer
       });
     }
 
-    if (answerDocs.length > 0) {
-      await this.answerRepository.insertMany(answerDocs);
+    // 按层分组答案
+    const answersByLayer = {
+      basic: [],
+      emotional: []
+    };
+
+    for (const data of answerDataWithLayers) {
+      if (answersByLayer[data.layer]) {
+        answersByLayer[data.layer].push(data);
+      }
     }
 
+    // 对每一层，先删除该层的旧答案，再插入新答案
     let totalTokenCount = 0;
+    const allSavedAnswers = [];
     const helper = await this.userRepository.findById(userId);
-    for (const { questionId, answer } of answers) {
-      const question = await this.questionRepository.findById(questionId);
-      if (!question) continue;
 
-      await this.storageService.saveAnswer({
-        userId,
-        targetUserId,
-        questionId: question._id,
-        question,
-        answer,
-        layer: question.layer,
-        relationshipType: relation.relationshipType,
-        helperId: helper._id.toString(),
-        helperNickname: helper.nickname || helper.name,
-        questionRole: question.role,
-        questionOrder: question.order
-      });
-      totalTokenCount += countTokens(answer);
+    for (const layer of ['basic', 'emotional']) {
+      const layerAnswers = answersByLayer[layer];
+
+      if (layerAnswers.length > 0) {
+        // 只删除当前层的答案
+        await this.answerRepository.deleteMany({
+          userId,
+          targetUserId,
+          questionLayer: layer
+        });
+
+        const answerDocs = [];
+        for (const answerData of layerAnswers) {
+          const question = await this.questionRepository.findById(answerData.questionId);
+          if (!question) continue;
+
+          answerDocs.push({
+            userId,
+            targetUserId,
+            questionId: answerData.questionId,
+            questionLayer: question.layer,
+            answer: answerData.answer,
+            isSelfAnswer: false,
+            relationshipType: relation.relationshipType
+          });
+
+          // 保存到文件系统
+          await this.storageService.saveAnswer({
+            userId,
+            targetUserId,
+            questionId: question._id,
+            question,
+            answer: answerData.answer,
+            layer: question.layer,
+            relationshipType: relation.relationshipType,
+            helperId: helper._id.toString(),
+            helperNickname: helper.nickname || helper.name,
+            questionRole: question.role,
+            questionOrder: question.order
+          });
+
+          totalTokenCount += countTokens(answerData.answer);
+        }
+
+        if (answerDocs.length > 0) {
+          const inserted = await this.answerRepository.insertMany(answerDocs);
+          allSavedAnswers.push(...inserted);
+        }
+      }
     }
 
-    if (answerDocs.length > 0) {
-      const allAnswers = await this.answerRepository.find({
-        userId,
-        targetUserId
-      });
-      const newTotalTokenCount = allAnswers.reduce((sum, a) => sum + countTokens(a.answer), 0);
+    // 重新计算并更新总 token 数
+    if (allSavedAnswers.length > 0) {
+      const newTotalTokenCount = allSavedAnswers.reduce((sum, a) => sum + countTokens(a.answer), 0);
 
       await this.userRepository.findByIdAndUpdate(targetUserId, {
         $set: { 'companionChat.roleCard.memoryTokenCount': newTotalTokenCount }
       });
     }
 
-    return { savedCount: answerDocs.length };
+    return { savedCount: allSavedAnswers.length };
   }
 }
