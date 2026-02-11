@@ -59,18 +59,27 @@ export default function QuestionsPage() {
     try {
       setLoading(true)
       const res = await api.get(`/questions?layer=${currentLayer}&role=elder`)
-      if (res.data) {
-        setQuestions(res.data.questions || [])
+
+      if (res && res.success && res.questions) {
+        setQuestions(res.questions || [])
+
+        // 直接从 res.questions 中提取答案
         const answersMap: { [key: string]: string } = {}
-        res.data.questions.forEach((q: any) => {
-          if (q.answer) {
+        res.questions.forEach((q: any) => {
+          if (q.answer && q._id) {
             answersMap[q._id] = q.answer
           }
         })
         setAnswers(answersMap)
+      } else {
+        console.error('获取问题失败: 响应格式不正确', res)
+        setQuestions([])
+        setAnswers({})
       }
     } catch (error) {
       console.error('获取问题失败:', error)
+      setQuestions([])
+      setAnswers({})
     } finally {
       setLoading(false)
     }
