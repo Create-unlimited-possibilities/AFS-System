@@ -35,6 +35,20 @@ export default class AnswerService {
       existingAnswer.updatedAt = new Date();
       await existingAnswer.save();
 
+      await this.storageService.saveAnswer({
+        userId,
+        targetUserId: userId,
+        questionId: question._id,
+        question,
+        answer,
+        layer: question.layer,
+        relationshipType: 'self',
+        questionRole: question.role,
+        questionOrder: question.order,
+        helperId: null,
+        helperNickname: null
+      });
+
       // 更新 token 数（如果答案长度改变）
       if (tokenDiff !== 0) {
         await this.userRepository.findByIdAndUpdate(userId, {
@@ -62,7 +76,11 @@ export default class AnswerService {
       question,
       answer,
       layer: question.layer,
-      relationshipType: 'self'
+      relationshipType: 'self',
+      questionRole: question.role,
+      questionOrder: question.order,
+      helperId: null,
+      helperNickname: null
     });
 
     const tokenCount = countTokens(answer);
@@ -104,6 +122,21 @@ export default class AnswerService {
       existingAnswer.updatedAt = new Date();
       await existingAnswer.save();
 
+      const helper = await this.userRepository.findById(userId);
+      await this.storageService.saveAnswer({
+        userId,
+        targetUserId,
+        questionId: question._id,
+        question,
+        answer,
+        layer: question.layer,
+        relationshipType: relation.relationshipType,
+        helperId: helper._id.toString(),
+        helperNickname: helper.nickname || helper.name,
+        questionRole: question.role,
+        questionOrder: question.order
+      });
+
       // 更新 token 数（如果答案长度改变）
       if (tokenDiff !== 0) {
         await this.userRepository.findByIdAndUpdate(targetUserId, {
@@ -133,7 +166,10 @@ export default class AnswerService {
       answer,
       layer: question.layer,
       relationshipType: relation.relationshipType,
-      helper
+      helperId: helper._id.toString(),
+      helperNickname: helper.nickname || helper.name,
+      questionRole: question.role,
+      questionOrder: question.order
     });
 
     const tokenCount = countTokens(answer);
@@ -240,56 +276,94 @@ export default class AnswerService {
   }
 
   async batchSaveSelfAnswers(userId, answers) {
-    await this.answerRepository.deleteMany({
-      userId,
-      targetUserId: userId
-    });
-
-    const answerDocs = [];
-    const memoryUpdates = [];
-
+    // 首先获取所有问题的 layer 信息
+    const answerDataWithLayers = [];
     for (const answerData of answers) {
       const question = await this.questionRepository.findById(answerData.questionId);
       if (!question) continue;
-
-      answerDocs.push({
-        userId,
-        targetUserId: userId,
-        questionId: answerData.questionId,
-        questionLayer: question.layer,
-        answer: answerData.answer,
-        isSelfAnswer: true,
-        relationshipType: 'self'
+      answerDataWithLayers.push({
+        ...answerData,
+        layer: question.layer
       });
-
-      memoryUpdates.push({ question, answer: answerData.answer });
     }
 
-    if (answerDocs.length > 0) {
-      await this.answerRepository.create(answerDocs[0]);
+    // 按层分组答案
+    const answersByLayer = {
+      basic: [],
+      emotional: []
+    };
+
+    for (const data of answerDataWithLayers) {
+      if (answersByLayer[data.layer]) {
+        answersByLayer[data.layer].push(data);
+      }
     }
 
+    // 对每一层，先删除该层的旧答案，再插入新答案
     let totalTokenCount = 0;
-    for (const { question, answer } of memoryUpdates) {
-      await this.storageService.saveAnswer({
-        userId,
-        targetUserId: userId,
-        questionId: question._id,
-        question,
-        answer,
-        layer: question.layer,
-        relationshipType: 'self'
-      });
-      totalTokenCount += countTokens(answer);
+    const allSavedAnswers = [];
+
+    for (const layer of ['basic', 'emotional']) {
+      const layerAnswers = answersByLayer[layer];
+
+      if (layerAnswers.length > 0) {
+        // 只删除当前层的答案
+        await this.answerRepository.deleteMany({
+          userId,
+          targetUserId: userId,
+          questionLayer: layer
+        });
+
+        const answerDocs = [];
+        for (const answerData of layerAnswers) {
+          const question = await this.questionRepository.findById(answerData.questionId);
+          if (!question) continue;
+
+          answerDocs.push({
+            userId,
+            targetUserId: userId,
+            questionId: answerData.questionId,
+            questionLayer: question.layer,
+            answer: answerData.answer,
+            isSelfAnswer: true,
+            relationshipType: 'self'
+          });
+
+          // 保存到文件系统
+          await this.storageService.saveAnswer({
+            userId,
+            targetUserId: userId,
+            questionId: question._id,
+            question,
+            answer: answerData.answer,
+            layer: question.layer,
+            relationshipType: 'self',
+            questionRole: question.role,
+            questionOrder: question.order,
+            helperId: null,
+            helperNickname: null
+          });
+
+          totalTokenCount += countTokens(answerData.answer);
+        }
+
+        if (answerDocs.length > 0) {
+          const inserted = await this.answerRepository.insertMany(answerDocs);
+          allSavedAnswers.push(...inserted);
+        }
+      }
     }
 
-    if (totalTokenCount > 0) {
+    // 重新计算并更新总 token 数
+    if (allSavedAnswers.length > 0) {
+      const newTotalTokenCount = allSavedAnswers.reduce((sum, a) => sum + countTokens(a.answer), 0);
+
       await this.userRepository.findByIdAndUpdate(userId, {
-        $inc: { 'companionChat.roleCard.memoryTokenCount': totalTokenCount }
+        $set: { 'companionChat.roleCard.memoryTokenCount': newTotalTokenCount }
       });
     }
 
-    return { savedCount: answerDocs.length };
+    return { savedCount: allSavedAnswers.length };
   }
 
   async batchSaveAssistAnswers(userId, targetUserId, answers) {
@@ -322,7 +396,7 @@ export default class AnswerService {
     }
 
     if (answerDocs.length > 0) {
-      await this.answerRepository.create(answerDocs[0]);
+      await this.answerRepository.insertMany(answerDocs);
     }
 
     let totalTokenCount = 0;
@@ -339,14 +413,23 @@ export default class AnswerService {
         answer,
         layer: question.layer,
         relationshipType: relation.relationshipType,
-        helper
+        helperId: helper._id.toString(),
+        helperNickname: helper.nickname || helper.name,
+        questionRole: question.role,
+        questionOrder: question.order
       });
       totalTokenCount += countTokens(answer);
     }
 
-    if (totalTokenCount > 0) {
+    if (answerDocs.length > 0) {
+      const allAnswers = await this.answerRepository.find({
+        userId,
+        targetUserId
+      });
+      const newTotalTokenCount = allAnswers.reduce((sum, a) => sum + countTokens(a.answer), 0);
+
       await this.userRepository.findByIdAndUpdate(targetUserId, {
-        $inc: { 'companionChat.roleCard.memoryTokenCount': totalTokenCount }
+        $set: { 'companionChat.roleCard.memoryTokenCount': newTotalTokenCount }
       });
     }
 
