@@ -12,18 +12,18 @@ const storageService = new StorageService();
 // 1. 获取所有层次的进度（用于左侧面板）
 router.get('/progress', protect, async (req, res) => {
   try {
-    const { role = 'elder', elderCode } = req.query;
+    const { role = 'elder' } = req.query;
     const userId = req.user.id;
 
-    const layers = ['basic', 'emotional', 'ethics'];
+    const layers = ['basic', 'emotional'];
     const result = {};
 
     for (const layer of layers) {
       const questions = await Question.countDocuments({ role, layer, active: true });
       const answered = await Answer.countDocuments({
-        elderCode,
-        contributorId: userId,
-        layer
+        targetUserId: userId,
+        userId: userId,
+        questionLayer: layer
       });
 
       result[layer] = {
@@ -43,21 +43,26 @@ router.get('/progress', protect, async (req, res) => {
 // 2. 获取某个层次的所有问题 + 已答答案
 router.get('/', protect, async (req, res) => {
   try {
-    const { role = 'elder', layer = 'basic', elderCode } = req.query;
+    const { role = 'elder', layer = 'basic' } = req.query;
     const userId = req.user.id;
 
     const questions = await Question.find({ role, layer, active: true })
       .sort({ order: 1 })
       .lean();
 
+    // 使用正确的 userId 和 targetUserId 查询已回答内容
     const memories = await Answer.find({
-      elderCode,
-      contributorId: userId,
-      layer
+      targetUserId: userId,
+      userId: userId,
+      questionLayer: layer
     }).lean();
 
     const answerMap = {};
-    memories.forEach(m => { answerMap[m.questionOrder] = m.answer; });
+    memories.forEach(m => {
+      // 处理两种情况：questionId 可能是字符串或 ObjectId
+      const questionId = m.questionId._id ? m.questionId._id.toString() : m.questionId.toString();
+      answerMap[questionId] = m.answer;
+    });
 
     const result = questions.map(q => ({
       _id: q._id,
@@ -65,7 +70,7 @@ router.get('/', protect, async (req, res) => {
       question: q.question,
       placeholder: q.placeholder || '',
       type: q.type || 'textarea',
-      answer: answerMap[q.order] || ''
+      answer: answerMap[q._id.toString()] || ''
     }));
 
     const total = questions.length;
