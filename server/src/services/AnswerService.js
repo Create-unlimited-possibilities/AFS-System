@@ -43,7 +43,6 @@ export default class AnswerService {
         question,
         answer,
         layer: question.layer,
-        relationshipType: 'self',
         questionRole: question.role,
         questionOrder: question.order,
         helperId: null,
@@ -67,7 +66,8 @@ export default class AnswerService {
       questionLayer: question.layer,
       answer,
       isSelfAnswer: true,
-      relationshipType: 'self'
+      assistRelationId: null,
+      specificRelation: ''
     });
 
     await this.storageService.saveAnswer({
@@ -77,7 +77,6 @@ export default class AnswerService {
       question,
       answer,
       layer: question.layer,
-      relationshipType: 'self',
       questionRole: question.role,
       questionOrder: question.order,
       helperId: null,
@@ -120,6 +119,8 @@ export default class AnswerService {
       const tokenDiff = newTokenCount - oldTokenCount;
 
       existingAnswer.answer = answer;
+      existingAnswer.assistRelationId = relation._id;
+      existingAnswer.specificRelation = relation.specificRelation;
       existingAnswer.updatedAt = new Date();
       await existingAnswer.save();
 
@@ -131,7 +132,6 @@ export default class AnswerService {
         question,
         answer,
         layer: question.layer,
-        relationshipType: relation.relationshipType,
         helperId: helper._id.toString(),
         helperNickname: helper.nickname || helper.name,
         questionRole: question.role,
@@ -155,7 +155,8 @@ export default class AnswerService {
       questionLayer: question.layer,
       answer,
       isSelfAnswer: false,
-      relationshipType: relation.relationshipType
+      assistRelationId: relation._id,
+      specificRelation: relation.specificRelation
     });
 
     const helper = await this.userRepository.findById(userId);
@@ -166,7 +167,6 @@ export default class AnswerService {
       question,
       answer,
       layer: question.layer,
-      relationshipType: relation.relationshipType,
       helperId: helper._id.toString(),
       helperNickname: helper.nickname || helper.name,
       questionRole: question.role,
@@ -322,7 +322,6 @@ export default class AnswerService {
             question,
             answer: answerData.answer,
             layer: question.layer,
-            relationshipType: 'self',
             questionRole: question.role,
             questionOrder: question.order,
             helperId: null,
@@ -344,7 +343,8 @@ export default class AnswerService {
                 questionLayer: question.layer,
                 answer: answerData.answer,
                 isSelfAnswer: true,
-                relationshipType: 'self',
+                assistRelationId: null,
+                specificRelation: '',
                 updatedAt: new Date()
               },
               upsert: true
@@ -438,7 +438,6 @@ export default class AnswerService {
             question,
             answer: answerData.answer,
             layer: question.layer,
-            relationshipType: relation.relationshipType,
             helperId: helper._id.toString(),
             helperNickname: helper.nickname || helper.name,
             questionRole: question.role,
@@ -460,7 +459,8 @@ export default class AnswerService {
                 questionLayer: question.layer,
                 answer: answerData.answer,
                 isSelfAnswer: false,
-                relationshipType: relation.relationshipType,
+                assistRelationId: relation._id,
+                specificRelation: relation.specificRelation,
                 updatedAt: new Date()
               },
               upsert: true
