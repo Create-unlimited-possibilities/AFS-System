@@ -288,6 +288,49 @@ class VectorIndexService {
       return false;
     }
   }
+
+  async search(userId, query, topK = 5, relationType = null, relationSpecificId = null) {
+    await this.initialize();
+
+    try {
+      const collection = await this.getCollection(userId);
+
+      const queryEmbedding = await this.embeddings.embedQuery(query);
+
+      let where = {};
+      if (relationType) {
+        where.category = relationType;
+        if (relationSpecificId) {
+          where.helperId = relationSpecificId;
+        }
+      }
+
+      const results = await collection.query({
+        queryEmbeddings: [queryEmbedding],
+        nResults: topK,
+        where: Object.keys(where).length > 0 ? where : undefined
+      });
+
+      const memories = [];
+      if (results.documents && results.documents[0]) {
+        for (let i = 0; i < results.documents[0].length; i++) {
+          memories.push({
+            content: results.documents[0][i],
+            relevanceScore: 1 - (results.distances?.[0]?.[i] || 0),
+            category: results.metadatas?.[0]?.[i]?.category || 'self',
+            metadata: results.metadatas?.[0]?.[i] || {}
+          });
+        }
+      }
+
+      logger.info(`[VectorIndexService] 搜索完成 - Query: "${query}", Found: ${memories.length}`);
+
+      return memories;
+    } catch (error) {
+      logger.error('[VectorIndexService] 搜索失败:', error);
+      return [];
+    }
+  }
 }
 
 export default VectorIndexService;

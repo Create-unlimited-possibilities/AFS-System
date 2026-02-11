@@ -433,4 +433,130 @@ describe('VectorIndexService', () => {
       expect(progressCallback).toHaveBeenCalled();
     });
   });
+
+  describe('search', () => {
+    it('should return empty array if no index exists', async () => {
+      vi.stubEnv('OPENAI_API_KEY', 'test-key');
+      const mockCollection = {
+        query: vi.fn().mockResolvedValue({
+          documents: [[]],
+          distances: [[]],
+          metadatas: [[]]
+        })
+      };
+      vectorService.collections.set('user_user123', mockCollection);
+
+      const results = await vectorService.search('user123', 'test query');
+      expect(results).toEqual([]);
+      vi.unstubAllEnvs();
+    });
+
+    it('should filter by relationType', async () => {
+      vi.stubEnv('OPENAI_API_KEY', 'test-key');
+      const mockCollection = {
+        query: vi.fn().mockResolvedValue({
+          documents: [['Test content']],
+          distances: [[0.3]],
+          metadatas: [[{ category: 'family', helperId: 'helper1' }]]
+        })
+      };
+      vectorService.collections.set('user_user123', mockCollection);
+
+      const results = await vectorService.search('user123', 'test query', 5, 'family', 'helper1');
+
+      expect(mockCollection.query).toHaveBeenCalledWith({
+        queryEmbeddings: [[0.1, 0.2]],
+        nResults: 5,
+        where: { category: 'family', helperId: 'helper1' }
+      });
+      vi.unstubAllEnvs();
+    });
+
+    it('should return results with correct format', async () => {
+      vi.stubEnv('OPENAI_API_KEY', 'test-key');
+      const mockCollection = {
+        query: vi.fn().mockResolvedValue({
+          documents: [['First result', 'Second result']],
+          distances: [[0.2, 0.5]],
+          metadatas: [[
+            { category: 'self', memoryId: 'mem1' },
+            { category: 'family', memoryId: 'mem2', helperId: 'helper1' }
+          ]]
+        })
+      };
+      vectorService.collections.set('user_user123', mockCollection);
+
+      const results = await vectorService.search('user123', 'test query', 5);
+
+      expect(results).toEqual([
+        {
+          content: 'First result',
+          relevanceScore: 0.8,
+          category: 'self',
+          metadata: { category: 'self', memoryId: 'mem1' }
+        },
+        {
+          content: 'Second result',
+          relevanceScore: 0.5,
+          category: 'family',
+          metadata: { category: 'family', memoryId: 'mem2', helperId: 'helper1' }
+        }
+      ]);
+      vi.unstubAllEnvs();
+    });
+
+    it('should return empty array on error', async () => {
+      vi.stubEnv('OPENAI_API_KEY', 'test-key');
+      const mockCollection = {
+        query: vi.fn().mockRejectedValue(new Error('Search failed'))
+      };
+      vectorService.collections.set('user_user123', mockCollection);
+
+      const results = await vectorService.search('user123', 'test query');
+      expect(results).toEqual([]);
+      vi.unstubAllEnvs();
+    });
+
+    it('should use default topK of 5', async () => {
+      vi.stubEnv('OPENAI_API_KEY', 'test-key');
+      const mockCollection = {
+        query: vi.fn().mockResolvedValue({
+          documents: [['Test']],
+          distances: [[0.1]],
+          metadatas: [[{ category: 'self' }]]
+        })
+      };
+      vectorService.collections.set('user_user123', mockCollection);
+
+      await vectorService.search('user123', 'test query');
+
+      expect(mockCollection.query).toHaveBeenCalledWith({
+        queryEmbeddings: [[0.1, 0.2]],
+        nResults: 5,
+        where: undefined
+      });
+      vi.unstubAllEnvs();
+    });
+
+    it('should filter by relationType without relationSpecificId', async () => {
+      vi.stubEnv('OPENAI_API_KEY', 'test-key');
+      const mockCollection = {
+        query: vi.fn().mockResolvedValue({
+          documents: [['Test content']],
+          distances: [[0.3]],
+          metadatas: [[{ category: 'friend', helperId: 'helper1' }]]
+        })
+      };
+      vectorService.collections.set('user_user123', mockCollection);
+
+      const results = await vectorService.search('user123', 'test query', 5, 'friend');
+
+      expect(mockCollection.query).toHaveBeenCalledWith({
+        queryEmbeddings: [[0.1, 0.2]],
+        nResults: 5,
+        where: { category: 'friend' }
+      });
+      vi.unstubAllEnvs();
+    });
+  });
 });
