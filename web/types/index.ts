@@ -336,3 +336,28 @@ export interface ChatSessionSummary {
   isActive: boolean;
 }
 
+export interface VectorIndexStatus {
+  exists: boolean
+  memoryCount: number
+  canBuild: boolean
+  totalDocuments?: number
+  collectionName?: string
+}
+
+export interface VectorIndexBuildProgress {
+  current: number
+  total: number
+  message: string
+}
+
+export interface VectorIndexBuildResult {
+  success: boolean
+  userId: string
+  memoryCount: number
+  categories: {
+    self: number
+    family: number
+    friend: number
+  }
+  duration: number
+}
