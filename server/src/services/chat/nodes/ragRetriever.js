@@ -26,9 +26,9 @@ export async function ragRetrieverNode(state) {
       logger.info('[RAGRetriever] 陌生人模式，不进行记忆检索');
     } else {
       logger.info(`[RAGRetriever] ${relationType}模式，检索${relationType}记忆`);
-      
+
       const category = relationType;
-      retrievedMemories = await retrieveMemories(currentInput, category);
+      retrievedMemories = await retrieveMemories(currentInput, category, state.userId, interlocutor.specificId);
     }
 
     state.retrievedMemories = retrievedMemories;
@@ -43,21 +43,28 @@ export async function ragRetrieverNode(state) {
   }
 }
 
-async function retrieveMemories(query, category) {
+async function retrieveMemories(query, category, userId, relationSpecificId = null) {
   try {
-    const DualStorage = (await import('../../dualStorage.js')).default;
-    const dualStorage = new DualStorage();
-    
-    const memories = await dualStorage.retrieveMemories(query, category);
-    
-    return memories.map(memory => ({
-      content: memory.content,
-      relevanceScore: memory.score || 0.5,
-      category: memory.category || category,
-      metadata: memory.metadata || {}
-    }));
+    const VectorIndexService = (await import('../../services/vectorIndexService.js')).default;
+    const vectorService = new VectorIndexService();
+
+    const exists = await vectorService.indexExists(userId);
+    if (!exists) {
+      logger.warn(`[RAGRetriever] 用户 ${userId} 的向量索引不存在`);
+      return [];
+    }
+
+    const memories = await vectorService.search(
+      userId,
+      query,
+      5,
+      category,
+      relationSpecificId
+    );
+
+    return memories;
   } catch (error) {
-    logger.error('[RAGRetriever] 记忆检索失败:', error);
+    logger.error('[RAGRetriever] 向量搜索失败:', error);
     return [];
   }
 }
