@@ -31,7 +31,6 @@ export default function RootLayout({
             </NavbarWrapper>
           </PermissionProvider>
         </ThemeProvider>
-       </body>
       </body>
     </html>
   )

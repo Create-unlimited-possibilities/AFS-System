@@ -55,6 +55,9 @@ server/storage/userdata/
 server/storage/userdata/**/*
 ./server/storage/userdata/
 
+# Rolecard files (Method B)
+server/storage/rolecards/
+
 # LLM模型文件
 modelserver/models/blobs/
 modelserver/models/blobs/**/*

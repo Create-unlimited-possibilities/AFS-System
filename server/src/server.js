@@ -30,13 +30,15 @@ mongoose.connect(process.env.MONGO_URI)
 
 mongoose.connection.once('open', async () => {
   console.log('MongoDB 已连接');
-  
+
   const syncQueue = new SimpleSyncQueue(dualStorage);
   SimpleSyncQueue.instance = syncQueue;
-  
+
+  AutoHookRegistry.syncQueueClass = SimpleSyncQueue;
+
   const hookRegistry = new AutoHookRegistry(syncQueue);
-  hookRegistry.registerAll();
-  
+  await hookRegistry.registerAll();
+
   console.log('自动挂钩已注册');
 });
 

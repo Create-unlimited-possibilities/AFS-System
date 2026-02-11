@@ -114,7 +114,8 @@ export interface Answer {
   questionLayer: 'basic' | 'emotional';
   answer: string;
   isSelfAnswer: boolean;
-  relationshipType: 'self' | 'family' | 'friend';
+  assistRelationId?: string;
+  specificRelation?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -134,6 +135,13 @@ export interface AssistRelation {
   friendLevel?: 'casual' | 'close' | 'intimate';
   createdAt: string;
   isActive: boolean;
+  answerSummary?: {
+    hasAnswers: boolean;
+    basicAnswersCount: number;
+    emotionalAnswersCount: number;
+    lastAnswerUpdatedAt: string;
+  };
+  guidelinesGenerated?: boolean;
 }
 
 export interface Progress {

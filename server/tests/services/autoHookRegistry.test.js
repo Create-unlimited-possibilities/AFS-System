@@ -31,7 +31,14 @@ describe('AutoHookRegistry', () => {
     vi.mocked(path.join).mockImplementation((dir, ...rest) => {
       return rest.join('/');
     });
-    
+
+    vi.mocked(path.basename).mockImplementation((file, ext) => {
+      if (ext && file.endsWith(ext)) {
+        return file.slice(0, -ext.length);
+      }
+      return file;
+    });
+
     AutoHookRegistry.syncQueueClass = { instance: mockSyncQueue };
   });
 
@@ -85,6 +92,60 @@ describe('AutoHookRegistry', () => {
       
       expect(registry.hookedModels.has('Question')).toBe(false);
       expect(registry.hookedModels.has('Role')).toBe(false);
+    });
+
+    it('should register hooks for all target models', async () => {
+      const mockSchemas = {
+        User: { post: vi.fn() },
+        Answer: { post: vi.fn() },
+        AssistRelation: { post: vi.fn() },
+        ChatSession: { post: vi.fn() }
+      };
+
+      const mockModels = {
+        User: { schema: mockSchemas.User },
+        Answer: { schema: mockSchemas.Answer },
+        AssistRelation: { schema: mockSchemas.AssistRelation },
+        ChatSession: { schema: mockSchemas.ChatSession }
+      };
+
+      vi.spyOn(registry, 'getModel').mockResolvedValue(mockModels.User);
+      await registry.registerHook('User', 'User.js');
+
+      expect(registry.hookedModels.has('User')).toBe(true);
+      expect(mockSchemas.User.post).toHaveBeenCalledTimes(2);
+    });
+
+    it('should register all target models from directory', async () => {
+      const mockSchemas = {
+        User: { post: vi.fn() },
+        Answer: { post: vi.fn() },
+        AssistRelation: { post: vi.fn() },
+        ChatSession: { post: vi.fn() }
+      };
+
+      const mockModels = {
+        User: { schema: mockSchemas.User },
+        Answer: { schema: mockSchemas.Answer },
+        AssistRelation: { schema: mockSchemas.AssistRelation },
+        ChatSession: { schema: mockSchemas.ChatSession }
+      };
+
+      vi.spyOn(registry, 'getModel').mockImplementation(async (modelPath) => {
+        if (modelPath.includes('User.js')) return mockModels.User;
+        if (modelPath.includes('Answer.js')) return mockModels.Answer;
+        if (modelPath.includes('AssistRelation.js')) return mockModels.AssistRelation;
+        if (modelPath.includes('ChatSession.js')) return mockModels.ChatSession;
+        throw new Error(`Unknown model: ${modelPath}`);
+      });
+
+      await registry.registerAll();
+
+      expect(registry.hookedModels.has('User')).toBe(true);
+      expect(registry.hookedModels.has('Answer')).toBe(true);
+      expect(registry.hookedModels.has('AssistRelation')).toBe(true);
+      expect(registry.hookedModels.has('ChatSession')).toBe(true);
+      expect(registry.hookedModels.size).toBe(4);
     });
   });
 

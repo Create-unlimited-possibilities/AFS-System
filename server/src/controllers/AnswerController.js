@@ -3,6 +3,7 @@ import QuestionService from '../services/QuestionService.js';
 import Question from '../models/Question.js';
 import Answer from '../models/Answer.js';
 import User from '../models/User.js';
+import AssistRelation from '../models/AssistRelation.js';
 
 // 实例化服务类
 const answerService = new AnswerService();
@@ -270,6 +271,72 @@ class AnswerController {
     } catch (error) {
       console.error('批量保存协助答案失败:', error);
       res.status(403).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  async getAssistQuestions(req, res) {
+    try {
+      const { targetUserId } = req.query;
+      const userId = req.user.id;
+
+      if (!targetUserId) {
+        return res.status(400).json({
+          success: false,
+          error: 'targetUserId参数不能为空'
+        });
+      }
+
+      const relation = await AssistRelation.findOne({
+        assistantId: userId,
+        targetId: targetUserId,
+        isActive: true
+      });
+
+      if (!relation) {
+        return res.status(403).json({
+          success: false,
+          error: '您没有协助该用户的权限'
+        });
+      }
+
+      const questions = await Question.find({
+        role: relation.relationshipType,
+        active: true
+      }).sort({ layer: 1, order: 1 });
+
+      const answeredQuestions = await answerService.getAssistAnswers(userId, targetUserId);
+
+      const answerMap = {};
+      answeredQuestions.forEach(a => {
+        const questionId = a.questionId._id ? a.questionId._id.toString() : a.questionId.toString();
+        answerMap[questionId] = a.answer;
+      });
+
+      const formattedQuestions = questions.map(q => ({
+        _id: q._id.toString(),
+        order: q.order,
+        category: q.layer,
+        questionText: q.question,
+        questionType: q.type || 'textarea',
+        placeholder: q.placeholder || '',
+        answer: answerMap[q._id.toString()] || ''
+      }));
+
+      res.json({
+        success: true,
+        data: {
+          questions: formattedQuestions,
+          targetUser: relation.targetId,
+          relationType: relation.relationshipType,
+          specificRelation: relation.specificRelation
+        }
+      });
+    } catch (error) {
+      console.error('获取协助问题失败:', error);
+      res.status(500).json({
         success: false,
         error: error.message
       });

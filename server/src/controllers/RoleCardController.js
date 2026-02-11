@@ -7,11 +7,14 @@
  */
 
 import RoleCardGenerator from '../services/langchain/roleCardGenerator.js';
+import RoleCardGeneratorB from '../services/langchain/roleCardGeneratorB.js';
 import AssistantsGuidelinesPreprocessor from '../services/langchain/assistantsGuidelinesPreprocessor.js';
 import User from '../models/User.js';
 import logger from '../utils/logger.js';
+import roleCardConfig from '../config/roleCardConfig.js';
 
 const roleCardGenerator = new RoleCardGenerator();
+const roleCardGeneratorB = new RoleCardGeneratorB();
 const guidelinesPreprocessor = new AssistantsGuidelinesPreprocessor();
 
 class RoleCardController {
@@ -19,11 +22,20 @@ class RoleCardController {
    * 生成角色卡
    */
   async generateRoleCard(req, res) {
+    const userId = req.user.id;
+    const method = roleCardConfig.generationMethod;
+
+    logger.info(`[RoleCardController] 开始生成角色卡 - User: ${userId}, Method: ${method}`);
+
+    if (method === 'B') {
+      await this.generateWithProgressB(userId, res);
+    } else {
+      await this.generateMethodA(userId, res);
+    }
+  }
+
+  async generateMethodA(userId, res) {
     try {
-      const userId = req.user.id;
-
-      logger.info(`[RoleCardController] 开始生成角色卡 - User: ${userId}`);
-
       const result = await roleCardGenerator.generateRoleCard(userId);
 
       logger.info(`[RoleCardController] 角色卡生成成功 - User: ${userId}`);
@@ -41,6 +53,36 @@ class RoleCardController {
         success: false,
         error: error.message
       });
+    }
+  }
+
+  async generateWithProgressB(userId, res) {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const progressCallback = (type, data) => {
+      try {
+        res.write(`event: ${type}\n`);
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      } catch (error) {
+        logger.error('[RoleCardController] SSE write error:', error);
+      }
+    };
+
+    try {
+      await roleCardGeneratorB.generateRoleCard(userId, progressCallback);
+
+      logger.info(`[RoleCardController] 角色卡生成成功 - User: ${userId}`);
+
+      res.write(`event: done\n`);
+      res.write(`data: ${JSON.stringify({ success: true })}\n\n`);
+    } catch (error) {
+      logger.error('[RoleCardController] 生成角色卡失败:', error);
+      res.write(`event: error\n`);
+      res.write(`data: ${JSON.stringify({ success: false, error: error.message })}\n\n`);
+    } finally {
+      res.end();
     }
   }
 

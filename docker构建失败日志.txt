@@ -1,0 +1,49 @@
+ => ERROR [web builder 6/6] RUN npm run build                                                                  46.8s
+ => CACHED [server 3/5] COPY package.json .                                                                     0.0s
+ => CANCELED [server 4/5] RUN npm install --legacy-peer-deps                                                   34.7s
+------
+ > [web builder 6/6] RUN npm run build:
+1.664
+1.664 > afs-web@1.0.0 build
+1.664 > next build
+1.664
+4.952 Attention: Next.js now collects completely anonymous telemetry regarding usage.
+4.952 This information is used to shape Next.js' roadmap and prioritize features.
+4.952 You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+4.952 https://nextjs.org/telemetry
+4.952
+5.150    ▲ Next.js 15.5.11
+5.150
+6.233  ⚠ Mismatching @next/swc version, detected: 15.5.7 while Next.js is on 15.5.11. Please ensure these match
+6.599    Creating an optimized production build ...
+7.618  ⚠ Mismatching @next/swc version, detected: 15.5.7 while Next.js is on 15.5.11. Please ensure these match
+21.85  ⚠ Mismatching @next/swc version, detected: 15.5.7 while Next.js is on 15.5.11. Please ensure these match
+28.43  ⚠ Mismatching @next/swc version, detected: 15.5.7 while Next.js is on 15.5.11. Please ensure these match
+37.77  ✓ Compiled successfully in 26.1s
+37.78    Linting and checking validity of types ...
+45.69 Failed to compile.
+45.69
+45.69 app/chat/page.tsx
+45.69 Type error: Type '{ params: { sessionId: string; }; }' does not satisfy the constraint 'PageProps'.
+45.69   Types of property 'params' are incompatible.
+45.69     Type '{ sessionId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+45.69
+45.81 Next.js build worker exited with code: 1 and signal: null
+------
+Dockerfile-web:21
+
+--------------------
+
+  19 |
+
+  20 |     # 构建应用
+
+  21 | >>> RUN npm run build
+
+  22 |
+
+  23 |     # 生产阶段
+
+--------------------
+
+target web: failed to solve: process "/bin/sh -c npm run build" did not complete successfully: exit code: 1

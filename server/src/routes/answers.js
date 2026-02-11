@@ -31,5 +31,8 @@ router.post('/answers/batch-self', protect, (req, res) => {
 router.post('/answers/batch-assist', protect, (req, res) => {
   answerController.batchSaveAssistAnswers(req, res);
 });
+router.get('/questions/assist', protect, (req, res) => {
+  answerController.getAssistQuestions(req, res);
+});
 
 export default router;

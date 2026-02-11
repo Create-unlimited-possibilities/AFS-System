@@ -7,6 +7,10 @@ services:
         - NEXT_PUBLIC_API_URL=http://localhost:3001
     ports:
       - "3002:3000"
+    volumes:
+      - ./web/app:/app/app
+      - ./web/lib:/app/lib
+      - ./web/components:/app/components
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:3001
     depends_on:
@@ -22,6 +26,8 @@ services:
     ports:
       - "3001:3000"
     volumes:
+      - ./server:/app
+      - /app/node_modules
       - ./server/storage:/app/storage
     depends_on:
       - mongoserver

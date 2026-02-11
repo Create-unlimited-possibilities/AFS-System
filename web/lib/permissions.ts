@@ -24,13 +24,13 @@ export const hasAnyPermission = (user: User | null, permissionNames: string[]): 
     return false;
   }
 
-  if (!user.role.permissions || !Array.isArray(user.role.permissions)) {
+  if (!user.role || !user.role.permissions) {
     console.warn('[hasAnyPermission] Invalid permissions');
     return false;
   }
 
   return permissionNames.some((permissionName) =>
-    user.role!.permissions.some((permission) => permission.name === permissionName)
+    user.role?.permissions?.some((permission) => permission.name === permissionName)
   );
 };
 
@@ -45,27 +45,7 @@ export const hasAllPermissions = (user: User | null, permissionNames: string[]):
   }
 
   return permissionNames.every((permissionName) =>
-    user.role!.permissions.some((permission) => permission.name === permissionName)
-  );
-};
-
-export const hasAnyPermission = (user: User | null, permissionNames: string[]): boolean => {
-  if (!user || !user.role) {
-    return false;
-  }
-
-  return permissionNames.some((permissionName) =>
-    user.role!.permissions.some((permission) => permission.name === permissionName)
-  );
-};
-
-export const hasAllPermissions = (user: User | null, permissionNames: string[]): boolean => {
-  if (!user || !user.role) {
-    return false;
-  }
-
-  return permissionNames.every((permissionName) =>
-    user.role!.permissions.some((permission) => permission.name === permissionName)
+    user.role?.permissions?.some((permission) => permission.name === permissionName)
   );
 };
 
