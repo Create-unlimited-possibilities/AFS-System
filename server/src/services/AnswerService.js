@@ -223,19 +223,22 @@ export default class AnswerService {
     const answers = await this.answerRepository.find({
       targetUserId: targetUserId,
       userId: { $ne: targetUserId }
-    });
+    }).populate('assistRelationId');
 
     const groupedByContributor = {};
     answers.forEach(answer => {
       const contributorId = answer.userId._id.toString();
       if (!groupedByContributor[contributorId]) {
+        const relationshipType = answer.assistRelationId?.relationshipType || 'unknown';
+        const specificRelation = answer.assistRelationId?.specificRelation || '';
         groupedByContributor[contributorId] = {
           contributor: {
             id: answer.userId._id,
             name: answer.userId.name,
             email: answer.userId.email
           },
-          relationshipType: answer.relationshipType,
+          relationshipType: relationshipType,
+          specificRelation: specificRelation,
           answers: [],
           basicCount: 0,
           emotionalCount: 0
