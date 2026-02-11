@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 import { UserPlus, UserMinus, Mail, Search, Plus } from 'lucide-react'
+import Link from 'next/link'
 
 interface AssistRelation {
   _id: string
@@ -28,11 +29,12 @@ interface AssistRelation {
 export default function AssistPage() {
   const { user } = useAuthStore()
   const [relations, setRelations] = useState<AssistRelation[]>([])
-  const [email, setEmail] = useState('')
-  const [searchEmail, setSearchEmail] = useState('')
+  const [searchCode, setSearchCode] = useState('')
   const [foundUser, setFoundUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [relationshipType, setRelationshipType] = useState<'family' | 'friend'>('family')
+  const [specificRelationship, setSpecificRelationship] = useState('')
 
   useEffect(() => {
     fetchRelations()
@@ -51,10 +53,10 @@ export default function AssistPage() {
   }
 
   const handleSearchUser = async () => {
-    if (!searchEmail) return
+    if (!searchCode) return
 
     try {
-      const res = await api.get<{ user: any }>(`/auth/assist/search?email=${searchEmail}`)
+      const res = await api.get<{ user: any }>(`/auth/assist/search?code=${searchCode}`)
       if (res.success && res.data?.user) {
         setFoundUser(res.data.user)
       } else {
@@ -63,7 +65,7 @@ export default function AssistPage() {
       }
     } catch (error) {
       console.error('搜索用户失败:', error)
-      alert('搜索失败，请检查邮箱是否正确')
+      alert('搜索失败，请检查编号是否正确')
     }
   }
 
@@ -74,10 +76,13 @@ export default function AssistPage() {
       setSubmitting(true)
       await api.post('/auth/assist/verify', {
         targetEmail: foundUser.email,
-        targetCode: foundUser.uniqueCode
+        targetCode: foundUser.uniqueCode,
+        relationshipType,
+        specificRelationship
       })
       alert('协助请求已发送！')
-      setSearchEmail('')
+      setSearchCode('')
+      setSpecificRelationship('')
       setFoundUser(null)
       fetchRelations()
     } catch (error) {
@@ -133,39 +138,90 @@ export default function AssistPage() {
                 添加新的协助关系
               </CardTitle>
               <CardDescription>
-                输入对方的邮箱地址，发送协助请求
+                输入对方的专属编号，发送协助请求
               </CardDescription>
             </CardHeader>
             <CardContent>
               {!foundUser ? (
-                <div className="flex gap-2">
-                  <div className="flex-1">
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <Input
+                        type="text"
+                        placeholder="输入对方专属编号"
+                        value={searchCode}
+                        onChange={(e) => setSearchCode(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSearchUser()}
+                      />
+                    </div>
+                    <Button onClick={handleSearchUser}>
+                      <Search className="h-4 w-4 mr-2" />
+                      搜索
+                    </Button>
+                  </div>
+                  <div>
+                    <Label className="text-base font-medium">关系类型</Label>
+                    <div className="flex gap-4 mt-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="relationshipType"
+                          value="family"
+                          checked={relationshipType === 'family'}
+                          onChange={(e) => setRelationshipType(e.target.value as 'family' | 'friend')}
+                          className="w-4 h-4"
+                        />
+                        <span>家人</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="relationshipType"
+                          value="friend"
+                          checked={relationshipType === 'friend'}
+                          onChange={(e) => setRelationshipType(e.target.value as 'family' | 'friend')}
+                          className="w-4 h-4"
+                        />
+                        <span>朋友</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="specificRelationship" className="text-base font-medium">具体关系</Label>
                     <Input
-                      type="email"
-                      placeholder="输入对方邮箱地址"
-                      value={searchEmail}
-                      onChange={(e) => setSearchEmail(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSearchUser()}
+                      id="specificRelationship"
+                      type="text"
+                      placeholder="如：妻子、大儿子、小女儿等"
+                      value={specificRelationship}
+                      onChange={(e) => setSpecificRelationship(e.target.value)}
+                      className="mt-2"
                     />
                   </div>
-                  <Button onClick={handleSearchUser}>
-                    <Search className="h-4 w-4 mr-2" />
-                    搜索
-                  </Button>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
+                  <div className="p-4 border rounded-lg">
+                    <div className="mb-3">
                       <div className="font-medium">{foundUser.name}</div>
                       <div className="text-sm text-muted-foreground">{foundUser.email}</div>
+                      <div className="text-sm text-muted-foreground">专属编号: {foundUser.uniqueCode}</div>
+                    </div>
+                    <div className="mb-3">
+                      <div className="text-sm">
+                        <span className="font-medium">关系类型: </span>
+                        {relationshipType === 'family' ? '家人' : '朋友'}
+                      </div>
+                      <div className="text-sm">
+                        <span className="font-medium">具体关系: </span>
+                        {specificRelationship}
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
                         onClick={() => {
                           setFoundUser(null)
-                          setSearchEmail('')
+                          setSearchCode('')
                         }}
                       >
                         取消
@@ -214,14 +270,21 @@ export default function AssistPage() {
                         </div>
                         <div className="flex gap-2">
                           {relation.status === 'accepted' && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleRemoveRelation(relation._id)}
-                            >
-                              <UserMinus className="h-4 w-4 mr-1" />
-                              移除
-                            </Button>
+                            <>
+                              <Link href={`/questions/assist?targetId=${relation.assistedUser._id}`}>
+                                <Button variant="default" size="sm">
+                                  回答问题
+                                </Button>
+                              </Link>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleRemoveRelation(relation._id)}
+                              >
+                                <UserMinus className="h-4 w-4 mr-1" />
+                                移除
+                              </Button>
+                            </>
                           )}
                           {relation.status === 'pending' && (
                             <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded">
