@@ -3,6 +3,7 @@ import QuestionRepository from '../repositories/QuestionRepository.js';
 import UserRepository from '../repositories/UserRepository.js';
 import AssistRelationRepository from '../repositories/AssistRelationRepository.js';
 import StorageService from './storageService.js';
+import Answer from '../models/Answer.js';
 import { countTokens } from '../utils/tokenCounter.js';
 
 export default class AnswerService {
@@ -283,7 +284,8 @@ export default class AnswerService {
       if (!question) continue;
       answerDataWithLayers.push({
         ...answerData,
-        layer: question.layer
+        layer: question.layer,
+        questionObj: question
       });
     }
 
@@ -299,7 +301,7 @@ export default class AnswerService {
       }
     }
 
-    // 对每一层，先删除该层的旧答案，再插入新答案
+    // 使用 bulkWrite 进行批量替换（upsert: true）
     let totalTokenCount = 0;
     const allSavedAnswers = [];
 
@@ -307,27 +309,10 @@ export default class AnswerService {
       const layerAnswers = answersByLayer[layer];
 
       if (layerAnswers.length > 0) {
-        // 只删除当前层的答案
-        await this.answerRepository.deleteMany({
-          userId,
-          targetUserId: userId,
-          questionLayer: layer
-        });
-
-        const answerDocs = [];
+        const bulkOps = [];
+        
         for (const answerData of layerAnswers) {
-          const question = await this.questionRepository.findById(answerData.questionId);
-          if (!question) continue;
-
-          answerDocs.push({
-            userId,
-            targetUserId: userId,
-            questionId: answerData.questionId,
-            questionLayer: question.layer,
-            answer: answerData.answer,
-            isSelfAnswer: true,
-            relationshipType: 'self'
-          });
+          const question = answerData.questionObj;
 
           // 保存到文件系统
           await this.storageService.saveAnswer({
@@ -344,12 +329,42 @@ export default class AnswerService {
             helperNickname: null
           });
 
+          // 准备 bulkWrite 操作
+          bulkOps.push({
+            replaceOne: {
+              filter: {
+                userId,
+                targetUserId: userId,
+                questionId: question._id
+              },
+              replacement: {
+                userId,
+                targetUserId: userId,
+                questionId: question._id,
+                questionLayer: question.layer,
+                answer: answerData.answer,
+                isSelfAnswer: true,
+                relationshipType: 'self',
+                updatedAt: new Date()
+              },
+              upsert: true
+            }
+          });
+
           totalTokenCount += countTokens(answerData.answer);
         }
 
-        if (answerDocs.length > 0) {
-          const inserted = await this.answerRepository.insertMany(answerDocs);
-          allSavedAnswers.push(...inserted);
+        // 执行批量写入
+        if (bulkOps.length > 0) {
+          const result = await Answer.bulkWrite(bulkOps, { ordered: false });
+          
+          // 获取保存的答案（查询以返回完整文档）
+          const savedAnswers = await this.answerRepository.find({
+            userId,
+            targetUserId: userId,
+            questionLayer: layer
+          });
+          allSavedAnswers.push(...savedAnswers);
         }
       }
     }
@@ -384,7 +399,8 @@ export default class AnswerService {
       if (!question) continue;
       answerDataWithLayers.push({
         ...answerData,
-        layer: question.layer
+        layer: question.layer,
+        questionObj: question
       });
     }
 
@@ -400,7 +416,7 @@ export default class AnswerService {
       }
     }
 
-    // 对每一层，先删除该层的旧答案，再插入新答案
+    // 使用 bulkWrite 进行批量替换（upsert: true）
     let totalTokenCount = 0;
     const allSavedAnswers = [];
     const helper = await this.userRepository.findById(userId);
@@ -409,27 +425,10 @@ export default class AnswerService {
       const layerAnswers = answersByLayer[layer];
 
       if (layerAnswers.length > 0) {
-        // 只删除当前层的答案
-        await this.answerRepository.deleteMany({
-          userId,
-          targetUserId,
-          questionLayer: layer
-        });
-
-        const answerDocs = [];
+        const bulkOps = [];
+        
         for (const answerData of layerAnswers) {
-          const question = await this.questionRepository.findById(answerData.questionId);
-          if (!question) continue;
-
-          answerDocs.push({
-            userId,
-            targetUserId,
-            questionId: answerData.questionId,
-            questionLayer: question.layer,
-            answer: answerData.answer,
-            isSelfAnswer: false,
-            relationshipType: relation.relationshipType
-          });
+          const question = answerData.questionObj;
 
           // 保存到文件系统
           await this.storageService.saveAnswer({
@@ -446,12 +445,42 @@ export default class AnswerService {
             questionOrder: question.order
           });
 
+          // 准备 bulkWrite 操作
+          bulkOps.push({
+            replaceOne: {
+              filter: {
+                userId,
+                targetUserId,
+                questionId: question._id
+              },
+              replacement: {
+                userId,
+                targetUserId,
+                questionId: question._id,
+                questionLayer: question.layer,
+                answer: answerData.answer,
+                isSelfAnswer: false,
+                relationshipType: relation.relationshipType,
+                updatedAt: new Date()
+              },
+              upsert: true
+            }
+          });
+
           totalTokenCount += countTokens(answerData.answer);
         }
 
-        if (answerDocs.length > 0) {
-          const inserted = await this.answerRepository.insertMany(answerDocs);
-          allSavedAnswers.push(...inserted);
+        // 执行批量写入
+        if (bulkOps.length > 0) {
+          const result = await Answer.bulkWrite(bulkOps, { ordered: false });
+          
+          // 获取保存的答案（查询以返回完整文档）
+          const savedAnswers = await this.answerRepository.find({
+            userId,
+            targetUserId,
+            questionLayer: layer
+          });
+          allSavedAnswers.push(...savedAnswers);
         }
       }
     }
