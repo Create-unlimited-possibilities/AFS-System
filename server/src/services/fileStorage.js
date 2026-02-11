@@ -11,8 +11,21 @@ const projectRoot = path.resolve(__dirname, '../../..');
 
 export default class FileStorage {
   constructor() {
-    // 使用相对于项目根目录的路径，兼容 Windows 和 Linux/Mac
-    this.basePath = path.join(projectRoot, 'server', 'storage', 'userdata');
+    // 检测是否在 Docker 容器内运行
+    // 方法1：检查 /.dockerenv 文件（标准Docker环境）
+    // 方法2：检查环境变量
+    // 方法3：检查 /proc/1/cgroup（Linux容器通用方法）
+    const isDocker = fs.existsSync('/.dockerenv') || 
+                     process.env.DOCKER_CONTAINER === 'true' ||
+                     process.env.NODE_ENV === 'docker';
+    
+    // Docker 环境使用 /app/storage/userdata（挂载卷路径）
+    // 本地环境使用相对路径 server/storage/userdata
+    if (isDocker) {
+      this.basePath = '/app/storage/userdata';
+    } else {
+      this.basePath = path.join(projectRoot, 'server', 'storage', 'userdata');
+    }
   }
 
   async initialize() {
