@@ -47,8 +47,25 @@ describe('VectorIndexService', () => {
       await expect(vectorService.getCollection('user@123')).rejects.toThrow('Invalid userId: contains invalid characters for ChromaDB collection names');
     });
 
-    it('should throw error for userId starting with number', async () => {
-      await expect(vectorService.getCollection('123user')).rejects.toThrow('Invalid userId: contains invalid characters for ChromaDB collection names');
+    it('should accept userId starting with number', async () => {
+      vi.stubEnv('OPENAI_API_KEY', 'test-key');
+      const mockCollection = { id: 'mock-collection' };
+      vectorService.collections.set('user_123user', mockCollection);
+
+      const result = await vectorService.getCollection('123user');
+      expect(result).toBe(mockCollection);
+      vi.unstubAllEnvs();
+    });
+
+    it('should accept MongoDB ObjectId format (24-char hex string)', async () => {
+      vi.stubEnv('OPENAI_API_KEY', 'test-key');
+      const mockCollection = { id: 'mock-collection' };
+      const mongoObjectId = '507f1f77bcf86cd799439011';
+      vectorService.collections.set(`user_${mongoObjectId}`, mockCollection);
+
+      const result = await vectorService.getCollection(mongoObjectId);
+      expect(result).toBe(mockCollection);
+      vi.unstubAllEnvs();
     });
 
     it('should accept valid userId with alphanumeric', async () => {

@@ -58,7 +58,7 @@ class VectorIndexService {
       throw new Error('Invalid userId: must be a non-empty string');
     }
 
-    if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(userId)) {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(userId)) {
       throw new Error('Invalid userId: contains invalid characters for ChromaDB collection names');
     }
 
@@ -75,7 +75,20 @@ class VectorIndexService {
       this.collections.set(collectionName, collection);
       return collection;
     } catch (error) {
-      if (error.message?.includes('does not exist')) {
+      const errorMessage = error?.message || String(error);
+      const collectionNotFoundPatterns = [
+        'does not exist',
+        'not found',
+        'not exist',
+        'NotFoundError',
+        '404'
+      ];
+
+      const isCollectionNotFound = collectionNotFoundPatterns.some(pattern =>
+        errorMessage.toLowerCase().includes(pattern.toLowerCase())
+      );
+
+      if (isCollectionNotFound) {
         logger.info(`[VectorIndexService] 创建collection: ${collectionName}`);
         const collection = await this.client.createCollection({
           name: collectionName,
