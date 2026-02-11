@@ -14,16 +14,13 @@ vi.mock('chromadb', () => ({
   }
 }));
 
-vi.mock('@langchain/openai', () => ({
-  OpenAIEmbeddings: class {
-    constructor() {
-      this.embedQuery = vi.fn().mockResolvedValue([0.1, 0.2]);
-    }
-  },
-  ChatOpenAI: class {
-    constructor() {
-      this.invoke = vi.fn().mockResolvedValue('mock response');
-    }
+vi.mock('../../src/services/EmbeddingService.js', () => ({
+  default: class {
+    constructor() {}
+    initialize = vi.fn().mockResolvedValue(undefined);
+    embedQuery = vi.fn().mockResolvedValue([0.1, 0.2]);
+    embedDocuments = vi.fn().mockResolvedValue([[0.1, 0.2], [0.3, 0.4]]);
+    healthCheck = vi.fn().mockResolvedValue(true);
   }
 }));
 
@@ -70,54 +67,44 @@ describe('VectorIndexService', () => {
     });
 
     it('should accept userId starting with number', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const mockCollection = { id: 'mock-collection' };
       vectorService.collections.set('user_123user', mockCollection);
 
       const result = await vectorService.getCollection('123user');
       expect(result).toBe(mockCollection);
-      vi.unstubAllEnvs();
     });
 
     it('should accept MongoDB ObjectId format (24-char hex string)', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const mockCollection = { id: 'mock-collection' };
       const mongoObjectId = '507f1f77bcf86cd799439011';
       vectorService.collections.set(`user_${mongoObjectId}`, mockCollection);
 
       const result = await vectorService.getCollection(mongoObjectId);
       expect(result).toBe(mockCollection);
-      vi.unstubAllEnvs();
     });
 
     it('should accept valid userId with alphanumeric', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const mockCollection = { id: 'mock-collection' };
       vectorService.collections.set('user_valid123', mockCollection);
 
       const result = await vectorService.getCollection('valid123');
       expect(result).toBe(mockCollection);
-      vi.unstubAllEnvs();
     });
 
     it('should accept valid userId with underscore', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const mockCollection = { id: 'mock-collection' };
       vectorService.collections.set('user_test_user', mockCollection);
 
       const result = await vectorService.getCollection('test_user');
       expect(result).toBe(mockCollection);
-      vi.unstubAllEnvs();
     });
 
     it('should accept valid userId with hyphen', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const result = await vectorService.getCollection('test-user');
       expect(result).toHaveProperty('id', 'mock-collection');
       expect(result).toHaveProperty('delete');
       expect(result).toHaveProperty('add');
       expect(result).toHaveProperty('count');
-      vi.unstubAllEnvs();
     });
   });
 
@@ -141,32 +128,25 @@ describe('VectorIndexService', () => {
   });
 
   describe('initialize', () => {
-    it('should throw error if OPENAI_API_KEY is not set', async () => {
-      vi.stubEnv('OPENAI_API_KEY', undefined);
-      await expect(vectorService.initialize()).rejects.toThrow('OPENAI_API_KEY environment variable is required');
-      vi.unstubAllEnvs();
+    it('should initialize successfully', async () => {
+      await vectorService.initialize();
+      expect(vectorService.client).toBeDefined();
+      expect(vectorService.embeddingService).toBeDefined();
     });
   });
 
   describe('getCollection', () => {
-    it('should throw error when trying to use uninitialized service', async () => {
-      await expect(vectorService.getCollection('user123')).rejects.toThrow();
-    });
-
     it('should return cached collection if exists', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const mockCollection = { id: 'mock_collection_123' };
       vectorService.collections.set('user_a123', mockCollection);
 
       const result = await vectorService.getCollection('a123');
       expect(result).toBe(mockCollection);
-      vi.unstubAllEnvs();
     });
   });
 
   describe('indexExists', () => {
     it('should return true when collection has documents', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const mockCollection = {
         id: 'mock-collection',
         count: vi.fn().mockResolvedValue(10)
@@ -175,11 +155,9 @@ describe('VectorIndexService', () => {
 
       const result = await vectorService.indexExists('test123');
       expect(result).toBe(true);
-      vi.unstubAllEnvs();
     });
 
     it('should return false when collection has no documents', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const mockCollection = {
         id: 'mock-collection',
         count: vi.fn().mockResolvedValue(0)
@@ -188,11 +166,9 @@ describe('VectorIndexService', () => {
 
       const result = await vectorService.indexExists('test123');
       expect(result).toBe(false);
-      vi.unstubAllEnvs();
     });
 
     it('should return false when collection does not exist', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const mockCollection = {
         id: 'mock-collection',
         count: vi.fn().mockRejectedValue(new Error('does not exist'))
@@ -201,7 +177,6 @@ describe('VectorIndexService', () => {
 
       const result = await vectorService.indexExists('test123');
       expect(result).toBe(false);
-      vi.unstubAllEnvs();
     });
   });
 
@@ -360,7 +335,6 @@ describe('VectorIndexService', () => {
 
   describe('getStats', () => {
     it('should return collection stats', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const mockCollection = {
         id: 'mock-collection',
         count: vi.fn().mockResolvedValue(42)
@@ -373,17 +347,14 @@ describe('VectorIndexService', () => {
         totalDocuments: 42,
         collectionName: 'user_test123'
       });
-      vi.unstubAllEnvs();
     });
   });
 
   describe('rebuildIndex', () => {
     beforeEach(() => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
     });
 
     afterEach(() => {
-      vi.unstubAllEnvs();
       mockLoadUserMemories.mockReset();
     });
 
@@ -451,7 +422,6 @@ describe('VectorIndexService', () => {
 
   describe('search', () => {
     it('should return empty array if no index exists', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const mockCollection = {
         query: vi.fn().mockResolvedValue({
           documents: [[]],
@@ -463,11 +433,9 @@ describe('VectorIndexService', () => {
 
       const results = await vectorService.search('user123', 'test query');
       expect(results).toEqual([]);
-      vi.unstubAllEnvs();
     });
 
     it('should filter by relationType', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const mockCollection = {
         query: vi.fn().mockResolvedValue({
           documents: [['Test content']],
@@ -484,11 +452,9 @@ describe('VectorIndexService', () => {
         nResults: 5,
         where: { category: 'family', helperId: 'helper1' }
       });
-      vi.unstubAllEnvs();
     });
 
     it('should return results with correct format', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const mockCollection = {
         query: vi.fn().mockResolvedValue({
           documents: [['First result', 'Second result']],
@@ -517,11 +483,9 @@ describe('VectorIndexService', () => {
           metadata: { category: 'family', memoryId: 'mem2', helperId: 'helper1' }
         }
       ]);
-      vi.unstubAllEnvs();
     });
 
     it('should return empty array on error', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const mockCollection = {
         query: vi.fn().mockRejectedValue(new Error('Search failed'))
       };
@@ -529,11 +493,9 @@ describe('VectorIndexService', () => {
 
       const results = await vectorService.search('user123', 'test query');
       expect(results).toEqual([]);
-      vi.unstubAllEnvs();
     });
 
     it('should use default topK of 5', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const mockCollection = {
         query: vi.fn().mockResolvedValue({
           documents: [['Test']],
@@ -550,11 +512,9 @@ describe('VectorIndexService', () => {
         nResults: 5,
         where: undefined
       });
-      vi.unstubAllEnvs();
     });
 
     it('should filter by relationType without relationSpecificId', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const mockCollection = {
         query: vi.fn().mockResolvedValue({
           documents: [['Test content']],
@@ -571,7 +531,6 @@ describe('VectorIndexService', () => {
         nResults: 5,
         where: { category: 'friend' }
       });
-      vi.unstubAllEnvs();
     });
   });
 });
@@ -579,11 +538,9 @@ describe('VectorIndexService', () => {
 describe('RoleCardController', () => {
   describe('buildVectorIndex', () => {
     beforeEach(() => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
     });
 
     afterEach(() => {
-      vi.unstubAllEnvs();
       mockLoadUserMemories.mockReset();
     });
 
@@ -653,7 +610,6 @@ describe('RoleCardController', () => {
 
   describe('getVectorIndexStatus', () => {
     it('should return status with existing index', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
 
       const mockMemories = Array.from({ length: 5 }, (_, i) => ({
         memoryId: `mem${i}`,
@@ -689,11 +645,9 @@ describe('RoleCardController', () => {
           })
         })
       );
-      vi.unstubAllEnvs();
     });
 
     it('should return status without A_set memories', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'test-key');
 
       mockLoadUserMemories.mockResolvedValue({
         A_set: [],
@@ -718,7 +672,6 @@ describe('RoleCardController', () => {
           })
         })
       );
-      vi.unstubAllEnvs();
     });
   });
 });

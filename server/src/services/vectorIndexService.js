@@ -7,41 +7,35 @@
  */
 
 import { ChromaClient } from 'chromadb';
-import { OpenAIEmbeddings } from '@langchain/openai';
+import EmbeddingService from './EmbeddingService.js';
 import logger from '../utils/logger.js';
 
 class VectorIndexService {
   constructor() {
     this.client = null;
-    this.embeddings = null;
+    this.embeddingService = null;
     this.collections = new Map();
   }
 
   /**
    * 初始化ChromaDB客户端和embeddings
-   * @throws {Error} If OPENAI_API_KEY is not set or initialization fails
+   * @throws {Error} If initialization fails
    */
   async initialize() {
     if (this.client) return;
-
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY environment variable is required');
-    }
 
     try {
       this.client = new ChromaClient({
         path: process.env.STORAGE_PATH || '/app/storage/userdata/chroma_db'
       });
 
-      this.embeddings = new OpenAIEmbeddings({
-        openAIApiKey: process.env.OPENAI_API_KEY,
-        modelName: 'text-embedding-3-small'
-      });
+      this.embeddingService = new EmbeddingService();
+      await this.embeddingService.initialize();
 
       logger.info('[VectorIndexService] ChromaDB客户端初始化成功');
     } catch (error) {
       this.client = null;
-      this.embeddings = null;
+      this.embeddingService = null;
       logger.error('[VectorIndexService] 初始化失败:', error);
       throw error;
     }
@@ -152,12 +146,12 @@ class VectorIndexService {
       for (let i = 0; i < allMemories.length; i += batchSize) {
         const batch = allMemories.slice(i, i + batchSize);
 
-        for (const memory of batch) {
-          const text = this.buildMemoryText(memory);
+      for (const memory of batch) {
+        const text = this.buildMemoryText(memory);
 
-          const embedding = await this.embeddings.embedQuery(text);
+        const embedding = await this.embeddingService.embedQuery(text);
 
-          const metadata = this.buildMetadata(memory);
+        const metadata = this.buildMetadata(memory);
 
           processedMemories.push({
             id: memory.memoryId,
@@ -295,7 +289,7 @@ class VectorIndexService {
     try {
       const collection = await this.getCollection(userId);
 
-      const queryEmbedding = await this.embeddings.embedQuery(query);
+      const queryEmbedding = await this.embeddingService.embedQuery(query);
 
       let where = {};
       if (relationType) {
