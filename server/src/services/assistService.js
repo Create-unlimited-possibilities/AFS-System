@@ -14,7 +14,7 @@ class AssistService {
     });
 
     if (existingRelation) {
-      throw new Error('该用户已在您的协助列表中');
+      throw new Error('目标用户已被添加');
     }
 
     return false;
