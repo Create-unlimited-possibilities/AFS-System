@@ -276,6 +276,67 @@ export async function getSentimentHistory(targetUserId: string, strangerId: stri
   return get<{ history: SentimentHistoryItem[] }>(`/sentiment/${targetUserId}/${strangerId}/history`, token);
 }
 
+export async function buildVectorIndex(onProgress: (data: any) => void) {
+  const token = getToken();
+  if (!token) {
+    throw new Error('未登录');
+  }
+
+  const response = await fetch(`${API_URL}/rolecard/vector-index/build`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
+
+  if (!reader) {
+    throw new Error('无法读取响应流');
+  }
+
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (line.startsWith('event: ')) {
+        const eventType = line.substring(7).trim();
+        continue;
+      }
+      if (line.startsWith('data: ')) {
+        const data = JSON.parse(line.substring(6).trim());
+        onProgress(data);
+      }
+    }
+  }
+}
+
+export async function getVectorIndexStatus() {
+  return apiRequest<{
+    success: boolean;
+    status: {
+      exists: boolean;
+      memoryCount: number;
+      canBuild: boolean;
+      totalDocuments?: number;
+      collectionName?: string;
+    }
+  }>('/rolecard/vector-index/status');
+}
+
 // 导出 api 对象以兼容 import { api } from '@/lib/api'
 export const api = {
   get,
