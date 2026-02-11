@@ -7,16 +7,21 @@ class AssistController {
   // 搜索用户
   async searchUser(req, res) {
     try {
-      const { email } = req.query;
+      const { code, email } = req.query;
 
-      if (!email) {
+      if (!code && !email) {
         return res.status(400).json({
           success: false,
-          error: '邮箱不能为空'
+          error: '专属编号或邮箱不能为空'
         });
       }
 
-      const user = await User.findOne({ email: email.toLowerCase() });
+      let user;
+      if (code) {
+        user = await User.findOne({ uniqueCode: code });
+      } else {
+        user = await User.findOne({ email: email.toLowerCase() });
+      }
 
       if (!user) {
         return res.status(404).json({
