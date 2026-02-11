@@ -71,7 +71,7 @@ describe('AssistService - checkDuplicateRelation', () => {
       });
 
       await expect(assistService.checkDuplicateRelation(assistantId, targetId))
-        .rejects.toThrow('该用户已在您的协助列表中');
+        .rejects.toThrow('目标用户已被添加');
     });
   });
 });
@@ -108,7 +108,7 @@ describe('AssistService - createRelation', () => {
         relationshipType: 'friend',
         specificRelation: '好朋友',
         friendLevel: 'close'
-      })).rejects.toThrow('该用户已在您的协助列表中');
+      })).rejects.toThrow('目标用户已被添加');
     });
 
     it('should allow creating relation when no active relation exists', async () => {
