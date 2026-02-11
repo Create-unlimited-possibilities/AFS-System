@@ -4,7 +4,12 @@ vi.mock('chromadb', () => ({
   ChromaClient: class {
     constructor() {
       this.getCollection = vi.fn().mockRejectedValue(new Error('does not exist'));
-      this.createCollection = vi.fn().mockResolvedValue({ id: 'mock-collection' });
+      this.createCollection = vi.fn().mockResolvedValue({
+        id: 'mock-collection',
+        delete: vi.fn().mockResolvedValue(undefined),
+        add: vi.fn().mockResolvedValue(undefined),
+        count: vi.fn().mockResolvedValue(0)
+      });
     }
   }
 }));
@@ -14,12 +19,18 @@ vi.mock('@langchain/openai', () => ({
     constructor() {
       this.embedQuery = vi.fn().mockResolvedValue([0.1, 0.2]);
     }
+  },
+  ChatOpenAI: class {
+    constructor() {
+      this.invoke = vi.fn().mockResolvedValue('mock response');
+    }
   }
 }));
 
 const mockLoadUserMemories = vi.fn();
 
 vi.mock('../../src/services/fileStorage.js', () => ({
+  loadUserMemories: mockLoadUserMemories,
   default: class {
     constructor() {
       this.loadUserMemories = mockLoadUserMemories;
@@ -28,6 +39,7 @@ vi.mock('../../src/services/fileStorage.js', () => ({
 }));
 
 import VectorIndexService from '../../src/services/vectorIndexService.js';
+import RoleCardController from '../../src/controllers/RoleCardController.js';
 
 describe('VectorIndexService', () => {
   let vectorService;
@@ -101,7 +113,10 @@ describe('VectorIndexService', () => {
     it('should accept valid userId with hyphen', async () => {
       vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const result = await vectorService.getCollection('test-user');
-      expect(result).toStrictEqual({ id: 'mock-collection' });
+      expect(result).toHaveProperty('id', 'mock-collection');
+      expect(result).toHaveProperty('delete');
+      expect(result).toHaveProperty('add');
+      expect(result).toHaveProperty('count');
       vi.unstubAllEnvs();
     });
   });
@@ -556,6 +571,153 @@ describe('VectorIndexService', () => {
         nResults: 5,
         where: { category: 'friend' }
       });
+      vi.unstubAllEnvs();
+    });
+  });
+});
+
+describe('RoleCardController', () => {
+  describe('buildVectorIndex', () => {
+    beforeEach(() => {
+      vi.stubEnv('OPENAI_API_KEY', 'test-key');
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      mockLoadUserMemories.mockReset();
+    });
+
+    it('should return error if no A_set memories', async () => {
+      mockLoadUserMemories.mockResolvedValue({
+        A_set: [],
+        Bste: [],
+        Cste: []
+      });
+
+      const mockReq = { user: { id: 'test123' } };
+      const mockRes = {
+        setHeader: vi.fn(),
+        write: vi.fn(),
+        end: vi.fn()
+      };
+
+      await RoleCardController.buildVectorIndex(mockReq, mockRes);
+
+      expect(mockRes.write).toHaveBeenCalledWith(
+        expect.stringContaining('请先完成至少一个A套问题')
+      );
+      expect(mockRes.end).toHaveBeenCalled();
+    });
+
+    it('should build index successfully with memories', async () => {
+      const mockMemories = Array.from({ length: 10 }, (_, i) => ({
+        memoryId: `mem${i}`,
+        targetUserId: 'test123',
+        question: `Question ${i}`,
+        answer: `Answer ${i}`,
+        questionRole: 'elder',
+        questionLayer: 'basic',
+        questionOrder: i,
+        createdAt: '2024-01-01T00:00:00.000Z'
+      }));
+
+      mockLoadUserMemories.mockResolvedValue({
+        A_set: mockMemories,
+        Bste: [],
+        Cste: []
+      });
+
+      const mockReq = { user: { id: 'test123' } };
+      const mockRes = {
+        setHeader: vi.fn(),
+        write: vi.fn(),
+        end: vi.fn()
+      };
+
+      const vectorService = new VectorIndexService();
+      const mockCollection = {
+        delete: vi.fn().mockResolvedValue(undefined),
+        add: vi.fn().mockResolvedValue(undefined),
+        count: vi.fn().mockResolvedValue(10)
+      };
+      vectorService.collections.set('user_test123', mockCollection);
+
+      await RoleCardController.buildVectorIndex(mockReq, mockRes);
+
+      expect(mockRes.write).toHaveBeenCalledWith(
+        expect.stringContaining('event: done')
+      );
+      expect(mockRes.end).toHaveBeenCalled();
+    });
+  });
+
+  describe('getVectorIndexStatus', () => {
+    it('should return status with existing index', async () => {
+      vi.stubEnv('OPENAI_API_KEY', 'test-key');
+
+      const mockMemories = Array.from({ length: 5 }, (_, i) => ({
+        memoryId: `mem${i}`,
+        targetUserId: 'test123',
+        question: `Question ${i}`,
+        answer: `Answer ${i}`,
+        questionRole: 'elder',
+        questionLayer: 'basic',
+        questionOrder: i,
+        createdAt: '2024-01-01T00:00:00.000Z'
+      }));
+
+      mockLoadUserMemories.mockResolvedValue({
+        A_set: mockMemories,
+        Bste: [],
+        Cste: []
+      });
+
+      const mockReq = { user: { id: 'test123' } };
+      const mockRes = {
+        json: vi.fn()
+      };
+
+      await RoleCardController.getVectorIndexStatus(mockReq, mockRes);
+
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          status: expect.objectContaining({
+            exists: false,
+            memoryCount: 5,
+            canBuild: true
+          })
+        })
+      );
+      vi.unstubAllEnvs();
+    });
+
+    it('should return status without A_set memories', async () => {
+      vi.stubEnv('OPENAI_API_KEY', 'test-key');
+
+      mockLoadUserMemories.mockResolvedValue({
+        A_set: [],
+        Bste: [{ memoryId: 'mem1' }],
+        Cste: [{ memoryId: 'mem2' }]
+      });
+
+      const mockReq = { user: { id: 'test123' } };
+      const mockRes = {
+        json: vi.fn()
+      };
+
+      await RoleCardController.getVectorIndexStatus(mockReq, mockRes);
+
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          status: expect.objectContaining({
+            exists: false,
+            memoryCount: 2,
+            canBuild: false
+          })
+        })
+      );
       vi.unstubAllEnvs();
     });
   });

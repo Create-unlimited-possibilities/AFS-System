@@ -12,6 +12,7 @@ import AssistantsGuidelinesPreprocessor from '../services/langchain/assistantsGu
 import User from '../models/User.js';
 import logger from '../utils/logger.js';
 import roleCardConfig from '../config/roleCardConfig.js';
+import VectorIndexService from '../services/vectorIndexService.js';
 
 const roleCardGenerator = new RoleCardGenerator();
 const roleCardGeneratorB = new RoleCardGeneratorB();
@@ -221,6 +222,95 @@ class RoleCardController {
       });
     } catch (error) {
       logger.error('[RoleCardController] 更新协助者对话准则失败:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * 构建向量索引（SSE进度反馈）
+   */
+  async buildVectorIndex(req, res) {
+    const userId = req.user.id;
+
+    logger.info(`[RoleCardController] 开始构建向量索引 - User: ${userId}`);
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const progressCallback = (data) => {
+      try {
+        res.write(`event: progress\n`);
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      } catch (error) {
+        logger.error('[RoleCardController] SSE写入失败:', error);
+      }
+    };
+
+    try {
+      const { loadUserMemories } = await import('../services/fileStorage.js');
+      const FileStorage = (await import('../services/fileStorage.js')).default;
+      const fileStorage = new FileStorage();
+
+      const memories = await fileStorage.loadUserMemories(userId);
+
+      if (memories.A_set.length === 0) {
+        res.write(`event: error\n`);
+        res.write(`data: ${JSON.stringify({ success: false, error: '请先完成至少一个A套问题' })}\n\n`);
+        res.end();
+        return;
+      }
+
+      const vectorService = new VectorIndexService();
+      const result = await vectorService.rebuildIndex(userId, progressCallback);
+
+      logger.info(`[RoleCardController] 向量索引构建成功 - User: ${userId}`);
+
+      res.write(`event: done\n`);
+      res.write(`data: ${JSON.stringify({ success: true, ...result })}\n\n`);
+    } catch (error) {
+      logger.error('[RoleCardController] 构建向量索引失败:', error);
+
+      res.write(`event: error\n`);
+      res.write(`data: ${JSON.stringify({ success: false, error: error.message })}\n\n`);
+    } finally {
+      res.end();
+    }
+  }
+
+  /**
+   * 获取向量索引状态
+   */
+  async getVectorIndexStatus(req, res) {
+    const userId = req.user.id;
+
+    try {
+      const vectorService = new VectorIndexService();
+      const exists = await vectorService.indexExists(userId);
+
+      const stats = exists ? await vectorService.getStats(userId) : null;
+
+      const FileStorage = (await import('../services/fileStorage.js')).default;
+      const fileStorage = new FileStorage();
+      const memories = await fileStorage.loadUserMemories(userId);
+
+      const memoryCount = memories.A_set.length + memories.Bste.length + memories.Cste.length;
+      const canBuild = memories.A_set.length > 0;
+
+      res.json({
+        success: true,
+        status: {
+          exists,
+          memoryCount,
+          canBuild,
+          ...stats
+        }
+      });
+    } catch (error) {
+      logger.error('[RoleCardController] 获取索引状态失败:', error);
       res.status(500).json({
         success: false,
         error: error.message
