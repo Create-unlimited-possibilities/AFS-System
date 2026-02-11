@@ -24,4 +24,12 @@ router.post('/assistants/:assistantId/regenerate', protect, (req, res) => {
   rolecardController.regenerateAssistantGuidelines(req, res);
 });
 
+router.post('/vector-index/build', protect, (req, res) => {
+  rolecardController.buildVectorIndex(req, res);
+});
+
+router.get('/vector-index/status', protect, (req, res) => {
+  rolecardController.getVectorIndexStatus(req, res);
+});
+
 export default router;
