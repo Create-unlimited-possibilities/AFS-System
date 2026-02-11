@@ -92,7 +92,7 @@ class AssistController {
   async createRelation(req, res) {
     try {
       const userId = req.user?.id || req.user?._id;
-      const { targetCode, targetEmail, relationshipType = 'friend', specificRelation, friendLevel } = req.body;
+      const { targetCode, targetEmail, relationshipType, specificRelation, friendLevel } = req.body;
 
       if (!targetCode || !targetEmail) {
         return res.status(400).json({
