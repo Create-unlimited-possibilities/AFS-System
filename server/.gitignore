@@ -1,0 +1,19 @@
+node_modules/
+dist/
+build/
+*.log
+.env
+
+# Models directory (large files, should not be committed)
+models/embedding_model/
+*.gguf
+
+# Coverage
+coverage/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
