@@ -40,6 +40,8 @@ class VectorIndexService {
 
       logger.info('[VectorIndexService] ChromaDB客户端初始化成功');
     } catch (error) {
+      this.client = null;
+      this.embeddings = null;
       logger.error('[VectorIndexService] 初始化失败:', error);
       throw error;
     }
@@ -54,6 +56,10 @@ class VectorIndexService {
   async getCollection(userId) {
     if (!userId || typeof userId !== 'string') {
       throw new Error('Invalid userId: must be a non-empty string');
+    }
+
+    if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(userId)) {
+      throw new Error('Invalid userId: contains invalid characters for ChromaDB collection names');
     }
 
     await this.initialize();
@@ -100,3 +106,4 @@ class VectorIndexService {
 }
 
 export default VectorIndexService;
+

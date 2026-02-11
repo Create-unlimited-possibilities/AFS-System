@@ -1,4 +1,22 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+vi.mock('chromadb', () => ({
+  ChromaClient: class {
+    constructor() {
+      this.getCollection = vi.fn().mockRejectedValue(new Error('does not exist'));
+      this.createCollection = vi.fn().mockResolvedValue({ id: 'mock-collection' });
+    }
+  }
+}));
+
+vi.mock('@langchain/openai', () => ({
+  OpenAIEmbeddings: class {
+    constructor() {
+      this.embedQuery = vi.fn().mockResolvedValue([0.1, 0.2]);
+    }
+  }
+}));
+
 import VectorIndexService from '../../src/services/vectorIndexService.js';
 
 describe('VectorIndexService', () => {
@@ -24,6 +42,41 @@ describe('VectorIndexService', () => {
     it('should throw error for invalid userId (number)', async () => {
       await expect(vectorService.getCollection(123)).rejects.toThrow('Invalid userId');
     });
+
+    it('should throw error for invalid userId with invalid characters', async () => {
+      await expect(vectorService.getCollection('user@123')).rejects.toThrow('Invalid userId: contains invalid characters for ChromaDB collection names');
+    });
+
+    it('should throw error for userId starting with number', async () => {
+      await expect(vectorService.getCollection('123user')).rejects.toThrow('Invalid userId: contains invalid characters for ChromaDB collection names');
+    });
+
+    it('should accept valid userId with alphanumeric', async () => {
+      vi.stubEnv('OPENAI_API_KEY', 'test-key');
+      const mockCollection = { id: 'mock-collection' };
+      vectorService.collections.set('user_valid123', mockCollection);
+
+      const result = await vectorService.getCollection('valid123');
+      expect(result).toBe(mockCollection);
+      vi.unstubAllEnvs();
+    });
+
+    it('should accept valid userId with underscore', async () => {
+      vi.stubEnv('OPENAI_API_KEY', 'test-key');
+      const mockCollection = { id: 'mock-collection' };
+      vectorService.collections.set('user_test_user', mockCollection);
+
+      const result = await vectorService.getCollection('test_user');
+      expect(result).toBe(mockCollection);
+      vi.unstubAllEnvs();
+    });
+
+    it('should accept valid userId with hyphen', async () => {
+      vi.stubEnv('OPENAI_API_KEY', 'test-key');
+      const result = await vectorService.getCollection('test-user');
+      expect(result).toStrictEqual({ id: 'mock-collection' });
+      vi.unstubAllEnvs();
+    });
   });
 
   describe('clearCollectionCache', () => {
@@ -47,14 +100,9 @@ describe('VectorIndexService', () => {
 
   describe('initialize', () => {
     it('should throw error if OPENAI_API_KEY is not set', async () => {
-      const originalKey = process.env.OPENAI_API_KEY;
-      delete process.env.OPENAI_API_KEY;
-
-      try {
-        await expect(vectorService.initialize()).rejects.toThrow('OPENAI_API_KEY environment variable is required');
-      } finally {
-        process.env.OPENAI_API_KEY = originalKey;
-      }
+      vi.stubEnv('OPENAI_API_KEY', undefined);
+      await expect(vectorService.initialize()).rejects.toThrow('OPENAI_API_KEY environment variable is required');
+      vi.unstubAllEnvs();
     });
   });
 
@@ -64,11 +112,13 @@ describe('VectorIndexService', () => {
     });
 
     it('should return cached collection if exists', async () => {
+      vi.stubEnv('OPENAI_API_KEY', 'test-key');
       const mockCollection = { id: 'mock_collection_123' };
-      vectorService.collections.set('user_123', mockCollection);
+      vectorService.collections.set('user_a123', mockCollection);
 
-      const result = await vectorService.getCollection('123');
+      const result = await vectorService.getCollection('a123');
       expect(result).toBe(mockCollection);
+      vi.unstubAllEnvs();
     });
   });
 });
