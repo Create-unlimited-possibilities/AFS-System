@@ -1,8 +1,15 @@
 import { acquireLock } from '../utils/simpleFileLock.js';
+import FileStorage from './fileStorage.js';
+import Answer from '../models/Answer.js';
+import Question from '../models/Question.js';
+import User from '../models/User.js';
+import AssistRelation from '../models/AssistRelation.js';
+import ChatSession from '../models/ChatSession.js';
 
 export default class SimpleSyncQueue {
   constructor(dualStorage) {
     this.dualStorage = dualStorage;
+    this.fileStorage = new FileStorage();
     this.pending = new Set();
     this.timer = null;
     this.buffer = new Map();
@@ -66,8 +73,7 @@ export default class SimpleSyncQueue {
     if (operation === 'delete') {
       return;
     }
-    const User = await import('../models/User.js');
-    const user = await User.default.findById(id).lean();
+    const user = await User.findById(id).lean();
     if (user) {
       await this.dualStorage.saveUserProfile(id, user);
       await this.dualStorage.saveRoleCard(id, user.companionChat?.roleCard);
@@ -81,10 +87,21 @@ export default class SimpleSyncQueue {
     if (operation === 'delete') {
       return;
     }
-    const Answer = await import('../models/Answer.js');
-    const answer = await Answer.default.findById(id).lean();
+    const answer = await Answer.findById(id).lean();
     if (answer) {
       await this.dualStorage.saveAnswer(id, answer);
+
+      const question = await Question.findById(answer.questionId).lean();
+      if (question) {
+        await this.fileStorage.saveMemoryFile({
+          ...answer,
+          question: question.question,
+          questionRole: question.role,
+          questionOrder: question.order,
+          helperId: null,
+          helperNickname: null
+        });
+      }
     }
   }
 
@@ -92,8 +109,7 @@ export default class SimpleSyncQueue {
     if (operation === 'delete') {
       return;
     }
-    const AssistRelation = await import('../models/AssistRelation.js');
-    const relation = await AssistRelation.default.findById(id).lean();
+    const relation = await AssistRelation.findById(id).lean();
     if (relation) {
       await this.dualStorage.saveAssistRelation(id, relation);
     }
@@ -103,8 +119,7 @@ export default class SimpleSyncQueue {
     if (operation === 'delete') {
       return;
     }
-    const ChatSession = await import('../models/ChatSession.js');
-    const session = await ChatSession.default.findById(id).lean();
+    const session = await ChatSession.findById(id).lean();
     if (session) {
       await this.dualStorage.saveChatSession(id, session);
     }

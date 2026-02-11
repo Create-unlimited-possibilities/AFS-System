@@ -1,4 +1,5 @@
-import fs from 'fs/promises';
+import fs from 'fs';
+import fsPromises from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
@@ -14,7 +15,6 @@ export default class FileStorage {
     // 检测是否在 Docker 容器内运行
     // 方法1：检查 /.dockerenv 文件（标准Docker环境）
     // 方法2：检查环境变量
-    // 方法3：检查 /proc/1/cgroup（Linux容器通用方法）
     const isDocker = fs.existsSync('/.dockerenv') || 
                      process.env.DOCKER_CONTAINER === 'true' ||
                      process.env.NODE_ENV === 'docker';
@@ -29,7 +29,7 @@ export default class FileStorage {
   }
 
   async initialize() {
-    await fs.mkdir(this.basePath, { recursive: true });
+    await fsPromises.mkdir(this.basePath, { recursive: true });
   }
 
   async saveMemoryFile(answer) {
@@ -59,7 +59,7 @@ export default class FileStorage {
     }
 
     const layerPath = path.join(folderPath, questionLayer);
-    await fs.mkdir(layerPath, { recursive: true });
+    await fsPromises.mkdir(layerPath, { recursive: true });
 
     const fileName = `question_${questionOrder}.json`;
     const filePath = path.join(layerPath, fileName);
@@ -85,7 +85,7 @@ export default class FileStorage {
       createdAt: new Date().toISOString()
     };
 
-    await fs.writeFile(filePath, JSON.stringify(memory, null, 2), 'utf-8');
+    await fsPromises.writeFile(filePath, JSON.stringify(memory, null, 2), 'utf-8');
     console.log(`[FileStorage] 保存记忆文件: ${filePath}`);
     return memory;
   }
@@ -110,7 +110,7 @@ export default class FileStorage {
 
       // 加载 Bste (family) - 从所有 helper 文件夹中加载
       const BstePath = path.join(userPath, 'Bste');
-      const B_folders = await fs.readdir(BstePath).catch(() => []);
+      const B_folders = await fsPromises.readdir(BstePath).catch(() => []);
       for (const folder of B_folders) {
         if (folder.startsWith('.')) continue;
         await this.loadMemoriesFromFolder(path.join(BstePath, folder), memories.Bste);
@@ -118,7 +118,7 @@ export default class FileStorage {
 
       // 加载 Cste (friend) - 从所有 helper 文件夹中加载
       const CstePath = path.join(userPath, 'Cste');
-      const C_folders = await fs.readdir(CstePath).catch(() => []);
+      const C_folders = await fsPromises.readdir(CstePath).catch(() => []);
       for (const folder of C_folders) {
         if (folder.startsWith('.')) continue;
         await this.loadMemoriesFromFolder(path.join(CstePath, folder), memories.Cste);
@@ -134,7 +134,7 @@ export default class FileStorage {
 
   async loadMemoriesFromFolder(folderPath, targetArray) {
     try {
-      const entries = await fs.readdir(folderPath, { withFileTypes: true });
+      const entries = await fsPromises.readdir(folderPath, { withFileTypes: true });
 
       for (const entry of entries) {
         if (entry.name.startsWith('.')) continue;
@@ -144,7 +144,7 @@ export default class FileStorage {
         if (entry.isDirectory()) {
           await this.loadMemoriesFromFolder(fullPath, targetArray);
         } else if (entry.isFile() && entry.name.endsWith('.json')) {
-          const data = await fs.readFile(fullPath, 'utf-8');
+          const data = await fsPromises.readFile(fullPath, 'utf-8');
           const memory = JSON.parse(data);
           targetArray.push(memory);
         }

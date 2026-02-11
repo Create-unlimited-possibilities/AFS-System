@@ -1,5 +1,6 @@
 // 双重存储系统 - 所有资料同时存储在MongoDB和本地文件系统
-import fs from 'fs/promises';
+import fs from 'fs';
+import fsPromises from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -25,7 +26,7 @@ export default class DualStorage {
   }
 
   async initialize() {
-    await fs.mkdir(this.basePath, { recursive: true });
+    await fsPromises.mkdir(this.basePath, { recursive: true });
   }
 
   /**
@@ -37,12 +38,12 @@ export default class DualStorage {
     await this.initialize();
 
     const userPath = path.join(this.basePath, String(userId));
-    await fs.mkdir(userPath, { recursive: true });
+    await fsPromises.mkdir(userPath, { recursive: true });
 
     const filePath = path.join(userPath, 'rolecard.json');
 
     try {
-      await fs.writeFile(filePath, JSON.stringify(roleCard, null, 2), 'utf-8');
+      await fsPromises.writeFile(filePath, JSON.stringify(roleCard, null, 2), 'utf-8');
       console.log(`[DualStorage] 角色卡已保存到文件系统: ${filePath}`);
       return { success: true, filePath };
     } catch (error) {
@@ -59,7 +60,7 @@ export default class DualStorage {
     const filePath = path.join(this.basePath, String(userId), 'rolecard.json');
 
     try {
-      const data = await fs.readFile(filePath, 'utf-8');
+      const data = await fsPromises.readFile(filePath, 'utf-8');
       const roleCard = JSON.parse(data);
       console.log(`[DualStorage] 角色卡已从文件系统加载: ${filePath}`);
       return roleCard;
@@ -78,12 +79,12 @@ export default class DualStorage {
     await this.initialize();
 
     const userPath = path.join(this.basePath, String(userId));
-    await fs.mkdir(userPath, { recursive: true });
+    await fsPromises.mkdir(userPath, { recursive: true });
 
     const filePath = path.join(userPath, 'profile.json');
 
     try {
-      await fs.writeFile(filePath, JSON.stringify(userData, null, 2), 'utf-8');
+      await fsPromises.writeFile(filePath, JSON.stringify(userData, null, 2), 'utf-8');
       console.log(`[DualStorage] 用户资料已保存到文件系统: ${filePath}`);
       return { success: true, filePath };
     } catch (error) {
@@ -100,7 +101,7 @@ export default class DualStorage {
     const filePath = path.join(this.basePath, String(userId), 'profile.json');
 
     try {
-      const data = await fs.readFile(filePath, 'utf-8');
+      const data = await fsPromises.readFile(filePath, 'utf-8');
       const profile = JSON.parse(data);
       console.log(`[DualStorage] 用户资料已从文件系统加载: ${filePath}`);
       return profile;
@@ -119,14 +120,14 @@ export default class DualStorage {
     await this.initialize();
 
     const userPath = path.join(this.basePath, String(userId));
-    await fs.mkdir(userPath, { recursive: true });
+    await fsPromises.mkdir(userPath, { recursive: true });
 
     const filePath = path.join(userPath, 'assist-relations.json');
 
     try {
       let relations = [];
       try {
-        const data = await fs.readFile(filePath, 'utf-8');
+        const data = await fsPromises.readFile(filePath, 'utf-8');
         relations = JSON.parse(data);
       } catch (err) {
         // 文件不存在，创建新数组
@@ -141,7 +142,7 @@ export default class DualStorage {
         relations.push({ ...relation, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
       }
 
-      await fs.writeFile(filePath, JSON.stringify(relations, null, 2), 'utf-8');
+      await fsPromises.writeFile(filePath, JSON.stringify(relations, null, 2), 'utf-8');
       console.log(`[DualStorage] 协助关系已保存到文件系统: ${filePath}`);
       return { success: true, filePath };
     } catch (error) {
@@ -158,7 +159,7 @@ export default class DualStorage {
     const filePath = path.join(this.basePath, String(userId), 'assist-relations.json');
 
     try {
-      const data = await fs.readFile(filePath, 'utf-8');
+      const data = await fsPromises.readFile(filePath, 'utf-8');
       const relations = JSON.parse(data);
       console.log(`[DualStorage] 协助关系已从文件系统加载: ${filePath}`);
       return relations;
@@ -177,7 +178,7 @@ export default class DualStorage {
     await this.initialize();
 
     const userPath = path.join(this.basePath, String(userId));
-    await fs.mkdir(userPath, { recursive: true });
+    await fsPromises.mkdir(userPath, { recursive: true });
 
     const filePath = path.join(userPath, 'assistants-guidelines.json');
 
@@ -189,7 +190,7 @@ export default class DualStorage {
         version: '1.0.0'
       };
 
-      await fs.writeFile(filePath, JSON.stringify(dataToSave, null, 2), 'utf-8');
+      await fsPromises.writeFile(filePath, JSON.stringify(dataToSave, null, 2), 'utf-8');
       console.log(`[DualStorage] 协助者对话准则已保存到文件系统: ${filePath}`);
       return { success: true, filePath, count: guidelines.length };
     } catch (error) {
@@ -206,7 +207,7 @@ export default class DualStorage {
     const filePath = path.join(this.basePath, String(userId), 'assistants-guidelines.json');
 
     try {
-      const data = await fs.readFile(filePath, 'utf-8');
+      const data = await fsPromises.readFile(filePath, 'utf-8');
       const parsed = JSON.parse(data);
       console.log(`[DualStorage] 协助者对话准则已从文件系统加载: ${filePath}`);
       return parsed.guidelines || [];
@@ -281,7 +282,7 @@ export default class DualStorage {
     const filePath = path.join(this.basePath, String(userId), 'assistants-guidelines.json');
 
     try {
-      const stats = fs.stat(filePath);
+      const stats = fsPromises.stat(filePath);
       return {
         exists: true,
         size: stats.size,
@@ -304,7 +305,7 @@ export default class DualStorage {
     const userPath = path.join(this.basePath, String(userId));
 
     try {
-      await fs.rm(userPath, { recursive: true, force: true });
+      await fsPromises.rm(userPath, { recursive: true, force: true });
       console.log(`[DualStorage] 用户文件系统数据已删除: ${userPath}`);
       return { success: true };
     } catch (error) {
@@ -326,10 +327,10 @@ export default class DualStorage {
   async saveSentiments(userId, sentiments) {
     await this.initialize();
     const userPath = path.join(this.basePath, String(userId));
-    await fs.mkdir(userPath, { recursive: true });
+    await fsPromises.mkdir(userPath, { recursive: true });
     const filePath = path.join(userPath, 'strangerSentiments.json');
     try {
-      await fs.writeFile(filePath, JSON.stringify(sentiments, null, 2), 'utf-8');
+      await fsPromises.writeFile(filePath, JSON.stringify(sentiments, null, 2), 'utf-8');
       console.log(`[DualStorage] 陌生人好感度已保存: ${filePath}`);
       return { success: true, filePath };
     } catch (error) {
@@ -341,10 +342,10 @@ export default class DualStorage {
   async saveConversations(userId, conversations) {
     await this.initialize();
     const userPath = path.join(this.basePath, String(userId));
-    await fs.mkdir(userPath, { recursive: true });
+    await fsPromises.mkdir(userPath, { recursive: true });
     const filePath = path.join(userPath, 'conversationsAsTarget.json');
     try {
-      await fs.writeFile(filePath, JSON.stringify(conversations, null, 2), 'utf-8');
+      await fsPromises.writeFile(filePath, JSON.stringify(conversations, null, 2), 'utf-8');
       console.log(`[DualStorage] 对话历史已保存: ${filePath}`);
       return { success: true, filePath };
     } catch (error) {
@@ -356,10 +357,10 @@ export default class DualStorage {
   async saveAnswer(answerId, answer) {
     await this.initialize();
     const answerPath = path.join(this.basePath, 'answers', String(answerId));
-    await fs.mkdir(answerPath, { recursive: true });
+    await fsPromises.mkdir(answerPath, { recursive: true });
     const filePath = path.join(answerPath, 'answer.json');
     try {
-      await fs.writeFile(filePath, JSON.stringify(answer, null, 2), 'utf-8');
+      await fsPromises.writeFile(filePath, JSON.stringify(answer, null, 2), 'utf-8');
       console.log(`[DualStorage] 答案已保存: ${filePath}`);
       return { success: true, filePath };
     } catch (error) {
@@ -371,10 +372,10 @@ export default class DualStorage {
   async saveChatSession(sessionId, session) {
     await this.initialize();
     const sessionPath = path.join(this.basePath, 'chatSessions', String(sessionId));
-    await fs.mkdir(sessionPath, { recursive: true });
+    await fsPromises.mkdir(sessionPath, { recursive: true });
     const filePath = path.join(sessionPath, 'session.json');
     try {
-      await fs.writeFile(filePath, JSON.stringify(session, null, 2), 'utf-8');
+      await fsPromises.writeFile(filePath, JSON.stringify(session, null, 2), 'utf-8');
       console.log(`[DualStorage] 会话已保存: ${filePath}`);
       return { success: true, filePath };
     } catch (error) {
@@ -386,7 +387,7 @@ export default class DualStorage {
   async loadSentiments(userId) {
     const filePath = path.join(this.basePath, String(userId), 'strangerSentiments.json');
     try {
-      const data = await fs.readFile(filePath, 'utf-8');
+      const data = await fsPromises.readFile(filePath, 'utf-8');
       const sentiments = JSON.parse(data);
       console.log(`[DualStorage] 陌生人好感度已从文件系统加载: ${filePath}`);
       return sentiments;
@@ -399,7 +400,7 @@ export default class DualStorage {
   async loadConversations(userId) {
     const filePath = path.join(this.basePath, String(userId), 'conversationsAsTarget.json');
     try {
-      const data = await fs.readFile(filePath, 'utf-8');
+      const data = await fsPromises.readFile(filePath, 'utf-8');
       const conversations = JSON.parse(data);
       console.log(`[DualStorage] 对话历史已从文件系统加载: ${filePath}`);
       return conversations;
@@ -412,7 +413,7 @@ export default class DualStorage {
   async loadAnswer(answerId) {
     const filePath = path.join(this.basePath, 'answers', String(answerId), 'answer.json');
     try {
-      const data = await fs.readFile(filePath, 'utf-8');
+      const data = await fsPromises.readFile(filePath, 'utf-8');
       const answer = JSON.parse(data);
       console.log(`[DualStorage] 答案已从文件系统加载: ${filePath}`);
       return answer;
@@ -425,7 +426,7 @@ export default class DualStorage {
   async loadChatSession(sessionId) {
     const filePath = path.join(this.basePath, 'chatSessions', String(sessionId), 'session.json');
     try {
-      const data = await fs.readFile(filePath, 'utf-8');
+      const data = await fsPromises.readFile(filePath, 'utf-8');
       const session = JSON.parse(data);
       console.log(`[DualStorage] 会话已从文件系统加载: ${filePath}`);
       return session;

@@ -41,36 +41,48 @@ export default class AutoHookRegistry {
     }
 
     try {
-      const Model = await this.getModel(modelPath);
-      
-      Model.schema.post('save', function(doc) {
-        const syncQueueClass = AutoHookRegistry.syncQueueClass;
-        if (syncQueueClass?.instance) {
-          syncQueueClass.instance.enqueue(
-            modelName,
-            doc._id.toString(),
-            'save',
-            doc
-          );
-        }
-      });
+      const mongoose = await import('mongoose');
+      const Model = mongoose.default.model(modelName);
 
-      Model.schema.post('deleteOne', { query: true, document: false }, function() {
-        const syncQueueClass = AutoHookRegistry.syncQueueClass;
-        if (syncQueueClass?.instance) {
-          const filter = this.getFilter();
-          syncQueueClass.instance.enqueue(
-            modelName,
-            filter._id,
-            'delete'
-          );
-        }
-      });
+      if (!Model) {
+        console.warn(`Model not found: ${modelName}, attempting to load from file...`);
+        const ModelFromFile = await this.getModel(modelPath);
+        this.registerHooksToModel(ModelFromFile, modelName);
+        this.hookedModels.add(modelName);
+        return;
+      }
 
+      this.registerHooksToModel(Model, modelName);
       this.hookedModels.add(modelName);
     } catch (err) {
       console.error(`Failed to hook ${modelName}:`, err.message);
     }
+  }
+
+  registerHooksToModel(Model, modelName) {
+    Model.schema.post('save', function(doc) {
+      const syncQueueClass = AutoHookRegistry.syncQueueClass;
+      if (syncQueueClass?.instance) {
+        syncQueueClass.instance.enqueue(
+          modelName,
+          doc._id.toString(),
+          'save',
+          doc
+        );
+      }
+    });
+
+    Model.schema.post('deleteOne', { query: true, document: false }, function() {
+      const syncQueueClass = AutoHookRegistry.syncQueueClass;
+      if (syncQueueClass?.instance) {
+        const filter = this.getFilter();
+        syncQueueClass.instance.enqueue(
+          modelName,
+          filter._id,
+          'delete'
+        );
+      }
+    });
   }
 
   async getModel(modelPath) {
