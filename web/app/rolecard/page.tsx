@@ -11,8 +11,11 @@ import type { RoleCardExtended, AssistantGuideline } from '@/types'
 import { Sparkles, Copy, CheckCircle, AlertCircle, User, Loader2 } from 'lucide-react'
 import CloudPattern from '@/components/decorations/CloudPattern'
 import GenerateButton from './components/GenerateButton'
+import BuildVectorIndexButton from './components/BuildVectorIndexButton'
 import RoleCardEditor from './components/RoleCardEditor'
 import GuidelinesViewer from './components/GuidelinesViewer'
+import { buildVectorIndex } from '@/lib/api'
+import type { VectorIndexStatus, VectorIndexBuildProgress } from '@/types'
 
 interface Stats {
   basicProgress: { total: number; answered: number }
@@ -31,6 +34,9 @@ export default function RolecardPage() {
   const [copied, setCopied] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [generateProgress, setGenerateProgress] = useState<{ current: number; total: number; message: string } | undefined>(undefined)
+  const [buildingIndex, setBuildingIndex] = useState(false)
+  const [buildProgress, setBuildProgress] = useState<VectorIndexBuildProgress | undefined>(undefined)
+  const [vectorIndexStatus, setVectorIndexStatus] = useState<VectorIndexStatus | undefined>(undefined)
 
   useEffect(() => {
     if (hasHydrated && user) {
@@ -71,6 +77,8 @@ export default function RolecardPage() {
         totalAnswers: basicAnswered + emotionalAnswered,
         memoryTokenCount,
       })
+
+      await fetchVectorIndexStatus()
     } catch (error) {
       console.error('获取角色卡数据失败:', error)
     } finally {
@@ -102,6 +110,47 @@ export default function RolecardPage() {
       setGenerateProgress(undefined)
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const fetchVectorIndexStatus = async () => {
+    try {
+      const res = await api.get('/rolecard/vector-index/status')
+      if (res.success && res.data?.status) {
+        setVectorIndexStatus(res.data.status)
+      }
+    } catch (error) {
+      console.error('获取向量索引状态失败:', error)
+    }
+  }
+
+  const handleBuildVectorIndex = async () => {
+    if (!user?._id) return
+
+    try {
+      setBuildingIndex(true)
+      setBuildProgress({ current: 0, total: 1, message: '正在初始化...' })
+
+      await buildVectorIndex((data) => {
+        if (data.message) {
+          setBuildProgress({
+            current: data.current || 0,
+            total: data.total || 1,
+            message: data.message
+          })
+        }
+      })
+
+      setTimeout(() => {
+        setBuildProgress(undefined)
+        fetchVectorIndexStatus()
+      }, 2000)
+    } catch (error) {
+      console.error('构建向量索引失败:', error)
+      alert(error.message || '构建失败，请重试')
+      setBuildProgress(undefined)
+    } finally {
+      setBuildingIndex(false)
     }
   }
 
@@ -284,6 +333,13 @@ export default function RolecardPage() {
                     isDisabled={!isFullyAnswered()}
                     progress={generateProgress}
                     onClick={handleGenerateRoleCard}
+                  />
+                  <BuildVectorIndexButton
+                    isBuilding={buildingIndex}
+                    isDisabled={buildingIndex}
+                    progress={buildProgress}
+                    status={vectorIndexStatus}
+                    onClick={handleBuildVectorIndex}
                   />
                   {roleCard && (
                     <Button
