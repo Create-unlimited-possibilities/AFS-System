@@ -5,48 +5,78 @@ import styles from './styles.module.css';
 
 type FeatureItem = {
   title: string;
-  Svg: React.ComponentType<React.ComponentProps<'svg'>>;
   description: ReactNode;
+  icon: string;
 };
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Easy to Use',
-    Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
+    title: '数字记忆保存',
+    icon: '📚',
     description: (
       <>
-        Docusaurus was designed from the ground up to be easily installed and
-        used to get your website up and running quickly.
+        结构化存储老人的人生故事和珍贵记忆，支持基础层次和情感层次的问题体系，
+        让每一个故事都被完整记录。
       </>
     ),
   },
   {
-    title: 'Focus on What Matters',
-    Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
+    title: 'AI 陪伴对话',
+    icon: '🤖',
     description: (
       <>
-        Docusaurus lets you focus on your docs, and we&apos;ll do the chores. Go
-        ahead and move your docs into the <code>docs</code> directory.
+        基于 LangGraph 的个性化 AI 对话体验，AI 能记住你是谁、理解你的故事，
+        以熟悉的方式与你交流。
       </>
     ),
   },
   {
-    title: 'Powered by React',
-    Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
+    title: '家庭协作',
+    icon: '👨‍👩‍👧‍👦',
     description: (
       <>
-        Extend or customize your website layout by reusing React. Docusaurus can
-        be extended while reusing the same header and footer.
+        支持多人协作完善记忆档案，家人和朋友可以协助回答问题，
+        共同构建完整的人生记录。
+      </>
+    ),
+  },
+  {
+    title: '角色卡生成',
+    icon: '🎭',
+    description: (
+      <>
+        AI 自动分析用户回答，生成个性化角色描述，包含性格特征、背景故事、
+        兴趣爱好等维度。
+      </>
+    ),
+  },
+  {
+    title: 'RAG 检索',
+    icon: '🔍',
+    description: (
+      <>
+        使用 ChromaDB 向量数据库进行语义检索，实现基于个人记忆的
+        智能问答和上下文构建。
+      </>
+    ),
+  },
+  {
+    title: '权限管理',
+    icon: '🔐',
+    description: (
+      <>
+        完善的 RBAC 权限控制系统，保护用户隐私，确保只有授权人员
+        才能访问敏感记忆数据。
       </>
     ),
   },
 ];
 
-function Feature({title, Svg, description}: FeatureItem) {
+function Feature({title, description, icon}: FeatureItem) {
   return (
     <div className={clsx('col col--4')}>
       <div className="text--center">
-        <Svg className={styles.featureSvg} role="img" />
+        <div className={styles.featureIcon}>{icon}</div>
       </div>
       <div className="text--center padding-horiz--md">
         <Heading as="h3">{title}</Heading>

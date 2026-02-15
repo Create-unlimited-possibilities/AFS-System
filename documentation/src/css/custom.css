@@ -1,30 +1,472 @@
 /**
- * Any CSS included here will be global. The classic template
- * bundles Infima by default. Infima is a CSS framework designed to
- * work well for content-centric websites.
+ * AFS System Documentation Site
+ * Design System: Accessible & Ethical Style
+ * Colors: Primary #0891B2 (Cyan), Secondary #22D3EE, CTA #059669 (Green)
+ * Typography: Figtree / Noto Sans
  */
 
-/* You can override the default Infima variables here. */
+/* ============================================
+   Color Variables - Light Mode
+   ============================================ */
 :root {
-  --ifm-color-primary: #2e8555;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e;
-  --ifm-code-font-size: 95%;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+  /* Primary Colors - Cyan */
+  --ifm-color-primary: #0891b2;
+  --ifm-color-primary-dark: #0782a0;
+  --ifm-color-primary-darker: #077a98;
+  --ifm-color-primary-darkest: #06657d;
+  --ifm-color-primary-light: #099cc4;
+  --ifm-color-primary-lighter: #09a4cc;
+  --ifm-color-primary-lightest: #0ab9e5;
+
+  /* Secondary Colors */
+  --ifm-color-secondary: #22d3ee;
+  --ifm-color-secondary-dark: #1ec4de;
+  --ifm-color-secondary-darker: #1dbbd4;
+  --ifm-color-secondary-darkest: #189ab0;
+  --ifm-color-secondary-light: #3ddaf2;
+  --ifm-color-secondary-lighter: #4de0f5;
+  --ifm-color-secondary-lightest: #7aeaf9;
+
+  /* CTA / Success Colors - Green */
+  --ifm-color-success: #059669;
+  --ifm-color-success-dark: #05875e;
+  --ifm-color-success-darker: #047f58;
+  --ifm-color-success-darkest: #046947;
+  --ifm-color-success-light: #06a774;
+  --ifm-color-success-lighter: #06af7c;
+  --ifm-color-success-lightest: #08c391;
+
+  /* Background & Text Colors */
+  --ifm-background-color: #ecfeff;
+  --ifm-background-surface-color: #ffffff;
+  --ifm-font-color-base: #164e63;
+  --ifm-font-color-base-inverse: #ffffff;
+  --ifm-heading-color: #0e7490;
+  --ifm-heading-font-weight: 600;
+
+  /* Typography */
+  --ifm-font-family-base: 'Noto Sans SC', 'Figtree', system-ui, -apple-system, sans-serif;
+  --ifm-heading-font-family: 'Noto Sans SC', 'Figtree', system-ui, -apple-system, sans-serif;
+  --ifm-font-size-base: 16px;
+  --ifm-line-height-base: 1.75;
+
+  /* Link Colors */
+  --ifm-link-color: #0891b2;
+  --ifm-link-hover-color: #06657d;
+  --ifm-link-decoration: none;
+  --ifm-link-hover-decoration: underline;
+
+  /* Code Styling */
+  --ifm-code-font-size: 90%;
+  --ifm-code-background: rgba(8, 145, 178, 0.1);
+  --ifm-code-color: #0891b2;
+  --docusaurus-highlighted-code-line-bg: rgba(8, 145, 178, 0.15);
+
+  /* Border & Shadow */
+  --ifm-border-color: #cffafe;
+  --ifm-toc-border-color: #cffafe;
+  --ifm-global-shadow-lw: 0 1px 2px 0 rgba(22, 78, 99, 0.05);
+  --ifm-global-shadow-md: 0 4px 6px -1px rgba(22, 78, 99, 0.1);
+
+  /* Navbar */
+  --ifm-navbar-background-color: rgba(255, 255, 255, 0.95);
+  --ifm-navbar-shadow: 0 1px 2px 0 rgba(22, 78, 99, 0.05);
+
+  /* Sidebar */
+  --ifm-menu-color: #164e63;
+  --ifm-menu-color-active: #0891b2;
+  --ifm-menu-color-background-active: rgba(8, 145, 178, 0.1);
+
+  /* Footer */
+  --ifm-footer-background-color: #f0fdfa;
+  --ifm-footer-color: #164e63;
+  --ifm-footer-link-color: #0891b2;
+  --ifm-footer-link-hover-color: #06657d;
 }
 
-/* For readability concerns, you should choose a lighter palette in dark mode. */
+/* ============================================
+   Color Variables - Dark Mode
+   ============================================ */
 [data-theme='dark'] {
-  --ifm-color-primary: #25c2a0;
-  --ifm-color-primary-dark: #21af90;
-  --ifm-color-primary-darker: #1fa588;
-  --ifm-color-primary-darkest: #1a8870;
-  --ifm-color-primary-light: #29d5b0;
-  --ifm-color-primary-lighter: #32d8b4;
-  --ifm-color-primary-lightest: #4fddbf;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+  /* Primary Colors - Lighter Cyan for Dark Mode */
+  --ifm-color-primary: #22d3ee;
+  --ifm-color-primary-dark: #1ec4de;
+  --ifm-color-primary-darker: #1dbbd4;
+  --ifm-color-primary-darkest: #189ab0;
+  --ifm-color-primary-light: #3ddaf2;
+  --ifm-color-primary-lighter: #4de0f5;
+  --ifm-color-primary-lightest: #7aeaf9;
+
+  /* Secondary Colors */
+  --ifm-color-secondary: #67e8f9;
+
+  /* CTA / Success Colors */
+  --ifm-color-success: #10b981;
+  --ifm-color-success-light: #34d399;
+
+  /* Background & Text Colors */
+  --ifm-background-color: #0c1622;
+  --ifm-background-surface-color: #111827;
+  --ifm-font-color-base: #e0f2fe;
+  --ifm-heading-color: #67e8f9;
+
+  /* Link Colors */
+  --ifm-link-color: #22d3ee;
+  --ifm-link-hover-color: #67e8f9;
+
+  /* Code Styling */
+  --ifm-code-background: rgba(34, 211, 238, 0.15);
+  --ifm-code-color: #67e8f9;
+  --docusaurus-highlighted-code-line-bg: rgba(34, 211, 238, 0.2);
+
+  /* Border & Shadow */
+  --ifm-border-color: rgba(34, 211, 238, 0.2);
+  --ifm-toc-border-color: rgba(34, 211, 238, 0.1);
+  --ifm-global-shadow-lw: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --ifm-global-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+
+  /* Navbar */
+  --ifm-navbar-background-color: rgba(17, 24, 39, 0.95);
+
+  /* Sidebar */
+  --ifm-menu-color: #e0f2fe;
+  --ifm-menu-color-active: #22d3ee;
+  --ifm-menu-color-background-active: rgba(34, 211, 238, 0.15);
+
+  /* Footer */
+  --ifm-footer-background-color: #0f172a;
+  --ifm-footer-color: #e0f2fe;
+  --ifm-footer-link-color: #22d3ee;
+  --ifm-footer-link-hover-color: #67e8f9;
+}
+
+/* ============================================
+   Global Styles
+   ============================================ */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--ifm-font-family-base);
+  line-height: var(--ifm-line-height-base);
+}
+
+/* ============================================
+   Typography
+   ============================================ */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--ifm-heading-font-family);
+  font-weight: var(--ifm-heading-font-weight);
+  color: var(--ifm-heading-color);
+}
+
+/* ============================================
+   Links
+   ============================================ */
+a {
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+/* ============================================
+   Navbar Styles
+   ============================================ */
+.navbar {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.navbar__title {
+  font-weight: 600;
+}
+
+.navbar__link {
+  transition: color 0.2s ease;
+}
+
+.navbar__link--active {
+  font-weight: 500;
+}
+
+/* ============================================
+   Sidebar / Menu Styles
+   ============================================ */
+.menu__link {
+  border-radius: 8px;
+  margin: 2px 0;
+  padding: 8px 12px;
+  transition: all 0.2s ease;
+}
+
+.menu__link:hover {
+  background-color: var(--ifm-menu-color-background-active);
+}
+
+.menu__link--active {
+  font-weight: 500;
+  background-color: var(--ifm-menu-color-background-active);
+}
+
+.menu__list-item-collapsible {
+  border-radius: 8px;
+}
+
+/* ============================================
+   Card Styles
+   ============================================ */
+.card {
+  border-radius: 12px;
+  border: 1px solid var(--ifm-border-color);
+  box-shadow: var(--ifm-global-shadow-lw);
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: var(--ifm-global-shadow-md);
+  transform: translateY(-2px);
+}
+
+/* ============================================
+   Button Styles
+   ============================================ */
+.button--primary {
+  background-color: var(--ifm-color-primary);
+  border-color: var(--ifm-color-primary);
+  transition: all 0.2s ease;
+}
+
+.button--primary:hover {
+  background-color: var(--ifm-color-primary-dark);
+  border-color: var(--ifm-color-primary-dark);
+  transform: translateY(-1px);
+}
+
+.button--secondary {
+  background-color: var(--ifm-color-secondary);
+  border-color: var(--ifm-color-secondary);
+  color: #0c1622;
+}
+
+.button--secondary:hover {
+  background-color: var(--ifm-color-secondary-dark);
+  border-color: var(--ifm-color-secondary-dark);
+}
+
+/* CTA Button */
+.button--cta {
+  background-color: var(--ifm-color-success);
+  border-color: var(--ifm-color-success);
+}
+
+.button--cta:hover {
+  background-color: var(--ifm-color-success-dark);
+  border-color: var(--ifm-color-success-dark);
+}
+
+/* ============================================
+   Code Blocks
+   ============================================ */
+code {
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+pre {
+  border-radius: 12px;
+  border: 1px solid var(--ifm-border-color);
+}
+
+/* ============================================
+   Table of Contents
+   ============================================ */
+.table-of-contents__link {
+  border-radius: 6px;
+  padding: 4px 8px;
+  margin-left: -8px;
+  transition: all 0.2s ease;
+}
+
+.table-of-contents__link:hover {
+  background-color: var(--ifm-menu-color-background-active);
+}
+
+.table-of-contents__link--active {
+  font-weight: 500;
+  color: var(--ifm-color-primary);
+}
+
+/* ============================================
+   Footer Styles
+   ============================================ */
+.footer {
+  border-top: 1px solid var(--ifm-border-color);
+}
+
+.footer__link-item {
+  transition: color 0.2s ease;
+}
+
+/* ============================================
+   Hero Section
+   ============================================ */
+.hero--primary {
+  background: linear-gradient(135deg, var(--ifm-color-primary) 0%, var(--ifm-color-primary-dark) 100%);
+}
+
+[data-theme='dark'] .hero--primary {
+  background: linear-gradient(135deg, #0891b2 0%, #06657d 100%);
+}
+
+/* ============================================
+   Announcement Bar
+   ============================================ */
+div[class*='announcementBar'] {
+  background: linear-gradient(90deg, var(--ifm-color-primary) 0%, var(--ifm-color-success) 100%);
+  color: white;
+  font-weight: 500;
+}
+
+/* ============================================
+   Doc Item Styles
+   ============================================ */
+.theme-doc-markdown {
+  line-height: 1.8;
+}
+
+.theme-doc-markdown p {
+  margin-bottom: 1.25rem;
+}
+
+.theme-doc-markdown ul,
+.theme-doc-markdown ol {
+  padding-left: 1.5rem;
+}
+
+/* ============================================
+   Breadcrumb Styles
+   ============================================ */
+.breadcrumbs__link {
+  border-radius: 6px;
+  padding: 4px 8px;
+  transition: all 0.2s ease;
+}
+
+.breadcrumbs__link:hover {
+  background-color: var(--ifm-menu-color-background-active);
+}
+
+/* ============================================
+   Pagination Styles
+   ============================================ */
+.pagination-nav__link {
+  border-radius: 12px;
+  border: 1px solid var(--ifm-border-color);
+  transition: all 0.2s ease;
+}
+
+.pagination-nav__link:hover {
+  border-color: var(--ifm-color-primary);
+  box-shadow: var(--ifm-global-shadow-md);
+}
+
+/* ============================================
+   Badge Styles
+   ============================================ */
+.badge--primary {
+  background-color: var(--ifm-color-primary);
+}
+
+.badge--secondary {
+  background-color: var(--ifm-color-secondary);
+  color: #0c1622;
+}
+
+/* ============================================
+   Alert / Admonition Styles
+   ============================================ */
+.admonition {
+  border-radius: 12px;
+  border-left-width: 4px;
+}
+
+.admonition-heading {
+  font-weight: 600;
+}
+
+.admonition--info {
+  background-color: rgba(8, 145, 178, 0.1);
+  border-left-color: var(--ifm-color-primary);
+}
+
+.admonition--tip {
+  background-color: rgba(5, 150, 105, 0.1);
+  border-left-color: var(--ifm-color-success);
+}
+
+.admonition--warning {
+  background-color: rgba(245, 158, 11, 0.1);
+  border-left-color: #f59e0b;
+}
+
+.admonition--danger {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-left-color: #ef4444;
+}
+
+/* ============================================
+   Accessibility
+   ============================================ */
+:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 2px;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================
+   Responsive Adjustments
+   ============================================ */
+@media screen and (max-width: 996px) {
+  :root {
+    --ifm-font-size-base: 15px;
+  }
+
+  .card:hover {
+    transform: none;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  :root {
+    --ifm-font-size-base: 14px;
+  }
+}
+
+/* ============================================
+   Print Styles
+   ============================================ */
+@media print {
+  .navbar,
+  .footer,
+  .table-of-contents,
+  .pagination-nav {
+    display: none;
+  }
+
+  .theme-doc-markdown {
+    font-size: 12pt;
+  }
 }

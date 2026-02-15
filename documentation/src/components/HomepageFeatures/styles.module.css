@@ -9,3 +9,25 @@
   height: 200px;
   width: 200px;
 }
+
+.featureIcon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  display: inline-block;
+  background: linear-gradient(135deg, var(--ifm-color-primary) 0%, var(--ifm-color-primary-dark) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  border-radius: 50%;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(8, 145, 178, 0.1);
+  border: 2px solid var(--ifm-color-primary-light);
+}
+
+[data-theme='dark'] .featureIcon {
+  background-color: rgba(34, 211, 238, 0.15);
+  border-color: var(--ifm-color-primary);
+}

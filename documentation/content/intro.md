@@ -1,47 +1,62 @@
 ---
 sidebar_position: 1
+slug: /
 ---
 
-# Tutorial Intro
+# AFS System 简介
 
-Let's discover **Docusaurus in less than 5 minutes**.
+:::info 项目定位
+**AFS System** 是一个面向老年人的**数字记忆传承系统**，帮助老年人保存人生故事，并通过 AI 技术实现个性化对话陪伴。
+:::
 
-## Getting Started
+## 核心价值
 
-Get started by **creating a new site**.
+### 数字记忆保存
+结构化存储老人的人生故事和珍贵记忆，包括：
+- 基础层次：日常生活、家庭背景、工作经历
+- 情感层次：人生感悟、重要关系、价值观
 
-Or **try Docusaurus immediately** with **[docusaurus.new](https://docusaurus.new)**.
+### AI 陪伴对话
+基于个人记忆的个性化 AI 对话体验：
+- 记住你是谁
+- 理解你的故事
+- 以熟悉的方式交流
 
-### What you'll need
+### 家庭协作
+多人协作完善记忆档案：
+- 家人协助填写
+- 朋友补充回忆
+- 共同构建完整的人生记录
 
-- [Node.js](https://nodejs.org/en/download/) version 20.0 or above:
-  - When installing Node.js, you are recommended to check all checkboxes related to dependencies.
+## 系统特性
 
-## Generate a new site
+| 特性 | 描述 |
+|------|------|
+| 专属编号 | 16位唯一标识，方便家人协助 |
+| 双重存储 | MongoDB + 文件系统，数据安全可靠 |
+| 角色卡生成 | AI 分析回答，生成个性化角色描述 |
+| RAG 检索 | 向量索引支持语义检索 |
+| 好感度系统 | 陌生人对话的情感追踪 |
+| 权限管理 | RBAC 权限控制，保护隐私 |
 
-Generate a new Docusaurus site using the **classic template**.
+## 技术亮点
 
-The classic template will automatically be added to your project after you run the command:
+- **现代化技术栈**: Next.js 15 + Express.js + MongoDB
+- **AI 集成**: LangChain + LangGraph + Ollama
+- **RAG 检索**: ChromaDB 向量数据库 + 语义检索
+- **容器化部署**: Docker Compose 一键部署
 
-```bash
-npm init docusaurus@latest my-website classic
-```
+## 快速导航
 
-You can type this command into Command Prompt, Powershell, Terminal, or any other integrated terminal of your code editor.
+- [安装部署](/docs/getting-started/installation) - 快速开始使用
+- [系统架构](/docs/architecture/overview) - 了解系统设计
+- [API 文档](/docs/api/overview) - 接口参考
+- [模块说明](/docs/modules/auth) - 功能模块详解
 
-The command also installs all necessary dependencies you need to run Docusaurus.
+## 项目状态
 
-## Start your site
-
-Run the development server:
-
-```bash
-cd my-website
-npm run start
-```
-
-The `cd` command changes the directory you're working with. In order to work with your newly created Docusaurus site, you'll need to navigate the terminal there.
-
-The `npm run start` command builds your website locally and serves it through a development server, ready for you to view at http://localhost:3000/.
-
-Open `docs/intro.md` (this page) and edit some lines: the site **reloads automatically** and displays your changes.
+:::success v2.0.0 已发布
+- 后端模块化架构重构完成
+- 9 个独立功能模块
+- 完善的 API 文档
+:::
