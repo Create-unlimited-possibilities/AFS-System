@@ -1,4 +1,22 @@
 services:
+  # Documentation Site (Docusaurus)
+  docs:
+    build:
+      context: ./documentation
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "3003:80"
+    networks:
+      - afs-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
   web:
     build:
       context: ./web
@@ -6,6 +24,7 @@ services:
       target: ${NODE_ENV:-development}
       args:
         - NEXT_PUBLIC_API_URL=http://localhost:3001
+        - NEXT_PUBLIC_DOCS_URL=http://localhost:3003
     ports:
       - "3002:3000"
     volumes:
@@ -16,9 +35,12 @@ services:
       - ./web/stores:/app/stores
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - NEXT_PUBLIC_DOCS_URL=http://localhost:3003
+      - NEXT_PUBLIC_GITHUB_URL=https://github.com/Create-unlimited-possibilities/AFS-System
       - NODE_ENV=${NODE_ENV:-development}
     depends_on:
       - server
+      - docs
     networks:
       - afs-network
     restart: unless-stopped
