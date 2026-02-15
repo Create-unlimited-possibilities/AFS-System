@@ -2,7 +2,8 @@ services:
   web:
     build:
       context: ./web
-      dockerfile: Dockerfile-web
+      dockerfile: Dockerfile
+      target: ${NODE_ENV:-development}
       args:
         - NEXT_PUBLIC_API_URL=http://localhost:3001
     ports:
@@ -15,37 +16,12 @@ services:
       - ./web/stores:/app/stores
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - NODE_ENV=${NODE_ENV:-development}
     depends_on:
       - server
     networks:
       - afs-network
     restart: unless-stopped
-    profiles:
-      - production
-
-  web-dev:
-    build:
-      context: ./web
-      dockerfile: Dockerfile-web-dev
-      args:
-        - NEXT_PUBLIC_API_URL=http://localhost:3001
-    ports:
-      - "3002:3000"
-    volumes:
-      - ./web/app:/app/app
-      - ./web/lib:/app/lib
-      - ./web/types:/app/types
-      - ./web/components:/app/components
-      - ./web/stores:/app/stores
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3001
-    depends_on:
-      - server
-    networks:
-      - afs-network
-    restart: unless-stopped
-    profiles:
-      - development
 
   server:
     build:
