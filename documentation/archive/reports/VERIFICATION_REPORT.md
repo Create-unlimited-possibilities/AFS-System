@@ -109,7 +109,7 @@ All tested methods create the expected directory structure and files correctly. 
 
 ## Files Changed
 
-- **Created:** `F:\FPY\AFS-System\server\verify-storage-structure.js`
+- **Created:** `${PROJECT_ROOT}/server/verify-storage-structure.js`
   - Standalone verification script that tests all DualStorage save methods
   - Creates temporary directory structure for testing
   - Verifies both directory creation and file content

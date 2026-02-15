@@ -430,25 +430,25 @@ The afs-demo-backup.tar.gz file contains:
 
 ### Export
 ```batch
-cd F:\FPY\AFS-System
+cd /path/to/AFS-System
 scripts\export-demo-data-en.bat
 ```
 
 ### Import
 ```batch
-cd F:\FPY\AFS-System
+cd /path/to/AFS-System
 scripts\import-demo-data-en.bat
 ```
 
 ### Verify
 ```batch
-cd F:\FPY\AFS-System
+cd /path/to/AFS-System
 scripts\verify-backup-en.bat
 ```
 
 ### Test
 ```batch
-cd F:\FPY\AFS-System
+cd /path/to/AFS-System
 scripts\test-demo-functionality-en.bat
 ```
 

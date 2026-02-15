@@ -47,7 +47,7 @@ slug: /dual-storage-architecture
 ### 项目目录
 
 ```
-F:\FPY\AFS-System\
+${PROJECT_ROOT}/
 ├── server/
 │   ├── storage/                 # 文件系统记忆数据
 │   │   └── userdata/

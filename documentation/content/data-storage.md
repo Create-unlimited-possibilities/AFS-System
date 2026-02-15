@@ -16,7 +16,7 @@ slug: /data-storage
 ## 📂 正确的目录结构
 
 ```
-F:\FPY\AFS-System\
+${PROJECT_ROOT}/
 ├── server/
 │   ├── src/                    # 源代码
 │   ├── storage/                 # 文件系统记忆数据
@@ -245,7 +245,7 @@ docker exec -it afs-system-mongoserver-1 mongosh afs_db
 mongosh "mongodb://localhost:27018/afs_db"
 
 # 本地文件位置
-F:\FPY\AFS-System\mongoserver\mongodb_data\
+${PROJECT_ROOT}/mongoserver/mongodb_data/
 ```
 
 #### 文件系统数据
@@ -255,7 +255,7 @@ docker exec -it afs-system-server-1 sh
 cd /app/storage/userdata/
 
 # 本地文件位置
-F:\FPY\AFS-System\server\storage\userdata\
+${PROJECT_ROOT}/server/storage/userdata/
 ```
 
 ### 备份数据

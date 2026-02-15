@@ -74,8 +74,8 @@ AFS（Advanced Family System）是一个基于Web的家庭互动系统，旨在�
 
 ### 本地开发
 ```bash
-cd F:\FPY\AFS-System
-docker-compose up -d
+cd /path/to/AFS-System
+docker compose up -d
 ```
 
 ### 演示环境

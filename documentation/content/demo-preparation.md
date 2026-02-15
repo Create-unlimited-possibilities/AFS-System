@@ -74,8 +74,8 @@ docker ps
 
 #### 检查容器状态
 ```bash
-cd F:\FPY\AFS-System
-docker-compose ps
+cd /path/to/AFS-System
+docker compose ps
 ```
 
 #### 验证数据库数据
@@ -89,7 +89,7 @@ docker exec -it afs-system-mongoserver-1 mongosh afs_db
 
 #### 使用自动化脚本导出
 ```bash
-cd F:\FPY\AFS-System
+cd /path/to/AFS-System
 scripts\export-demo-data.bat
 ```
 
