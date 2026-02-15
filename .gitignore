@@ -127,3 +127,12 @@ documentation/archive/deprecated/*
 
 # Server backups (migration data)
 server/server/backups/
+
+# ============================================
+# 测试覆盖率报告（不上传）
+# ============================================
+coverage/
+**/coverage/
+server/coverage/
+*.lcov
+.nyc_output/
