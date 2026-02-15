@@ -3,19 +3,24 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 
-import authRouter from './routes/auth/index.js';
-import answersRouter from './routes/answers.js';
-import usersRouter from './routes/users.js';
-import rolesRouter from './routes/roles.js';
-import settingsRouter from './routes/settings.js';
-import questionsRouter from './routes/questions.js';
-import chatRouter from './routes/chat.js';
-import rolecardRouter from './routes/rolecard.js';
-import sentimentRouter from './routes/sentiment.js';
-import { protect } from './middleware/auth.js';
-import AutoHookRegistry from './services/autoHookRegistry.js';
-import SimpleSyncQueue from './services/simpleSyncQueue.js';
-import dualStorage from './services/dualStorage.js';
+// Module routes
+import authRouter from './modules/auth/route.js';
+import usersRouter from './modules/user/route.js';
+import rolesRouter from './modules/roles/route.js';
+import settingsRouter from './modules/settings/route.js';
+import answersRouter from './modules/qa/routes/answers.js';
+import questionsRouter from './modules/qa/routes/questions.js';
+import chatRouter from './modules/chat/route.js';
+import rolecardRouter from './modules/rolecard/route.js';
+import sentimentRouter from './modules/sentiment/route.js';
+
+// Auth middleware
+import { protect } from './modules/auth/middleware.js';
+
+// Core services
+import AutoHookRegistry from './core/hooks/registry.js';
+import SimpleSyncQueue from './core/storage/syncQueue.js';
+import dualStorage from './core/storage/dual.js';
 
 dotenv.config();
 
