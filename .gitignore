@@ -97,3 +97,10 @@ web/yarn-error.log*
 # Next.js typescript
 web/*.tsbuildinfo
 web/next-env.d.ts
+
+# Archive - historical documents (keep structure, ignore contents)
+documentation/archive/reports/*
+documentation/archive/progress/*
+documentation/archive/deprecated/*
+!documentation/archive/.gitkeep
+!documentation/archive/*/.gitkeep
