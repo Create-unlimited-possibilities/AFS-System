@@ -104,3 +104,6 @@ documentation/archive/progress/*
 documentation/archive/deprecated/*
 !documentation/archive/.gitkeep
 !documentation/archive/*/.gitkeep
+
+# Server backups (migration data)
+server/server/backups/
