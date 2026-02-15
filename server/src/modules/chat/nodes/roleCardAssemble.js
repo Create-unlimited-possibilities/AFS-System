@@ -1,12 +1,12 @@
 /**
- * 角色卡组装节点
- * 动态组装角色卡（使用预处理结果）
- * 
+ * 角色卡组装节点 V2
+ * 动态组装角色卡（使用新的V2组装器）
+ *
  * @author AFS Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 
-import DynamicRoleCardAssembler from '../assembler.js';
+import RoleCardAssemblerV2 from '../assembler.js';
 import logger from '../../../core/utils/logger.js';
 
 /**
@@ -16,42 +16,28 @@ import logger from '../../../core/utils/logger.js';
  */
 export async function roleCardAssembleNode(state) {
   try {
-    logger.info('[RoleCardAssemble] 组装角色卡');
+    logger.info('[RoleCardAssemble] 组装角色卡 V2');
 
-    const { roleCardMode, userId, interlocutor, systemPrompt: providedSystemPrompt } = state;
-    const sessionId = state.metadata?.sessionId || '';
+    const { userId, interlocutor, metadata } = state;
+    const sessionId = metadata?.sessionId || '';
+    const assistantId = interlocutor.specificId;
 
-    if (roleCardMode === 'dynamic') {
-      logger.info('[RoleCardAssemble] 方法A：使用DynamicRoleCardAssembler');
-      
-      const assembler = new DynamicRoleCardAssembler();
-      const dynamicRoleCard = await assembler.assembleDynamicRoleCard({
-        targetUserId: userId,
-        interlocutorUserId: interlocutor.id,
-        sessionId: sessionId,
-        assistantId: interlocutor.specificId
-      });
+    const assembler = new RoleCardAssemblerV2();
+    const result = await assembler.assembleDynamicRoleCard({
+      targetUserId: userId,
+      interlocutorUserId: interlocutor.id,
+      sessionId: sessionId,
+      assistantId: assistantId
+    });
 
-      state.roleCard = dynamicRoleCard.personaProfile;
-      state.systemPrompt = dynamicRoleCard.systemPrompt;
-      state.conversationGuidelines = dynamicRoleCard.conversationGuidelines;
-      state.sentimentGuidelines = dynamicRoleCard.sentimentGuidelines;
-      
-      logger.info('[RoleCardAssemble] 动态角色卡组装完成');
-    } else if (roleCardMode === 'static') {
-      logger.info('[RoleCardAssemble] 方法B：使用静态systemPrompt');
-      
-      if (providedSystemPrompt) {
-        state.systemPrompt = providedSystemPrompt;
-        logger.info('[RoleCardAssemble] 使用已加载的systemPrompt');
-      } else {
-        logger.warn('[RoleCardAssemble] 未提供systemPrompt');
-      }
-    } else {
-      throw new Error(`未知的roleCardMode: ${roleCardMode}`);
-    }
+    state.systemPrompt = result.systemPrompt;
+    state.dynamicData = result.dynamicData;
+    state.sessionMeta = result.session;
+
+    logger.info('[RoleCardAssemble] V2角色卡组装完成');
 
     return state;
+
   } catch (error) {
     logger.error('[RoleCardAssemble] 处理失败:', error);
     state.addError(error);

@@ -86,8 +86,8 @@ const sidebars: SidebarsConfig = {
         },
         {
           type: 'doc',
-          id: 'modules/overview',
-          label: '角色卡模块 (RoleCard)',
+          id: 'ai/rolecard-v2',
+          label: '角色卡模块 V2 (RoleCard)',
         },
         {
           type: 'doc',

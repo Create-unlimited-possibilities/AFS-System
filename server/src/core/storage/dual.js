@@ -435,4 +435,90 @@ export default class DualStorage {
       return null;
     }
   }
+
+  /**
+   * 保存 V2 角色卡
+   */
+  async saveRoleCardV2(userId, roleCardV2) {
+    await this.initialize();
+
+    const userPath = path.join(this.basePath, String(userId));
+    await fsPromises.mkdir(userPath, { recursive: true });
+
+    const filePath = path.join(userPath, 'rolecard-v2.json');
+
+    try {
+      await fsPromises.writeFile(filePath, JSON.stringify(roleCardV2, null, 2), 'utf-8');
+      console.log(`[DualStorage] V2角色卡已保存: ${filePath}`);
+      return { success: true, filePath };
+    } catch (error) {
+      console.error(`[DualStorage] V2角色卡保存失败:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 加载 V2 角色卡
+   */
+  async loadRoleCardV2(userId) {
+    const filePath = path.join(this.basePath, String(userId), 'rolecard-v2.json');
+
+    try {
+      const data = await fsPromises.readFile(filePath, 'utf-8');
+      const roleCard = JSON.parse(data);
+      console.log(`[DualStorage] V2角色卡已加载: ${filePath}`);
+      return roleCard;
+    } catch (error) {
+      console.warn(`[DualStorage] V2角色卡加载失败 ${userId}:`, error.message);
+      return null;
+    }
+  }
+
+  /**
+   * 保存关系层
+   */
+  async saveRelationLayer(userId, relationId, relationLayer) {
+    await this.initialize();
+
+    const userPath = path.join(this.basePath, String(userId), 'relation-layers');
+    await fsPromises.mkdir(userPath, { recursive: true });
+
+    const filePath = path.join(userPath, `${relationId}.json`);
+
+    try {
+      await fsPromises.writeFile(filePath, JSON.stringify(relationLayer, null, 2), 'utf-8');
+      console.log(`[DualStorage] 关系层已保存: ${filePath}`);
+      return { success: true, filePath };
+    } catch (error) {
+      console.error(`[DualStorage] 关系层保存失败:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 加载所有关系层
+   */
+  async loadAllRelationLayers(userId) {
+    const dirPath = path.join(this.basePath, String(userId), 'relation-layers');
+
+    try {
+      const files = await fsPromises.readdir(dirPath);
+      const layers = {};
+
+      for (const file of files) {
+        if (file.endsWith('.json')) {
+          const filePath = path.join(dirPath, file);
+          const data = await fsPromises.readFile(filePath, 'utf-8');
+          const layer = JSON.parse(data);
+          layers[layer.relationId || file.replace('.json', '')] = layer;
+        }
+      }
+
+      console.log(`[DualStorage] 已加载 ${Object.keys(layers).length} 个关系层`);
+      return layers;
+    } catch (error) {
+      console.warn(`[DualStorage] 关系层加载失败 ${userId}:`, error.message);
+      return {};
+    }
+  }
 }

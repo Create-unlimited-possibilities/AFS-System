@@ -22,7 +22,7 @@ sidebar_position: 1
 | **问答** | `modules/qa/` | 问题管理、回答保存 |
 | **协助关系** | `modules/assist/` | 协助关系建立、管理 |
 | **AI 对话** | `modules/chat/` | LangGraph 对话编排 |
-| **角色卡** | `modules/rolecard/` | 角色卡生成、向量索引 |
+| **角色卡** | `modules/rolecard/` | 角色卡生成 V2（分层架构）、向量索引 |
 | **好感度** | `modules/sentiment/` | 陌生人好感度追踪 |
 | **设置** | `modules/settings/` | 系统配置管理 |
 
