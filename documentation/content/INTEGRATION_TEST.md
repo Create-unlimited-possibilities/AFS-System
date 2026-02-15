@@ -136,7 +136,7 @@ data: {"success":true,"memoryCount":100}
    ```bash
    docker ps | grep modelserver
    ```
-2. 检查OLLAMA_BASE_URL是否正确（应该是 http://modelserver:11434）
+2. 检查OLLAMA_BASE_URL是否正确 (应该是 `http://modelserver:11434`)
 3. 查看server容器日志:
    ```bash
    docker-compose logs server

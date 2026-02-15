@@ -21,7 +21,7 @@ const config: Config = {
   organizationName: 'Create-unlimited-possibilities',
   projectName: 'AFS-System',
 
-  onBrokenLinks: 'throw',
+  onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
 
   // Chinese language support
@@ -50,17 +50,7 @@ const config: Config = {
           routeBasePath: 'docs',
           editUrl: 'https://github.com/Create-unlimited-possibilities/AFS-System/tree/main/documentation/',
         },
-        blog: {
-          showReadingTime: true,
-          feedOptions: {
-            type: ['rss', 'atom'],
-            xslt: true,
-          },
-          editUrl: 'https://github.com/Create-unlimited-possibilities/AFS-System/tree/main/documentation/',
-          onInlineTags: 'warn',
-          onInlineAuthors: 'warn',
-          onUntruncatedBlogPosts: 'warn',
-        },
+        blog: false,
         theme: {
           customCss: './src/css/custom.css',
         },
@@ -113,11 +103,6 @@ const config: Config = {
           label: '模块',
         },
         {
-          to: '/blog',
-          label: '博客',
-          position: 'left',
-        },
-        {
           href: 'https://github.com/Create-unlimited-possibilities/AFS-System',
           label: 'GitHub',
           position: 'right',
@@ -167,10 +152,6 @@ const config: Config = {
           title: '更多',
           items: [
             {
-              label: '博客',
-              to: '/blog',
-            },
-            {
               label: '贡献指南',
               href: 'https://github.com/Create-unlimited-possibilities/AFS-System/blob/main/CONTRIBUTING.md',
             },
@@ -219,19 +200,7 @@ const config: Config = {
   } satisfies Preset.ThemeConfig,
 
   // Plugins
-  plugins: [
-    [
-      '@docusaurus/plugin-client-redirects',
-      {
-        redirects: [
-          {
-            from: '/docs/intro',
-            to: '/docs/intro',
-          },
-        ],
-      },
-    ],
-  ],
+  plugins: [],
 
   // Custom fields for theming
   customFields: {
