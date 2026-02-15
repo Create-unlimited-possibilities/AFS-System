@@ -1,62 +1,97 @@
 /**
  * 向量索引服务
- * 管理ChromaDB向量索引的创建、更新和检索
+ * 管理向量索引的创建、更新和检索
+ * 使用内存向量存储
  *
  * @author AFS Team
- * @version 1.0.0
+ * @version 1.3.0
  */
 
-import { ChromaClient } from 'chromadb';
 import EmbeddingService from './EmbeddingService.js';
 import logger from '../utils/logger.js';
+import fs from 'fs';
+import path from 'path';
 
 class VectorIndexService {
   constructor() {
-    this.client = null;
     this.embeddingService = null;
     this.collections = new Map();
+    this.storagePath = process.env.STORAGE_PATH || path.join(process.cwd(), 'storage', 'vector_index');
+    
+    if (!fs.existsSync(this.storagePath)) {
+      fs.mkdirSync(this.storagePath, { recursive: true });
+    }
   }
 
-  /**
-   * 初始化ChromaDB客户端和embeddings
-   * @throws {Error} If initialization fails
-   */
   async initialize() {
-    if (this.client) return;
+    if (this.embeddingService) return;
 
     try {
-      this.client = new ChromaClient({
-        path: process.env.STORAGE_PATH || '/app/storage/userdata/chroma_db'
-      });
-
+      logger.info(`[VectorIndexService] 初始化向量存储, Storage: ${this.storagePath}`);
+      
       this.embeddingService = new EmbeddingService();
       await this.embeddingService.initialize();
 
-      logger.info('[VectorIndexService] ChromaDB客户端初始化成功');
+      await this.loadSavedIndexes();
+
+      logger.info('[VectorIndexService] 向量存储初始化成功');
     } catch (error) {
-      this.client = null;
       this.embeddingService = null;
       logger.error('[VectorIndexService] 初始化失败:', error);
       throw error;
     }
   }
 
-  /**
-   * 获取或创建用户collection
-   * @param {string} userId - 用户ID
-   * @returns {Promise<Collection>} ChromaDB collection
-   * @throws {Error} If userId is invalid or initialization fails
-   */
+  getCollectionPath(collectionName) {
+    return path.join(this.storagePath, `${collectionName}.json`);
+  }
+
+  async loadSavedIndexes() {
+    try {
+      const files = fs.readdirSync(this.storagePath);
+      for (const file of files) {
+        if (file.endsWith('.json')) {
+          const collectionName = file.replace('.json', '');
+          const filePath = this.getCollectionPath(collectionName);
+          
+          try {
+            const data = fs.readFileSync(filePath, 'utf8');
+            const collection = JSON.parse(data);
+            
+            if (collection && Array.isArray(collection.documents)) {
+              this.collections.set(collectionName, collection);
+              logger.info(`[VectorIndexService] 加载collection: ${collectionName}, 文档数: ${collection.documents.length}`);
+            }
+          } catch (parseError) {
+            logger.warn(`[VectorIndexService] 解析collection文件失败 ${file}:`, parseError.message);
+          }
+        }
+      }
+    } catch (error) {
+      logger.warn('[VectorIndexService] 加载索引失败:', error.message);
+    }
+  }
+
+  saveCollection(collection) {
+    try {
+      const filePath = this.getCollectionPath(collection.name);
+      const data = JSON.stringify(collection, null, 2);
+      fs.writeFileSync(filePath, data, 'utf8');
+      logger.debug(`[VectorIndexService] 保存collection ${collection.name}, 文档数: ${collection.documents.length}`);
+    } catch (error) {
+      logger.error(`[VectorIndexService] 保存collection失败 ${collection.name}:`, error);
+      throw error;
+    }
+  }
+
   async getCollection(userId) {
     if (!userId || typeof userId !== 'string') {
       throw new Error('Invalid userId: must be a non-empty string');
     }
 
     if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(userId)) {
-      throw new Error('Invalid userId: contains invalid characters for ChromaDB collection names');
+      throw new Error('Invalid userId: contains invalid characters for collection names');
     }
-
-    await this.initialize();
 
     const collectionName = `user_${userId}`;
 
@@ -64,50 +99,224 @@ class VectorIndexService {
       return this.collections.get(collectionName);
     }
 
-    try {
-      const collection = await this.client.getCollection({ name: collectionName });
-      this.collections.set(collectionName, collection);
-      return collection;
-    } catch (error) {
-      const errorMessage = error?.message || String(error);
-      const collectionNotFoundPatterns = [
-        'does not exist',
-        'not found',
-        'not exist',
-        'NotFoundError',
-        '404'
-      ];
-
-      const isCollectionNotFound = collectionNotFoundPatterns.some(pattern =>
-        errorMessage.toLowerCase().includes(pattern.toLowerCase())
-      );
-
-      if (isCollectionNotFound) {
-        logger.info(`[VectorIndexService] 创建collection: ${collectionName}`);
-        const collection = await this.client.createCollection({
-          name: collectionName,
-          metadata: {
-            userId,
-            createdAt: new Date().toISOString()
+    const collection = {
+      name: collectionName,
+      documents: [],
+      embeddings: [],
+      metadatas: [],
+      
+      add: async ({ ids, embeddings, documents, metadatas }) => {
+        logger.info(`[VectorIndexService] [${collection.name}] 添加 ${ids.length} 个文档`);
+        
+        if (!Array.isArray(collection.documents) || !Array.isArray(collection.embeddings) || !Array.isArray(collection.metadatas)) {
+          logger.error(`[VectorIndexService] collection数组结构异常: ${collection.name}`);
+          collection.documents = [];
+          collection.embeddings = [];
+          collection.metadatas = [];
+        }
+        
+        for (let i = 0; i < ids.length; i++) {
+          collection.documents.push({
+            id: ids[i],
+            text: documents[i]
+          });
+          collection.embeddings.push(embeddings[i]);
+          collection.metadatas.push(metadatas[i]);
+        }
+        
+        this.saveCollection(collection);
+      },
+      
+      get: async ({ ids, where, limit }) => {
+        if (!Array.isArray(collection.documents)) {
+          logger.error(`[VectorIndexService] get: documents不是数组`);
+          return [];
+        }
+        
+        let results = [];
+        
+        for (let i = 0; i < collection.documents.length; i++) {
+          const doc = collection.documents[i];
+          const embedding = collection.embeddings[i];
+          const metadata = collection.metadatas[i];
+          
+          if (!doc || !embedding || !metadata) continue;
+          
+          results.push({
+            id: doc.id,
+            document: doc.text,
+            embedding: embedding,
+            metadata: metadata
+          });
+        }
+        
+        if (ids && ids.length > 0) {
+          const idSet = new Set(ids);
+          results = results.filter(r => idSet.has(r.id));
+        }
+        
+        if (where && Object.keys(where).length > 0) {
+          for (const key in where) {
+            results = results.filter(r => r.metadata && r.metadata[key] === where[key]);
           }
-        });
-        this.collections.set(collectionName, collection);
-        return collection;
-      } else {
-        throw error;
+        }
+        
+        if (limit && limit > 0 && results.length > limit) {
+          results = results.slice(0, limit);
+        }
+        
+        return results;
+      },
+      
+      query: async ({ queryEmbeddings, nResults, where }) => {
+        if (!Array.isArray(collection.documents) || collection.documents.length === 0) {
+          return { results: [[]], distances: [[]] };
+        }
+        
+        let candidates = [];
+        for (let i = 0; i < collection.documents.length; i++) {
+          const doc = collection.documents[i];
+          const embedding = collection.embeddings[i];
+          const metadata = collection.metadatas[i];
+          
+          if (!doc || !embedding || !metadata) continue;
+          
+          candidates.push({
+            document: doc.text,
+            embedding: embedding,
+            metadata: metadata
+          });
+        }
+        
+        if (where && Object.keys(where).length > 0) {
+          for (const key in where) {
+            candidates = candidates.filter(r => r.metadata && r.metadata[key] === where[key]);
+          }
+        }
+        
+        const results = [];
+        const distances = [];
+        
+        for (const queryEmbedding of queryEmbeddings) {
+          const docResults = [];
+          const docDistances = [];
+          
+          for (const candidate of candidates) {
+            const similarity = this.cosineSimilarity(queryEmbedding, candidate.embedding);
+            docResults.push({
+              document: candidate.document,
+              embedding: candidate.embedding,
+              metadata: candidate.metadata
+            });
+            docDistances.push(1 - similarity);
+          }
+          
+          const sortedIndices = docDistances
+            .map((dist, idx) => ({ dist, idx }))
+            .sort((a, b) => a.dist - b.dist)
+            .slice(0, nResults)
+            .map(item => item.idx);
+          
+          const topResults = sortedIndices.map(idx => docResults[idx]);
+          
+          results.push(topResults);
+          distances.push(sortedIndices.map(idx => docDistances[idx]));
+        }
+        
+        return { results, distances };
+      },
+      
+      count: async () => {
+        return Array.isArray(collection.documents) ? collection.documents.length : 0;
+      },
+      
+      delete: async ({ where }) => {
+        if (!Array.isArray(collection.documents)) {
+          logger.error(`[VectorIndexService] delete: documents不是数组`);
+          collection.documents = [];
+          collection.embeddings = [];
+          collection.metadatas = [];
+          this.saveCollection(collection);
+          return;
+        }
+        
+        if (where && Object.keys(where).length > 0) {
+          const indicesToDelete = [];
+          
+          for (let i = 0; i < collection.documents.length; i++) {
+            const metadata = collection.metadatas[i];
+            
+            if (!metadata) continue;
+            
+            let matches = true;
+            for (const key in where) {
+              if (!metadata[key] || metadata[key] !== where[key]) {
+                matches = false;
+                break;
+              }
+            }
+            
+            if (matches) {
+              indicesToDelete.push(i);
+            }
+          }
+          
+          indicesToDelete.sort((a, b) => b - a);
+          
+          const newDocs = [];
+          const newEmbeddings = [];
+          const newMetadatas = [];
+          
+          for (let i = 0; i < collection.documents.length; i++) {
+            if (!indicesToDelete.includes(i)) {
+              newDocs.push(collection.documents[i]);
+              newEmbeddings.push(collection.embeddings[i]);
+              newMetadatas.push(collection.metadatas[i]);
+            }
+          }
+          
+          collection.documents = newDocs;
+          collection.embeddings = newEmbeddings;
+          collection.metadatas = newMetadatas;
+        } else {
+          collection.documents = [];
+          collection.embeddings = [];
+          collection.metadatas = [];
+        }
+        
+        this.saveCollection(collection);
       }
-    }
+    };
+
+    this.collections.set(collectionName, collection);
+    return collection;
   }
 
-  /**
-   * 清理collection缓存
-   * @param {string|null} userId - 可选，指定要清理的用户ID。如果为null，则清理所有缓存
-   */
+  cosineSimilarity(vec1, vec2) {
+    if (!vec1 || !vec2 || vec1.length === 0 || vec2.length === 0) {
+      return 0;
+    }
+
+    let dotProduct = 0;
+    let norm1 = 0;
+    let norm2 = 0;
+
+    for (let i = 0; i < vec1.length; i++) {
+      dotProduct += vec1[i] * vec2[i];
+      norm1 += vec1[i] * vec1[i];
+      norm2 += vec2[i] * vec2[i];
+    }
+
+    if (norm1 === 0 || norm2 === 0) {
+      return 0;
+    }
+
+    return dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2));
+  }
+
   clearCollectionCache(userId = null) {
-    if (userId) {
+    if (this.collections.has(`user_${userId}`)) {
       this.collections.delete(`user_${userId}`);
-    } else {
-      this.collections.clear();
     }
   }
 
@@ -141,43 +350,48 @@ class VectorIndexService {
       logger.info(`[VectorIndexService] 加载到 ${total} 条记忆`);
 
       const batchSize = 50;
-      const processedMemories = [];
+      let currentProcessed = 0;
 
       for (let i = 0; i < allMemories.length; i += batchSize) {
         const batch = allMemories.slice(i, i + batchSize);
 
-      for (const memory of batch) {
-        const text = this.buildMemoryText(memory);
+        const batchIds = [];
+        const batchEmbeddings = [];
+        const batchDocuments = [];
+        const batchMetadatas = [];
 
-        const embedding = await this.embeddingService.embedQuery(text);
+        for (const memory of batch) {
+          const text = this.buildMemoryText(memory);
+          const embedding = await this.embeddingService.embedQuery(text);
+          const metadata = this.buildMetadata(memory);
 
-        const metadata = this.buildMetadata(memory);
+          batchIds.push(memory.memoryId);
+          batchEmbeddings.push(embedding);
+          batchDocuments.push(text);
+          batchMetadatas.push(metadata);
 
-          processedMemories.push({
-            id: memory.memoryId,
-            embedding,
-            document: text,
-            metadata
-          });
-
-          const current = processedMemories.length + (i);
-          if (progressCallback) {
-            progressCallback({
-              current: Math.min(current, total),
-              total,
-              message: `正在处理记忆 ${Math.min(current, total)}/${total}...`
-            });
-          }
+          currentProcessed++;
         }
 
-        if (processedMemories.length > 0) {
-          await this.batchInsert(collection, processedMemories);
-          processedMemories.length = 0;
+        logger.info(`[VectorIndexService] 添加批次 ${Math.floor(i / batchSize) + 1}/${Math.ceil(total / batchSize)}, ${currentProcessed}/${total} 个文档`);
+
+        await collection.add({
+          ids: batchIds,
+          embeddings: batchEmbeddings,
+          documents: batchDocuments,
+          metadatas: batchMetadatas
+        });
+
+        if (progressCallback) {
+          progressCallback({
+            current: Math.min(currentProcessed, total),
+            total,
+            message: `正在处理记忆 ${Math.min(currentProcessed, total)}/${total}...`
+          });
         }
       }
 
       const duration = Date.now() - startTime;
-
       const stats = await this.getStats(userId);
 
       logger.info(`[VectorIndexService] 索引重建完成 - User: ${userId}, Count: ${total}, Duration: ${duration}ms`);
@@ -248,26 +462,12 @@ class VectorIndexService {
     return metadata;
   }
 
-  async batchInsert(collection, documents) {
-    try {
-      await collection.add({
-        ids: documents.map(d => d.id),
-        embeddings: documents.map(d => d.embedding),
-        documents: documents.map(d => d.document),
-        metadatas: documents.map(d => d.metadata)
-      });
-    } catch (error) {
-      logger.error('[VectorIndexService] 批量插入失败:', error);
-      throw error;
-    }
-  }
-
   async getStats(userId) {
     const collection = await this.getCollection(userId);
-    const result = await collection.count();
+    const count = await collection.count();
 
     return {
-      totalDocuments: result,
+      totalDocuments: count,
       collectionName: `user_${userId}`
     };
   }
@@ -299,20 +499,21 @@ class VectorIndexService {
         }
       }
 
-      const results = await collection.query({
+      const { results, distances } = await collection.query({
         queryEmbeddings: [queryEmbedding],
         nResults: topK,
         where: Object.keys(where).length > 0 ? where : undefined
       });
 
       const memories = [];
-      if (results.documents && results.documents[0]) {
-        for (let i = 0; i < results.documents[0].length; i++) {
+      if (results && results[0]) {
+        for (let i = 0; i < results[0].length; i++) {
+          const result = results[0][i];
           memories.push({
-            content: results.documents[0][i],
-            relevanceScore: 1 - (results.distances?.[0]?.[i] || 0),
-            category: results.metadatas?.[0]?.[i]?.category || 'self',
-            metadata: results.metadatas?.[0]?.[i] || {}
+            content: result.document,
+            relevanceScore: distances[0]?.[i] || 0,
+            category: result.metadata?.category || 'self',
+            metadata: result.metadata || {}
           });
         }
       }
@@ -328,4 +529,3 @@ class VectorIndexService {
 }
 
 export default VectorIndexService;
-

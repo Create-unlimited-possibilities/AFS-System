@@ -10,7 +10,10 @@ import fs from 'fs-extra';
 import path from 'path';
 import logger from './logger.js';
 
-const ROLECARDS_DIR = path.join(process.cwd(), 'server', 'storage', 'rolecards');
+const isDocker = fs.existsSync('/.dockerenv') || process.env.DOCKER_CONTAINER === 'true';
+const ROLECARDS_DIR = isDocker
+  ? path.join('/app', 'storage', 'rolecards')
+  : path.join(process.cwd(), 'server', 'storage', 'rolecards');
 
 /**
  * 角色卡存储类

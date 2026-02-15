@@ -74,10 +74,29 @@ class RoleCardController {
     try {
       await roleCardGeneratorB.generateRoleCard(userId, progressCallback);
 
+      const RolecardStorage = (await import('../utils/rolecardStorage.js')).default;
+      const rolecardStorage = new RolecardStorage();
+      const rolecard = await rolecardStorage.getLatestRolecard(userId);
+
       logger.info(`[RoleCardController] 角色卡生成成功 - User: ${userId}`);
 
       res.write(`event: done\n`);
-      res.write(`data: ${JSON.stringify({ success: true })}\n\n`);
+      res.write(`data: ${JSON.stringify({
+        success: true,
+        roleCard: {
+          personality: rolecard.systemPrompt,
+          background: '',
+          interests: [],
+          communicationStyle: '',
+          values: [],
+          emotionalNeeds: [],
+          lifeMilestones: [],
+          preferences: [],
+          strangerInitialSentiment: '',
+          generatedAt: rolecard.generatedAt,
+          updatedAt: rolecard.generatedAt
+        }
+      })}\n\n`);
     } catch (error) {
       logger.error('[RoleCardController] 生成角色卡失败:', error);
       res.write(`event: error\n`);
@@ -93,32 +112,56 @@ class RoleCardController {
   async getRoleCard(req, res) {
     try {
       const userId = req.user.id;
-
       const user = await User.findById(userId);
-      if (!user || !user.companionChat?.roleCard) {
-        return res.status(404).json({
-          success: false,
-          error: '角色卡不存在'
+
+      if (user?.companionChat?.roleCard) {
+        const roleCard = user.companionChat.roleCard;
+        res.json({
+          success: true,
+          roleCard: {
+            personality: roleCard.personality,
+            background: roleCard.background,
+            interests: roleCard.interests,
+            communicationStyle: roleCard.communicationStyle,
+            values: roleCard.values,
+            emotionalNeeds: roleCard.emotionalNeeds,
+            lifeMilestones: roleCard.lifeMilestones,
+            preferences: roleCard.preferences,
+            strangerInitialSentiment: roleCard.strangerInitialSentiment,
+            generatedAt: roleCard.generatedAt,
+            updatedAt: roleCard.updatedAt
+          }
         });
+        return;
       }
 
-      const roleCard = user.companionChat.roleCard;
+      const RolecardStorage = (await import('../utils/rolecardStorage.js')).default;
+      const rolecardStorage = new RolecardStorage();
+      const rolecard = await rolecardStorage.getLatestRolecard(userId);
 
-      res.json({
-        success: true,
-        roleCard: {
-          personality: roleCard.personality,
-          background: roleCard.background,
-          interests: roleCard.interests,
-          communicationStyle: roleCard.communicationStyle,
-          values: roleCard.values,
-          emotionalNeeds: roleCard.emotionalNeeds,
-          lifeMilestones: roleCard.lifeMilestones,
-          preferences: roleCard.preferences,
-          strangerInitialSentiment: roleCard.strangerInitialSentiment,
-          generatedAt: roleCard.generatedAt,
-          updatedAt: roleCard.updatedAt
-        }
+      if (rolecard) {
+        res.json({
+          success: true,
+          roleCard: {
+            personality: rolecard.systemPrompt,
+            background: '',
+            interests: [],
+            communicationStyle: '',
+            values: [],
+            emotionalNeeds: [],
+            lifeMilestones: [],
+            preferences: [],
+            strangerInitialSentiment: '',
+            generatedAt: rolecard.generatedAt,
+            updatedAt: rolecard.generatedAt
+          }
+        });
+        return;
+      }
+
+      return res.status(404).json({
+        success: false,
+        error: '角色卡不存在'
       });
     } catch (error) {
       logger.error('[RoleCardController] 获取角色卡失败:', error);
@@ -265,6 +308,15 @@ class RoleCardController {
       }
 
       const vectorService = new VectorIndexService();
+
+      const exists = await vectorService.indexExists(userId);
+      if (exists) {
+        res.write(`event: error\n`);
+        res.write(`data: ${JSON.stringify({ success: false, error: '记忆库已存在，无需重复构建' })}\n\n`);
+        res.end();
+        return;
+      }
+
       const result = await vectorService.rebuildIndex(userId, progressCallback);
 
       logger.info(`[RoleCardController] 向量索引构建成功 - User: ${userId}`);
@@ -298,13 +350,21 @@ class RoleCardController {
       const memories = await fileStorage.loadUserMemories(userId);
 
       const memoryCount = memories.A_set.length + memories.Bste.length + memories.Cste.length;
-      const canBuild = memories.A_set.length > 0;
+
+      const RolecardStorage = (await import('../utils/rolecardStorage.js')).default;
+      const rolecardStorage = new RolecardStorage();
+      const rolecard = await rolecardStorage.getLatestRolecard(userId);
+      const hasRoleCard = !!rolecard;
+      const canBuild = memories.A_set.length > 0 && !exists;
+
+      logger.info(`[RoleCardController] 向量索引状态 - User: ${userId}, hasRoleCard: ${hasRoleCard}, exists: ${exists}, canBuild: ${canBuild}`);
 
       res.json({
         success: true,
         status: {
           exists,
           memoryCount,
+          hasRoleCard,
           canBuild,
           ...stats
         }

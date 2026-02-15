@@ -339,9 +339,15 @@ export interface ChatSessionSummary {
 export interface VectorIndexStatus {
   exists: boolean
   memoryCount: number
+  hasRoleCard: boolean
   canBuild: boolean
   totalDocuments?: number
   collectionName?: string
+}
+
+export interface VectorIndexStatusResponse {
+  success: boolean;
+  status: VectorIndexStatus;
 }
 
 export interface VectorIndexBuildProgress {

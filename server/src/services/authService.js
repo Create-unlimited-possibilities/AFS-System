@@ -2,6 +2,7 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import Role from '../models/Role.js';
+import RolecardStorage from '../utils/rolecardStorage.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'afs-super-secret-key-2025-change-me-in-production';
 
@@ -34,7 +35,7 @@ class AuthService {
   /**
    * 格式化用户数据以兼容前端
    */
-  formatUserData(user) {
+  async formatUserData(user) {
     const userData = {
       _id: user._id,
       id: user._id,
@@ -42,15 +43,105 @@ class AuthService {
       email: user.email,
       name: user.name,
       createdAt: user.createdAt,
-      lastLogin: user.lastLogin,
-      companionChat: user.companionChat || {
-        memoryTokenCount: 0,
-        currentMode: 'mode1',
-        relationships: [],
-        roleCard: { selfCognition: { traits: [], vulnerabilities: [] } },
-        modelStatus: { hasCustomModel: false, trainingStatus: 'none' }
-      }
+      lastLogin: user.lastLogin
     };
+
+    // 如果用户没有companionChat，从文件系统读取角色卡数据
+    if (!user.companionChat) {
+      try {
+        const rolecardStorage = new RolecardStorage();
+        const rolecard = await rolecardStorage.getLatestRolecard(user._id);
+
+        if (rolecard) {
+          userData.companionChat = {
+            memoryTokenCount: 0,
+            currentMode: 'mode1',
+            relationships: [],
+            roleCard: {
+              personality: rolecard.systemPrompt,
+              background: '',
+              interests: [],
+              communicationStyle: '',
+              values: [],
+              emotionalNeeds: [],
+              lifeMilestones: [],
+              preferences: [],
+              strangerInitialSentiment: '',
+              generatedAt: rolecard.generatedAt,
+              updatedAt: rolecard.generatedAt,
+              memoryTokenCount: 0
+            },
+            modelStatus: { hasCustomModel: false, trainingStatus: 'none' }
+          };
+        } else {
+          userData.companionChat = {
+            memoryTokenCount: 0,
+            currentMode: 'mode1',
+            relationships: [],
+            roleCard: {
+              personality: '',
+              background: '',
+              interests: [],
+              communicationStyle: '',
+              values: [],
+              emotionalNeeds: [],
+              lifeMilestones: [],
+              preferences: [],
+              strangerInitialSentiment: '',
+              generatedAt: null,
+              updatedAt: null
+            },
+            modelStatus: { hasCustomModel: false, trainingStatus: 'none' }
+          };
+        }
+      } catch (error) {
+        console.error('[AuthService] 从文件系统读取角色卡失败:', error);
+        userData.companionChat = {
+          memoryTokenCount: 0,
+          currentMode: 'mode1',
+          relationships: [],
+          roleCard: {
+            personality: '',
+            background: '',
+            interests: [],
+            communicationStyle: '',
+            values: [],
+            emotionalNeeds: [],
+            lifeMilestones: [],
+            preferences: [],
+            strangerInitialSentiment: '',
+            generatedAt: null,
+            updatedAt: null
+          },
+          modelStatus: { hasCustomModel: false, trainingStatus: 'none' }
+        };
+      }
+    } else {
+      // 如果用户有companionChat，直接使用
+      userData.companionChat = user.companionChat;
+    }
+
+    // 如果用户有角色但没有companionChat，添加到companionChat
+    if (user.role && !userData.companionChat?.roleCard) {
+      const rolecardStorage = new RolecardStorage();
+      const rolecard = await rolecardStorage.getLatestRolecard(user._id);
+
+      if (rolecard) {
+        userData.companionChat.roleCard = {
+          personality: rolecard.systemPrompt,
+          background: '',
+          interests: [],
+          communicationStyle: '',
+          values: [],
+          emotionalNeeds: [],
+          lifeMilestones: [],
+          preferences: [],
+          strangerInitialSentiment: '',
+          generatedAt: rolecard.generatedAt,
+          updatedAt: rolecard.generatedAt
+        };
+      }
+    }
 
     // 如果用户有角色，添加角色信息
     if (user.role && typeof user.role === 'object') {

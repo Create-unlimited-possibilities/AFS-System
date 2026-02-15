@@ -17,6 +17,14 @@ export default class AnswerRepository {
       .sort({ createdAt: -1 });
   }
 
+  async findWithAssistRelation(query) {
+    return await Answer.find(query)
+      .populate('questionId')
+      .populate('userId', 'name email uniqueCode')
+      .populate('assistRelationId')
+      .sort({ createdAt: -1 });
+  }
+
   async findOneAndUpdate(query, update, options = {}) {
     return await Answer.findOneAndUpdate(query, update, options);
   }

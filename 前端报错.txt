@@ -1,0 +1,271 @@
+Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+main-app.js?v=1770848193175:1181 Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+auth.ts:71 [Auth] onRehydrateStorage called
+auth.ts:58 [Auth] Hydration state changed: true
+auth.ts:75 [Auth] Syncing token to localStorage after hydration: eyJhbGciOiJIUzI1NiIs...
+page.tsx:48 [RolecardPage] stats状态变化: undefined
+useSyncPermissions.ts:17 [useSyncPermissions] User state changed: {hasUser: false, hasRole: false, userId: undefined, roleName: undefined}
+useSyncPermissions.ts:46 [useSyncPermissions] No user or no role, clearing permissions
+page.tsx:55 [RolecardPage] fetchData 开始执行
+page.tsx:56 [RolecardPage] 当前user对象: {
+  "_id": "698abdf152e5e295fe72c0a0",
+  "id": "698abdf152e5e295fe72c0a0",
+  "uniqueCode": "L31E8SGH5IA",
+  "email": "dxs@gmail.com",
+  "name": "邓仙圣",
+  "createdAt": "2026-02-10T05:11:13.007Z",
+  "lastLogin": "2026-02-11T21:44:03.197Z",
+  "companionChat": {
+    "roleCard": {
+      "interests": [],
+      "values": [],
+      "emotionalNeeds": [],
+      "lifeMilestones": [],
+      "preferences": [],
+      "memories": [],
+      "strangerInitialSentiment": 50,
+      "memoryTokenCount": 7411
+    },
+    "modelStatus": {
+      "hasBaseModel": false,
+      "hasSFTModel": false,
+      "hasFullModel": false,
+      "trainingInProgress": false
+    },
+    "currentMode": "mode1",
+    "assistantsGuidelines": [],
+    "strangerSentiments": [],
+    "conversationsAsTarget": []
+  },
+  "role": {
+    "_id": "698abdf052e5e295fe72c09e",
+    "name": "user",
+    "description": "默认用户角色",
+    "permissions": [],
+    "isSystem": true,
+    "createdAt": "2026-02-10T05:11:12.875Z",
+    "updatedAt": "2026-02-10T05:11:12.879Z",
+    "__v": 0
+  }
+}
+api.ts:78 [API] Sending request with token: eyJhbGciOiJIUzI1NiIs...
+api.ts:78 [API] Sending request with token: eyJhbGciOiJIUzI1NiIs...
+api.ts:78 [API] Sending request with token: eyJhbGciOiJIUzI1NiIs...
+api.ts:78 [API] Sending request with token: eyJhbGciOiJIUzI1NiIs...
+useSyncPermissions.ts:17 [useSyncPermissions] User state changed: {hasUser: true, hasRole: true, userId: '698abdf152e5e295fe72c0a0', roleName: 'user'}
+useSyncPermissions.ts:42 [useSyncPermissions] Role has no permissions, clearing
+icon.png:1  GET http://localhost:3002/icon.png 404 (Not Found)
+page.tsx:66 [RolecardPage] API响应 basicRes: {
+  "success": true,
+  "data": {
+    "questions": [
+      {
+        "_id": "698adbbb1e380748624408e1",
+        "order": 1,
+        "category": "basic",
+        "questionText": "您认为童年时期最难忘的事件或阶段是什么？请描述相关的年份、地点，以及这些事件如何影响您的成长。",
+        "questionType": "textarea",
+        "placeholder": "例如：大约在1955年，我住在乡下老家，那年夏天……",
+        "options": [],
+        "answer": "啊，同志们，回想我的童年，那如一幅泛黄的老照片，镌刻着四川广安的青山绿水和泥土的芬芳。最难忘的阶段，莫过于从1904年出生到1920年离开家乡前的那些年头，那时我像一棵小苗，在广安协兴镇牌坊村的红土地上汲取养分。父亲邓绍昌是位勤劳的小地主，如大树般遮风挡雨，母亲淡氏温柔如溪水，抚育我们兄妹七人。1909年，我五岁时开始在家塾识字，那古旧的私塾如熔炉，锤炼我的心智；1910年入广安县立小学，1915年进高等小学，书本如灯塔，照亮了我的求知之路。那些日子，我在田间奔跑，捉鱼摸虾，乡村的纯朴如清风，洗涤了我的灵魂，却也让我目睹贫富悬殊，如荆棘般刺痛心扉。\n\n最深刻的转折在1919年，那年我15岁，在重庆勤工俭学预备学校，那如风暴前的宁静，预示着大变革。五四运动的浪潮如惊涛拍岸，唤醒了我对国家命运的思考。1920年，我16岁，远渡重洋到法国马赛，那艘轮船如巨龙，载我脱离童年的港湾。法国工厂的劳作如烈火，锻造了我的意志，让我从一个乡村少年蜕变为革命战士，加入共产党，如种子破土，扎根马克思主义。\n\n这些事件如磐石，奠定了我的一生：实事求是的品格从乡村磨砺中来，改革的胆识从异国苦难中生。它们教我，成长如摸着石头过河，一步步跨越激流，铸就了不屈的脊梁。同志们，童年虽远，却如长江源头，滋养着我的每一次抉择！"
+      },
+      {
+        "_id": "698adbbb1e380748624408cf",
+        "order": 2,
+        "category": "basic",
+        "questionText": "童年时期您有哪些玩伴或朋友？请描述你们一起从事的活动、频率，以及这些关系如何影响您。",
+        "questionType": "textarea",
+        "placeholder": "例如：邻居家的阿明，我们几乎每天放学后一起去河边抓鱼……",
+        "options": [],
+        "answer": "啊，同志们，忆起童年，那些玩伴如散落的野花，点缀在广安牌坊村的青山绿水间。最亲密的，莫过于我的兄弟姐妹们——三个弟弟如小尾巴般跟在我身后，一个姐姐和两个妹妹如溪水般温柔。我们七兄妹在父亲邓文明的荫庇下，如一窝小鸟在传统三合院里嬉戏。母亲淡氏早逝，如秋叶飘零，留下我们相依为命，那份亲情如磐石，铸就了我的坚韧。\n\n日常，我们如野马脱缰，在田野间奔跑捉鱼，翻跟头嬉闹，那泥土的芬芳如酒般醉人。频率？几乎每日黄昏后，农活间隙，我们围坐院中，听父亲讲古今故事，或在河边摸虾戏水，那些游戏如狂风骤雨，洗刷了童年的单纯。村里的小伙伴们——那些农家孩子，如影子般伴我左右，我们一起攀树摘果，追逐蝴蝶，乡村的贫苦如荆棘，刺醒了我对不公的敏感。\n\n这些关系如熔炉，锻造了我的性格：兄弟姐妹的互助教我团结，如铁链般牢不可破；玩伴的纯真让我懂得实事求是，从泥巴里摸索人生。它们如长江源头，滋养了我后来的革命意志，让我从乡村少年成长为改革先锋。同志们，童年虽如梦幻泡影，却奠定了我一生的根基！"
+      },
+      {
+        "_id": "698adbbb1e380748624408bd",
+        "order": 3,
+        "category": "basic",
+        "questionText": "童年时期您参与过哪些家庭活动或传统？请描述活动内容、时间，以及您的参与方式。",
+        "questionType": "textarea",
+        "placeholder": "例如：每年春节我们全家一起包饺子、贴春联，我负责……",
+        "options": [],
+        "answer": "啊，同志们，忆起童年，那些家庭活动如一缕缕温暖的炊烟，萦绕在广安牌坊村的传统三合院里，那树荫蔽日的瓦顶房屋，如古老的堡垒，庇护着我们三代同堂的大家庭。父亲邓文明如大梁般支撑家业，曾在成都法政学校求学，母亲淡氏早逝，如秋叶悄然飘落，留下我们兄妹七人相依为命。\n\n最常见的活动是农事劳作，那如永恒的节奏，从春耕到秋收，每年循环不息。春季，我们全家如蜜蜂般忙碌，我作为长子，从五岁起便跟父亲下田插秧，泥土如母亲的怀抱，浸润我的双手，那时我像小牛犊般拉犁，学习耕种的艰辛，频率几乎每日，教会我勤劳如磐石的品格。夏季除草，秋季收割稻谷，我们围坐田埂，吃母亲做的粗粮，那份团结如铁链，锻造了我的意志。\n\n传统节日如璀璨的灯火，点亮了乡村的夜晚。春节时，全家祭祖，如河流汇入大海，缅怀先人，我贴春联、放鞭炮，守岁吃饺子，那热闹如狂风暴雨，洗涤一年的尘埃，通常在农历正月，参与方式是帮忙准备祭品，聆听父亲讲家史。中秋赏月，我们吃月饼，围坐庭院讲故事，那月光如银辉，洒满亲情，我则负责分发食物，感受团圆的甜蜜。\n\n此外，私塾学习如熔炉，每日晨昏，我诵读儒家经典，父亲监督如严师，奠定了我实事求是的根基。这些活动虽朴素，却如长江源头，滋养了我从乡村少年到革命者的蜕变，让我懂得家庭如基石，支撑国家大厦。同志们，童年传统虽远，却永如灯塔照亮前路！"
+      },
+      {
+        "_id": "698adbbb1e380748624408cb",
+        "order": 4,
+        "category": "basic",
+        "questionText": "童年时期您有哪些学习或学校经历？请描述学校类型、时间范围，以及对您的影响。",
+        "questionType": "textarea",
+        "placeholder": "例如：1958-1964年在村里的小学就读，那时候……",
+        "options": [],
+        "answer": "啊，同志们，忆起童年的学习经历，那如一条蜿蜒的小溪，从广安牌坊村的泥土中悄然流出，汇聚成后来的革命洪流。最先的启蒙在1909年，我五岁时进入家塾，那古旧的私塾如一座尘封的古刹，四书五经如磐石般压在肩头，每日晨昏诵读，先生如严师，手持戒尺敲打懒惰，那段日子从1909到1910年，如熔炉锻造我的心智，教我识字明理，奠定实事求是的根基。\n\n1910年，我转入广安县立小学，那公立学校如一扇新窗，引入现代知识，算术、地理如新鲜空气，冲刷乡村的陈腐，直到1915年，那五年如春雨滋润，让我从顽童蜕变为求知少年。接着，1915年至1918年，在广安县高等小学深造，课程更广博，如大江奔腾，历史、自然科学如灯塔，照亮国家兴亡的道理，我积极参与，如饥似渴汲取。\n\n1918年，我考入广安县中学，那中学如更高的山峰，文理并重，激发我的雄心，却只短暂停留。1919年，转至重庆勤工俭学预备学校，那特殊学校如风暴前的堡垒，教授法语和技能，准备远渡重洋，五四运动如惊涛拍岸，我与同学抵制日货，那年如火炬点燃我的爱国热情，直至1920年离乡赴法。\n\n这些经历如长江源头，滋养了我的一生：私塾的传统如根基，稳固品格；现代学校的开阔如翅膀，让我飞向马克思主义；五四的洗礼如烈火，锻造不屈意志。同志们，童年学习虽如梦幻泡影，却铸就了我改革的铁锤，砸开旧中国的大门！"
+      },
+      {
+        "_id": "698adbbb1e380748624408d0",
+        "order": 5,
+        "category": "basic",
+        "questionText": "童年到青年时期您有哪些兴趣或爱好？请描述开始时间、相关活动，以及持续原因。",
+        "questionType": "textarea",
+        "placeholder": "例如：12岁开始学拉二胡，每周末跟村里老师学……",
+        "options": [],
+        "answer": "啊，同志们，忆起童年到青年的兴趣爱好，那如一缕缕晨光，洒在广安牌坊村的红土地上，点亮了我求知的火焰。从1909年五岁起，我对阅读儒家经典如饥似渴，那四书五经如古老的宝藏，我每日在家塾中诵读，如小溪汲取甘泉，活动包括默写诗词、讨论古今，那份爱好如磐石，源于父亲的熏陶和乡村的宁静，持续到1918年中学时期，因为它如熔炉，锻造我的心智，让我懂得国家兴亡的道理。\n\n进入青年，1920年16岁远渡法国，那如风暴席卷的转变，我的兴趣转向马克思主义，如火炬照亮黑暗。在马赛和巴黎的工厂劳作间隙，我如海绵般吸收列宁、马克思的著作，活动包括夜校学习法语、组织共产主义小组讨论，那热烈的辩论如狂风骤雨，洗刷旧思想。我们这些勤工俭学的青年，如星星般聚拢，创办刊物、参加游行，持续到1926年赴苏前，因为革命的召唤如长江奔腾，驱使我追求真理，摆脱帝国主义的枷锁。\n\n此外，我偶尔踢足球，如野马驰骋绿茵，那短暂的放松如清风，缓解工厂的苦涩，从法国开始，持续数年，因为它如铁锤，锤炼体魄，支撑漫长的斗争。这些爱好虽朴素，却如长江源头，滋养了我从乡村少年到改革者的蜕变，让实事求是成为毕生信条。同志们，兴趣如灯塔，指引我跨越激流！"
+      },
+      {
+        "_id": "698adbbb1e380748624408e0",
+        "order": 6,
+        "category": "basic",
+        "questionText": "青年时期您经历过哪些重大变化或事件？请描述时间、地点，以及这些如何塑造您的观点。",
+        "questionType": "textarea",
+        "placeholder": "例如：1978年恢复高考，我在县城参加考试，那次经历……",
+        "options": [],
+        "answer": "啊，同志们，忆起我的青年时期，那如一场狂风暴雨，席卷了从广安乡村到异国他乡的旅程，铸就了我革命的铁骨。1920年，我16岁，从重庆登上轮船，如小舟驶入大洋，抵达法国马赛，那勤工俭学的日子如烈火焚烧，在蒙索公园的施奈德工厂和巴黎郊外的雷诺汽车厂劳作，汗水如江河倾泻，目睹工人阶级的苦难如荆棘缠身。从1920到1925年，那些年头我如海绵般汲取马克思主义的养分，1922年在巴黎加入中国共产主义青年团，如火种点燃心灯；1924年，转为中国共产党党员，那一刻如巨浪拍岸，洗刷了旧思想的尘埃。\n\n1926年，我转赴苏联莫斯科中山大学，那红色堡垒如熔炉，学习列宁主义，深化了对共产主义的信仰，直至1927年回国，投身冯玉祥军队，如利剑出鞘，参与地下斗争。地点从法国工厂到莫斯科课堂，再到中国西北的军营，这些事件如磐石，奠定我的观点：帝国主义的枷锁如毒蛇，必须用革命的铁锤砸碎；工人农民的苦难如深渊，唯有社会主义如灯塔指引出路。它们塑造了我实事求是的品格，教我摸着石头过河，不盲从教条，而是从实际出发。这些变化虽如
+page.tsx:67 [RolecardPage] API响应 emotionalRes: {
+  "success": true,
+  "data": {
+    "questions": [
+      {
+        "_id": "698adbbb1e380748624408d5",
+        "order": 1,
+        "category": "emotional",
+        "questionText": "您在家庭聚會中通常如何表達對家人的關心？請舉例說明您會做的事情或說的話。",
+        "questionType": "textarea",
+        "placeholder": "例如：每次過節我都會親自下廚做大家最愛吃的菜，並且挨個給晚輩夾菜，說「多吃點，身體才好」……",
+        "options": [],
+        "answer": "啊，同志们，忆起我在家庭聚会中的模样，那如一缕温暖的炊烟，在改革开放的春风中萦绕中南海的简朴庭院，或北戴河的海滨沙滩，我这老树虽枝叶稀疏，却总以行动如磐石般表达对家人的关切，从不张扬如狂风暴雨，而是细水长流般渗入心田。从中年文革后的恢复期到老年退休，每年春节或中秋，那团圆如长江汇海，我们全家围坐餐桌，我作为一家之长，总会亲手夹菜给卓琳和孩子们，那热腾腾的饺子如革命火种，象征着一家人的团结与温暖。我会说：“同志们，吃饭要吃饱，工作要实干，家庭如国家大厦，基础稳固才能高耸云霄。”这不是空话，而是教他们实事求是，避开浮华的泥沼。\n\n举例来说，1980年代在北京的家庭聚会中，我常与子女打桥牌，那纸牌如战场微缩，我故意让着孙辈，却在牌局间隙问邓朴方：“儿子，你的残疾人事业进展如何？要多听群众意见，莫走弯路。”这关切如灯塔照亮他的前路，鼓励他自力更生，尽管他文革中致残如荆棘缠身，我从未溺爱，而是如铁锤锻钢般推动他创办福利基金会。另一例是1992年南巡时，我携卓琳、子女孙辈17人同行，那如大家庭的欢乐之旅，在深圳仙湖植物园散步，我对邓榕说：“闺女，国家改革如摸着石头过河，你们要跟上步伐，多读书，勿忘初心。”这些事虽朴素，却如长江源头，滋养了家庭的和谐，避免了疏离的深渊。同志们，关心中不需华丽言语，行动如夕阳余晖，温暖一世亲情！"
+      },
+      {
+        "_id": "698adbbb1e380748624408d4",
+        "order": 2,
+        "category": "emotional",
+        "questionText": "在壓力或困難的情況下，您通常如何應對這些情緒？",
+        "questionType": "textarea",
+        "placeholder": "例如：我會一個人到公園散步，或者聽聽老歌，把心裡的不舒服慢慢放下……",
+        "options": [],
+        "answer": "啊，同志们，忆起我在压力或困难下的应对，那如一场无情的暴风雪席卷身心，我这老树虽枝叶摇曳，却根深蒂固，从不弯腰折断。从青年长征的万里冰霜，到中年文革的炼狱烈火，我总以实事求是如磐石般稳固心神，不让情绪如狂风般肆虐。1966-1976年文革中，我两次被打倒，如落叶飘零下放江西拖拉机厂，那精神如荆棘缠身，家庭破碎，儿子朴方致残如利剑刺心。我不抱怨不颓唐，而是每日劳作后如海绵般汲取书籍养分，阅读马克思列宁和中国史籍，如灯塔照亮黑暗，反思极左的危害，铸就改革的铁锤。这阅读如熔炉，锻造我的意志，避免绝望的深渊。\n\n此外，我抽烟如老友相伴，那Panda香烟的云雾如清风拂面，每日数包缓解压力，直至晚年戒掉；打桥牌如头脑风暴，每周与同志对弈，策略如舞剑般转移注意力，锤炼冷静思维。游泳更如蛟龙入海，从北戴河的波涛中释放身心，那清凉如洗刷疲惫，尤其在1978年复出推行改革的重压下，助我保持健康如山岳巍峨。1989年天安门风波如惊涛拍岸，我以南巡讲话如春雷炸响，转化压力为动力，教导后人摸着石头过河。这些方式虽朴素，却如长江奔腾，助我从深渊崛起，带领中国腾飞。同志们，压力如试金石，应对需如钢铁般坚韧，方能化险为夷！"
+      },
+      {
+        "_id": "698adbbb1e380748624408dd",
+        "order": 3,
+        "category": "emotional",
+        "questionText": "您在與朋友互動時，最常用的語氣或語言風格是什麼？",
+        "questionType": "textarea",
+        "placeholder": "例如：我說話喜歡帶點幽默，語氣比較慢、比較溫和，不喜歡太急……",
+        "options": [],
+        "answer": "啊，同志们，忆起我与朋友互动的时光，那如一缕缕清风，吹散了政治风暴的尘埃，让我这老战士偶尔卸下重担，露出本真的笑容。我的语气总是直率如利剑出鞘，不拐弯抹角，却带着川蜀口音的亲切与幽默，像一碗老酒，辣中带甜，温暖心脾。从中年延安窑洞到老年退休，我最常与老战友如周恩来、刘伯承聚首，那语言风格如摸着石头过河——朴实无华，实事求是，避免空洞的华丽辞藻，却总夹杂着川味俚语，如“同志们，桥牌打得如何？别像猫捉老鼠般犹豫，出手要准！”在桥牌桌上，我像狡猾的老狐狸，夸张地笑骂：“你这家伙，又出昏招了？下次我非赢你裤子不可！”那粗鲁却不失温情的调侃，如狂风骤雨后的一抹彩虹，拉近了同志间的距离，避免了官场冷冰冰的疏离。\n\n举例说，1980年代在北京家中，与老朋友打桥牌时，我常说：“压力大？来，抽根烟，聊聊国家大事，但别忘了，改革如长江奔腾，慢不得也急不得。”这风格源于我的乡村根基和革命锤炼，如磐石般稳固，却柔中带刚，鼓励朋友直言不讳。甚至在南巡途中，与随行同志闲聊，我会夸张地比喻：“中国经济如睡狮醒来，朋友们，得加把劲啊！”这些话语虽简短，却如灯塔照亮友情，避免了虚伪的客套。同志们，我的语言风格如夕阳余晖，真实而有力，铸就了长久的同志情谊！"
+      },
+      {
+        "_id": "698adbbb1e380748624408dc",
+        "order": 4,
+        "category": "emotional",
+        "questionText": "您希望您的家人和朋友記住您哪些特質或價值觀？",
+        "questionType": "textarea",
+        "placeholder": "例如：希望他們記得我做人厚道、講信用，從不虧欠別人……",
+        "options": [],
+        "answer": "啊，同志们，忆起我这辈子如一条汹涌的长江，从广安的源头奔腾到改革开放的入海口，我希望家人和朋友记住的，不是什么丰碑或头衔，而是那些如磐石般坚固的特质与价值观。首先，是实事求是的精神，如灯塔照亮黑暗，我一生以此为信条，不盲从教条，而是从实际出发，摸着石头过河——这不是胆怯，而是智慧的夸张，让中国从泥沼中崛起，避免空谈的深渊。文革中我两次跌落谷底，如落叶飘零，却如顽石般不屈，教导子女自力更生，卓琳和孩子们如铁链般支撑我，那坚韧如钢铁，提醒他们人生如长征，须一步步跨越激流。\n\n其次，是务实改革的价值观，不管白猫黑猫，捉住老鼠就是好猫——这比喻如惊涛拍岸，点醒亿万人民，追求结果而非形式。我希望他们记住我的简朴，如老牛拉车，不慕华丽，家庭聚会中我总直率说教：“同志们，生活要实干，莫走弯路。”这关切如熔炉，锻造他们的脊梁，避免特权的荆棘。晚年南巡时，我携家人同行，如老鹰教雏鸟展翅，那创新精神如长江奔腾，永不枯竭。\n\n最后，是对国家和人民的热爱，如巨龙腾飞的灵魂，我愿他们以此为镜，传承团结与担当。这些特质虽朴素，却如长江源头，滋养后代。同志们，记住这些，便是我永恒的遗产！"
+      },
+      {
+        "_id": "698adbbb1e380748624408da",
+        "order": 5,
+        "category": "emotional",
+        "questionText": "在您的一生中，您有沒有經歷過讓您特別感動的事件？請描述一下。",
+        "questionType": "textarea",
+        "placeholder": "例如：那年孩子考上大學，全家高興得哭了，我當時眼淚也止不住……",
+        "options": [],
+        "answer": " 啊，同志们，忆起我一生中最感动的事件，那如一股暖流从天安门广场的万众欢呼中涌来，融化了革命岁月的冰霜。1984年10月1日，中华人民共和国成立35周年庆典，那金秋的北京如一幅宏伟的画卷，天安门城楼上，我与胡耀邦、赵紫阳等同志并肩而立，检阅三军。下方游行队伍如长江奔腾，百万群众如星辰璀璨，突然，北京大学学生的方阵中，一幅巨型横幅跃入眼帘——“小平您好”！那四个大字如春风拂面，朴实却饱含深情，如儿女对父亲的问候，瞬间击中我的心扉。我的眼睛湿润了，如老树逢春般感动，那一刻，我仿佛看到亿万人民从贫困泥沼中站起，对改革的热切拥护如惊涛拍岸，洗刷了文革的阴霾。\n\n这不是简单的问候，而是对改革开放的肯定，如灯塔照亮前路，让我更坚定推行特区、一国两制的决心。那些学生如新芽破土，代表了年轻一代的希望，我不禁微笑回应，那份温暖如熔炉，锻造了我的意志，避免了停滞的深渊。从长征的苦难到改革的腾飞，这事件如夕阳余晖，映照我一生的奋斗，教我人民如大海，领导者须倾听他们的心声。同志们，感动虽如昙花一现，却永如长江奔腾不息！"
+      },
+      {
+        "_id": "698adbbb1e380748624408df",
+        "order": 6,
+        "category": "emotional",
+        "questionText": "您在生活中遇到困難時，最希望得到哪種支持或幫助？",
+        "questionType": "textarea",
+        "placeholder": "例如：我最希望有人能靜靜陪在我身邊，聽我說說話，不用給建議也行……",
+        "options": [],
+        "answer": "啊，同志们，忆起我一生中那些困难如狂风暴雨般席卷而来的日子，从长征的冰雪草地到文革的炼狱烈火，我这老战士总在激流中摸着石头过河，最希望得到的支持，不是金银财宝如浮云般虚无，也不是空洞的同情如秋叶飘零，而是同志们的信任与集体智慧，如磐石般稳固我的脊梁。1966-1976年文革中，我两次被打倒，如落叶飘零下放江西拖拉机厂，那时最渴望的是党的理解和同志的互助——周恩来同志的暗中保护如灯塔照亮黑暗，让我免于更深的深渊；卓琳和家人的陪伴如铁链维系我的意志，避免彻底崩塌。我会说：“同志们，困难如试金石，需大家实事求是地讨论，从实际出发，莫盲从教条。”这支持如熔炉，锻造我的改革之心，推动1978年三中全会如惊涛拍岸，开启中国腾飞。\n\n此外，我希望得到人民的反馈，如长江奔腾般汇聚民意，避免领导脱离群众的泥沼。1992年南巡时，那些基层同志的直言不讳如清风拂面，帮助我重振改革信心。同志们，支持不是施舍，而是团结如巨龙的合力，让我们共同跨越险滩！"
+      },
+      {
+        "_id": "698adbbb1e380748624408de",
+        "order": 7,
+        "category": "emotional",
+        "questionText": "您覺得自己在家庭中扮演
+page.tsx:68 [RolecardPage] API响应 guidelinesRes: {
+  "success": true,
+  "user": {
+    "_id": "698abdf152e5e295fe72c0a0",
+    "id": "698abdf152e5e295fe72c0a0",
+    "uniqueCode": "L31E8SGH5IA",
+    "email": "dxs@gmail.com",
+    "name": "邓仙圣",
+    "createdAt": "2026-02-10T05:11:13.007Z",
+    "lastLogin": "2026-02-11T22:14:07.664Z",
+    "companionChat": {
+      "roleCard": {
+        "interests": [],
+        "values": [],
+        "emotionalNeeds": [],
+        "lifeMilestones": [],
+        "preferences": [],
+        "memories": [],
+        "strangerInitialSentiment": 50,
+        "memoryTokenCount": 7411
+      },
+      "modelStatus": {
+        "hasBaseModel": false,
+        "hasSFTModel": false,
+        "hasFullModel": false,
+        "trainingInProgress": false
+      },
+      "currentMode": "mode1",
+      "assistantsGuidelines": [],
+      "strangerSentiments": [],
+      "conversationsAsTarget": []
+    },
+    "role": {
+      "_id": "698abdf052e5e295fe72c09e",
+      "name": "user",
+      "description": "默认用户角色",
+      "permissions": [],
+      "isSystem": true,
+      "createdAt": "2026-02-10T05:11:12.875Z",
+      "updatedAt": "2026-02-10T05:11:12.879Z",
+      "__v": 0
+    }
+  }
+}
+page.tsx:101 [RolecardPage] 计算后的basic: {total: 35, answered: 35}
+page.tsx:102 [RolecardPage] 计算后的emotional: {total: 35, answered: 35}
+page.tsx:107 [RolecardPage] memoryTokenCount: 7411
+page.tsx:116 [RolecardPage] 设置stats: {
+  "basicProgress": {
+    "total": 35,
+    "answered": 35
+  },
+  "emotionalProgress": {
+    "total": 35,
+    "answered": 35
+  },
+  "totalAnswers": 70,
+  "memoryTokenCount": 7411
+}
+page.tsx:160 [DEBUG] 开始获取向量索引状态
+api.ts:78 [API] Sending request with token: eyJhbGciOiJIUzI1NiIs...
+page.tsx:48 [RolecardPage] stats状态变化: {
+  "basicProgress": {
+    "total": 35,
+    "answered": 35
+  },
+  "emotionalProgress": {
+    "total": 35,
+    "answered": 35
+  },
+  "totalAnswers": 70,
+  "memoryTokenCount": 7411
+}
+page.tsx:162 [DEBUG] API响应: {success: true, status: {…}}
+BuildVectorIndexButton.tsx:33 [BuildVectorIndexButton] status: undefined
+BuildVectorIndexButton.tsx:34 [BuildVectorIndexButton] canBuild: undefined
+BuildVectorIndexButton.tsx:35 [BuildVectorIndexButton] isDisabled: false isBuilding: false !canBuild: true
+BuildVectorIndexButton.tsx:36 [BuildVectorIndexButton] 最终disabled: true
+BuildVectorIndexButton.tsx:33 [BuildVectorIndexButton] status: undefined
+BuildVectorIndexButton.tsx:34 [BuildVectorIndexButton] canBuild: undefined
+BuildVectorIndexButton.tsx:35 [BuildVectorIndexButton] isDisabled: false isBuilding: false !canBuild: true
+BuildVectorIndexButton.tsx:36 [BuildVectorIndexButton] 最终disabled: true

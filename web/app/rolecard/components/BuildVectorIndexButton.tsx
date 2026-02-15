@@ -14,6 +14,7 @@ interface BuildVectorIndexButtonProps {
   status?: {
     exists: boolean
     memoryCount: number
+    hasRoleCard: boolean
     canBuild: boolean
   }
   onClick: () => void
@@ -26,8 +27,13 @@ export default function BuildVectorIndexButton({
   status,
   onClick
 }: BuildVectorIndexButtonProps) {
-  const canBuild = status?.canBuild && !status?.exists;
+  const canBuild = status?.canBuild;
   const isReady = status?.exists;
+
+  console.log('[BuildVectorIndexButton] status:', status);
+  console.log('[BuildVectorIndexButton] canBuild:', canBuild);
+  console.log('[BuildVectorIndexButton] isDisabled:', isDisabled, 'isBuilding:', isBuilding, '!canBuild:', !canBuild);
+  console.log('[BuildVectorIndexButton] 最终disabled:', isDisabled || isBuilding || !canBuild);
 
   return (
     <Button

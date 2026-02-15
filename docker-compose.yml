@@ -10,7 +10,9 @@ services:
     volumes:
       - ./web/app:/app/app
       - ./web/lib:/app/lib
+      - ./web/types:/app/types
       - ./web/components:/app/components
+      - ./web/stores:/app/stores
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:3001
     depends_on:
@@ -18,6 +20,32 @@ services:
     networks:
       - afs-network
     restart: unless-stopped
+    profiles:
+      - production
+
+  web-dev:
+    build:
+      context: ./web
+      dockerfile: Dockerfile-web-dev
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:3001
+    ports:
+      - "3002:3000"
+    volumes:
+      - ./web/app:/app/app
+      - ./web/lib:/app/lib
+      - ./web/types:/app/types
+      - ./web/components:/app/components
+      - ./web/stores:/app/stores
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+    depends_on:
+      - server
+    networks:
+      - afs-network
+    restart: unless-stopped
+    profiles:
+      - development
 
   server:
     build:
@@ -32,15 +60,30 @@ services:
     depends_on:
       - mongoserver
       - modelserver
+      - chromaserver
     env_file:
       - .env
     environment:
       - PORT=3000
       - MODEL_SERVER_URL=http://modelserver:8000
       - WEATHER_API_KEY=your_api_key_here
+      - CHROMA_URL=http://chromaserver:8000
     networks:
       - afs-network
     restart: unless-stopped
+
+  chromaserver:
+    image: chromadb/chroma:latest
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./server/storage/chroma_db:/chroma/chroma
+    networks:
+      - afs-network
+    restart: unless-stopped
+    environment:
+      - CHROMA_SERVER_CORS_ALLOW_ORIGINS=*
+      - CHROMA_SERVER_HOST=0.0.0.0
 
   modelserver:
     build:

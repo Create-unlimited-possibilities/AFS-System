@@ -90,6 +90,14 @@ class AuthController {
   async getMe(req, res) {
     try {
       const user = await authService.getUserById(req.user.id || req.user._id);
+      console.log('[AuthController] /auth/me 返回用户数据:', {
+        userId: user._id,
+        hasCompanionChat: !!user.companionChat,
+        companionChat: user.companionChat ? {
+          hasRoleCard: !!user.companionChat.roleCard,
+          memoryTokenCount: user.companionChat.roleCard?.memoryTokenCount
+        } : null
+      });
       res.json({
         success: true,
         user

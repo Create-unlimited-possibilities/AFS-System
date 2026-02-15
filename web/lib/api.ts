@@ -10,6 +10,8 @@ export interface ApiResponse<T = any> {
   data?: T;
 }
 
+
+
 // 为了兼容登录/注册等直接返回数据的响应
 export interface AuthResponse {
   success: boolean;
@@ -87,7 +89,7 @@ export async function apiRequest<T = any>(
       };
     }
 
-    return data;
+    return data as ApiResponse<T>;
   } catch (error) {
     return {
       success: false,
@@ -276,7 +278,11 @@ export async function getSentimentHistory(targetUserId: string, strangerId: stri
   return get<{ history: SentimentHistoryItem[] }>(`/sentiment/${targetUserId}/${strangerId}/history`, token);
 }
 
-export async function buildVectorIndex(onProgress: (data: any) => void) {
+export async function buildVectorIndex(
+  onProgress: (data: any) => void,
+  onComplete?: () => void,
+  onError?: (error: Error) => void
+) {
   const token = getToken();
   if (!token) {
     throw new Error('未登录');
@@ -302,34 +308,64 @@ export async function buildVectorIndex(onProgress: (data: any) => void) {
   }
 
   let buffer = '';
+  let currentEventType = '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  return new Promise<void>(async (resolve, reject) => {
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-    for (const line of lines) {
-      if (line.startsWith('event: ')) {
-        const eventType = line.substring(7).trim();
-        continue;
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+
+          if (trimmedLine.startsWith('event: ')) {
+            currentEventType = trimmedLine.substring(7).trim();
+          } else if (trimmedLine.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(trimmedLine.substring(6).trim());
+
+              if (currentEventType === 'progress') {
+                onProgress(data);
+              } else if (currentEventType === 'done') {
+                if (data.success) {
+                  if (onComplete) onComplete();
+                  resolve();
+                } else {
+                  const error = new Error(data.error || '构建失败');
+                  if (onError) onError(error);
+                  reject(error);
+                }
+              } else if (currentEventType === 'error') {
+                const error = new Error(data.error || '构建失败');
+                if (onError) onError(error);
+                reject(error);
+              }
+            } catch (parseError) {
+              console.error('[buildVectorIndex] JSON解析失败:', parseError);
+            }
+
+            currentEventType = '';
+          }
+        }
       }
-      if (line.startsWith('data: ')) {
-        const data = JSON.parse(line.substring(6).trim());
-        onProgress(data);
-      }
+    } catch (error) {
+      reject(error as Error);
     }
-  }
+  });
 }
 
 export async function getVectorIndexStatus() {
   return apiRequest<{
     success: boolean;
-    status: {
+    status?: {
       exists: boolean;
       memoryCount: number;
+      hasRoleCard: boolean;
       canBuild: boolean;
       totalDocuments?: number;
       collectionName?: string;

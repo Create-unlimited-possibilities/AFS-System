@@ -220,10 +220,10 @@ export default class AnswerService {
   }
 
   async getAnswersFromOthers(targetUserId) {
-    const answers = await this.answerRepository.find({
+    const answers = await this.answerRepository.findWithAssistRelation({
       targetUserId: targetUserId,
       userId: { $ne: targetUserId }
-    }).populate('assistRelationId');
+    });
 
     const groupedByContributor = {};
     answers.forEach(answer => {

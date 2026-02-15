@@ -15,13 +15,19 @@ class AnswerController {
       const { layer = 'basic', role = 'elder' } = req.query;
       const userId = req.user?.id || req.user?._id;
 
+      console.log(`[AnswerController] 获取问题 - userId: ${userId}, layer: ${layer}, role: ${role}`);
+
       // 获取问题列表
       const questions = await Question.find({ role, layer, active: true })
         .sort({ order: 1 })
         .lean();
 
+      console.log(`[AnswerController] 问题总数: ${questions.length}`);
+
       // 获取用户已回答的问题
       const answeredQuestions = userId ? await answerService.getSelfAnswers(userId, layer) : [];
+
+      console.log(`[AnswerController] 已回答问题数: ${answeredQuestions.length}`);
 
       // 创建答案映射
       const answerMap = {};
@@ -33,6 +39,8 @@ class AnswerController {
 
       // 计算已回答数量
       const answered = Object.keys(answerMap).length;
+
+      console.log(`[AnswerController] 已匹配答案数: ${answered}`);
 
       // 将问题转换为前端期望的格式
       const formattedQuestions = questions.map(q => ({
@@ -46,7 +54,7 @@ class AnswerController {
         answer: answerMap[q._id.toString()] || ''
       }));
 
-      res.json({
+      const responseData = {
         success: true,
         data: {
           questions: formattedQuestions,
@@ -54,7 +62,11 @@ class AnswerController {
           answered,
           progress: questions.length > 0 ? Math.round((answered / questions.length) * 100) : 0
         }
-      });
+      };
+
+      console.log(`[AnswerController] 返回数据: total=${responseData.data.total}, answered=${responseData.data.answered}, progress=${responseData.data.progress}%`);
+
+      res.json(responseData);
     } catch (error) {
       console.error('获取问题失败:', error);
       res.status(500).json({

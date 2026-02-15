@@ -7,15 +7,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
-import type { RoleCardExtended, AssistantGuideline } from '@/types'
-import { Sparkles, Copy, CheckCircle, AlertCircle, User, Loader2 } from 'lucide-react'
+import type { RoleCardExtended, AssistantGuideline, User, VectorIndexStatus, VectorIndexStatusResponse } from '@/types'
+import { Sparkles, Copy, CheckCircle, AlertCircle, User as UserIcon, Loader2 } from 'lucide-react'
 import CloudPattern from '@/components/decorations/CloudPattern'
 import GenerateButton from './components/GenerateButton'
 import BuildVectorIndexButton from './components/BuildVectorIndexButton'
 import RoleCardEditor from './components/RoleCardEditor'
 import GuidelinesViewer from './components/GuidelinesViewer'
 import { buildVectorIndex } from '@/lib/api'
-import type { VectorIndexStatus, VectorIndexBuildProgress } from '@/types'
+import type { VectorIndexBuildProgress } from '@/types'
 
 interface Stats {
   basicProgress: { total: number; answered: number }
@@ -25,7 +25,7 @@ interface Stats {
 }
 
 export default function RolecardPage() {
-  const { user, hasHydrated } = useAuthStore()
+  const { user, hasHydrated, setUser } = useAuthStore()
   const [roleCard, setRoleCard] = useState<RoleCardExtended | undefined>(undefined)
   const [guidelines, setGuidelines] = useState<AssistantGuideline[] | undefined>(undefined)
   const [stats, setStats] = useState<Stats | undefined>(undefined)
@@ -44,9 +44,16 @@ export default function RolecardPage() {
     }
   }, [hasHydrated, user])
 
+  useEffect(() => {
+    console.log('[RolecardPage] stats状态变化:', JSON.stringify(stats, null, 2))
+  }, [stats])
+
   const fetchData = async () => {
     try {
       setLoading(true)
+
+      console.log('[RolecardPage] fetchData 开始执行')
+      console.log('[RolecardPage] 当前user对象:', JSON.stringify(user, null, 2))
 
       // 使用与 dashboard 相同的统计方法
       const [roleCardRes, guidelinesRes, basicRes, emotionalRes] = await Promise.all([
@@ -55,6 +62,27 @@ export default function RolecardPage() {
         api.get('/questions?layer=basic&role=elder'),
         api.get('/questions?layer=emotional&role=elder'),
       ])
+
+      console.log('[RolecardPage] API响应 basicRes:', JSON.stringify(basicRes, null, 2))
+      console.log('[RolecardPage] API响应 emotionalRes:', JSON.stringify(emotionalRes, null, 2))
+      console.log('[RolecardPage] API响应 guidelinesRes:', JSON.stringify(guidelinesRes, null, 2))
+
+      // 更新用户数据（确保companionChat字段存在）
+      if (guidelinesRes.success && guidelinesRes.data?.user && user) {
+        const updatedUser: User = {
+          ...user,
+          ...guidelinesRes.data.user,
+          _id: user._id,
+          id: user.id,
+          uniqueCode: user.uniqueCode,
+          email: user.email,
+          name: user.name,
+          createdAt: user.createdAt,
+          lastLogin: user.lastLogin
+        }
+        setUser(updatedUser)
+        console.log('[RolecardPage] Updated user with companionChat data')
+      }
 
       if (roleCardRes.success && roleCardRes.data?.roleCard) {
         setRoleCard(roleCardRes.data.roleCard)
@@ -69,7 +97,14 @@ export default function RolecardPage() {
       const basicAnswered = basicRes.data?.answered || 0
       const emotionalTotal = emotionalRes.data?.questions?.length || 0
       const emotionalAnswered = emotionalRes.data?.answered || 0
+
+      console.log('[RolecardPage] 计算后的basic:', { total: basicTotal, answered: basicAnswered })
+      console.log('[RolecardPage] 计算后的emotional:', { total: emotionalTotal, answered: emotionalAnswered })
+
+      // 从user对象获取memoryTokenCount
       const memoryTokenCount = user?.companionChat?.roleCard?.memoryTokenCount || 0
+
+      console.log('[RolecardPage] memoryTokenCount:', memoryTokenCount)
 
       setStats({
         basicProgress: { total: basicTotal, answered: basicAnswered },
@@ -78,9 +113,16 @@ export default function RolecardPage() {
         memoryTokenCount,
       })
 
+      console.log('[RolecardPage] 设置stats:', JSON.stringify({
+        basicProgress: { total: basicTotal, answered: basicAnswered },
+        emotionalProgress: { total: emotionalTotal, answered: emotionalAnswered },
+        totalAnswers: basicAnswered + emotionalAnswered,
+        memoryTokenCount,
+      }, null, 2))
+
       await fetchVectorIndexStatus()
     } catch (error) {
-      console.error('获取角色卡数据失败:', error)
+      console.error('[RolecardPage] 获取角色卡数据失败:', error)
     } finally {
       setLoading(false)
     }
@@ -115,12 +157,15 @@ export default function RolecardPage() {
 
   const fetchVectorIndexStatus = async () => {
     try {
-      const res = await api.get('/rolecard/vector-index/status')
-      if (res.success && res.data?.status) {
-        setVectorIndexStatus(res.data.status)
+      console.log('[DEBUG] 开始获取向量索引状态')
+      const res = await api.get<VectorIndexStatusResponse>('/rolecard/vector-index/status')
+      console.log('[DEBUG] API响应:', res)
+      if (res.success && res.status) {
+        setVectorIndexStatus(res.status)
+        console.log('[DEBUG] vectorIndexStatus已更新:', res.status)
       }
     } catch (error) {
-      console.error('获取向量索引状态失败:', error)
+      console.error('[DEBUG] 获取向量索引状态失败:', error)
     }
   }
 
@@ -131,20 +176,38 @@ export default function RolecardPage() {
       setBuildingIndex(true)
       setBuildProgress({ current: 0, total: 1, message: '正在初始化...' })
 
-      await buildVectorIndex((data) => {
-        if (data.message) {
-          setBuildProgress({
-            current: data.current || 0,
-            total: data.total || 1,
-            message: data.message
-          })
-        }
-      })
+      let buildCompleted = false
+      let buildError: Error | null = null
 
-      setTimeout(() => {
-        setBuildProgress(undefined)
-        fetchVectorIndexStatus()
-      }, 2000)
+      await buildVectorIndex(
+        (data) => {
+          if (data.message) {
+            setBuildProgress({
+              current: data.current || 0,
+              total: data.total || 1,
+              message: data.message
+            })
+          }
+        },
+        () => {
+          buildCompleted = true
+          setBuildProgress({ current: 1, total: 1, message: '构建完成！' })
+        },
+        (error) => {
+          buildError = error
+        }
+      )
+
+      if (buildError) {
+        throw buildError
+      }
+
+      if (buildCompleted) {
+        setTimeout(() => {
+          setBuildProgress(undefined)
+          fetchVectorIndexStatus()
+        }, 2000)
+      }
     } catch (error) {
       console.error('构建向量索引失败:', error)
       const errorMessage = error instanceof Error ? error.message : '构建失败，请重试'
@@ -227,7 +290,7 @@ export default function RolecardPage() {
               <Card className="hover:shadow-xl transition-all duration-300 animate-slide-up">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5 text-orange-600" />
+                    <UserIcon className="h-5 w-5 text-orange-600" />
                     您的专属编号
                   </CardTitle>
                   <CardDescription>家人或朋友可以凭此编号和您的邮箱与您的角色卡对话</CardDescription>
