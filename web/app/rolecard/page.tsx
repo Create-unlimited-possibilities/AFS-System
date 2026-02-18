@@ -453,6 +453,7 @@ export default function RolecardPage() {
                   <GenerateButton
                     isGenerating={generating}
                     isDisabled={!isFullyAnswered()}
+                    hasRoleCard={!!roleCard}
                     progress={generateProgress}
                     onClick={handleGenerateRoleCard}
                   />
