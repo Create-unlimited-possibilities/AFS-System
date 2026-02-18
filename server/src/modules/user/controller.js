@@ -112,6 +112,40 @@ class UserController {
       });
     }
   }
+
+  async getProfile(req, res) {
+    try {
+      const userId = req.user.id;  // JWT 中使用的是 id，不是 _id
+      const profile = await userService.getProfile(userId);
+      res.json({
+        success: true,
+        profile
+      });
+    } catch (error) {
+      res.status(404).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  async updateProfile(req, res) {
+    try {
+      const userId = req.user.id;  // JWT 中使用的是 id，不是 _id
+      const profileData = req.body;
+      const user = await userService.updateProfile(userId, profileData);
+      res.json({
+        success: true,
+        profile: user.profile,
+        message: '个人档案已更新'
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
 }
 
 export default new UserController();

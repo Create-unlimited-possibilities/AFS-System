@@ -4,6 +4,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { PermissionProvider } from "@/components/providers/PermissionProvider"
 import { NavbarWrapper } from "@/components/NavbarWrapper"
+import { NavigationGuardProvider } from "@/components/NavigationGuardContext"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -25,11 +26,13 @@ export default function RootLayout({
     <html lang="zh-CN" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <PermissionProvider>
-            <NavbarWrapper>
-              {children}
-            </NavbarWrapper>
-          </PermissionProvider>
+          <NavigationGuardProvider>
+            <PermissionProvider>
+              <NavbarWrapper>
+                {children}
+              </NavbarWrapper>
+            </PermissionProvider>
+          </NavigationGuardProvider>
         </ThemeProvider>
       </body>
     </html>

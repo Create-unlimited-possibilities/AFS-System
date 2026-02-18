@@ -2,8 +2,20 @@ import express from 'express';
 import userController from './controller.js';
 import { protect } from '../auth/middleware.js';
 import { requirePermission as requirePermissionMiddleware } from '../../core/middleware/permission.js';
+import { profileLogger } from '../../core/utils/logger.js';
 
 const router = express.Router();
+
+// 个人档案路由 - 用户自己可以访问（不需要特殊权限）
+router.get('/profile', protect, (req, res) => {
+  profileLogger.info('GET /profile', { userId: req.user._id });
+  userController.getProfile(req, res);
+});
+
+router.put('/profile', protect, (req, res) => {
+  profileLogger.info('PUT /profile', { userId: req.user._id });
+  userController.updateProfile(req, res);
+});
 
 router.get('/stats', protect, requirePermissionMiddleware('user:view'), (req, res) => {
   userController.getUserStats(req, res);

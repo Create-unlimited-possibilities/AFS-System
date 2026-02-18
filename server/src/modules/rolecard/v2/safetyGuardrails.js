@@ -1,9 +1,45 @@
 // server/src/modules/rolecard/v2/safetyGuardrails.js
 
-import logger from '../../../core/utils/logger.js';
+import fs from 'fs';
+import fsPromises from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { profileLogger } from '../../../core/utils/logger.js';
+
+// 获取项目根目录
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, '../../../..');
 
 /**
- * 系统默认的护栏规则
+ * 信任等级定义
+ * 用于生成安全提示词时的说明
+ */
+export const TRUST_LEVEL_DEFINITIONS = {
+  tier1_intimate: {
+    name: '最亲密',
+    description: '可以分享所有私密信息，包括财务、健康、情感秘密',
+    characteristics: ['深度情感连接', '长期信任历史', '相互依赖']
+  },
+  tier2_close: {
+    name: '亲近',
+    description: '可以分享大部分个人事务，但某些极度私密话题会保留',
+    characteristics: ['较强的情感连接', '经常交流', '相互支持']
+  },
+  tier3_familiar: {
+    name: '一般熟悉',
+    description: '有限度的信息分享，主要是日常话题',
+    characteristics: ['有互动但不深入', '了解表面信息']
+  },
+  tier4_acquaintance: {
+    name: '疏远/陌生人',
+    description: '仅分享基本公共信息',
+    characteristics: ['互动很少或不了解', '没有深入交流']
+  }
+};
+
+/**
+ * 默认安全规则（当配置文件不存在时使用）
  */
 export const DEFAULT_GUARDRAIL_RULES = [
   {
@@ -14,10 +50,7 @@ export const DEFAULT_GUARDRAIL_RULES = [
       keywords: ['性生活', '夫妻亲密', '床第', '性关系'],
       description: '夫妻/伴侣间的私密关系细节'
     },
-    allowedAudience: {
-      trustLevels: ['tier1_intimate'],
-      specificRelations: ['配偶', '丈夫', '妻子']
-    },
+    allowedAudience: { trustLevels: ['tier1_intimate'] },
     action: { type: 'block', redirectHint: '转移到家庭日常话题' },
     priority: 100,
     enabled: true
@@ -30,10 +63,7 @@ export const DEFAULT_GUARDRAIL_RULES = [
       keywords: ['存款数额', '具体收入', '债务金额', '财产分配', '银行密码'],
       description: '具体的财务数字和财产细节'
     },
-    allowedAudience: {
-      trustLevels: ['tier1_intimate'],
-      specificRelations: ['配偶', '子女', '儿子', '女儿']
-    },
+    allowedAudience: { trustLevels: ['tier1_intimate'] },
     action: { type: 'vague_response', vagueTemplate: '关于钱的事，家里有安排的' },
     priority: 90,
     enabled: true
@@ -46,10 +76,7 @@ export const DEFAULT_GUARDRAIL_RULES = [
       keywords: ['吵架', '矛盾', '不和', '闹翻', '关系不好'],
       description: '家庭内部的矛盾和冲突'
     },
-    allowedAudience: {
-      trustLevels: ['tier1_intimate', 'tier2_close'],
-      excludeRelations: ['朋友', '同事', '邻居']
-    },
+    allowedAudience: { trustLevels: ['tier1_intimate', 'tier2_close'] },
     action: { type: 'redirect', redirectHint: '转移到积极的家庭话题' },
     priority: 80,
     enabled: true
@@ -83,51 +110,180 @@ export const DEFAULT_GUARDRAIL_RULES = [
 ];
 
 /**
- * 关系信任等级映射
+ * 安全护栏管理器 V2
+ * 从配置文件读取规则，使用 LLM 分析的 trustLevel 进行判断
  */
-export const RELATION_TRUST_LEVELS = {
-  tier1_intimate: ['配偶', '丈夫', '妻子', '父亲', '母亲', '儿子', '女儿'],
-  tier2_close: ['兄弟', '姐妹', '哥哥', '弟弟', '姐姐', '妹妹', '挚友', '闺蜜'],
-  tier3_familiar: ['朋友', '同事', '同学', '邻居'],
-  tier4_acquaintance: ['普通朋友', '一般朋友', '认识的人']
-};
-
 class SafetyGuardrailsManager {
   constructor() {
-    this.rules = [...DEFAULT_GUARDRAIL_RULES];
+    this.rules = null;
+    this.groupSettings = {
+      autoStrictMode: true,
+      defaultDisclosureLevel: 'lowest_common',
+      conflictResolution: 'block_content'
+    };
+    this.configPath = this.getConfigPath();
   }
 
-  getGuardrails(userId, customRules = []) {
+  /**
+   * 获取配置文件路径
+   */
+  getConfigPath() {
+    // Docker 环境使用 /app/storage
+    const isDocker = fs.existsSync('/.dockerenv') ||
+                     process.env.DOCKER_CONTAINER === 'true' ||
+                     process.env.NODE_ENV === 'docker';
+
+    if (isDocker) {
+      return '/app/storage/safety-rules.json';
+    }
+    return path.join(projectRoot, 'server', 'storage', 'safety-rules.json');
+  }
+
+  /**
+   * 加载安全规则配置
+   */
+  async loadRules() {
+    if (this.rules) {
+      return this.rules;
+    }
+
+    try {
+      const data = await fsPromises.readFile(this.configPath, 'utf-8');
+      const config = JSON.parse(data);
+
+      this.rules = config.rules || DEFAULT_GUARDRAIL_RULES;
+      this.groupSettings = config.groupSettings || this.groupSettings;
+
+      profileLogger.info('安全规则配置已加载', {
+        path: this.configPath,
+        ruleCount: this.rules.length
+      });
+
+      return this.rules;
+    } catch (error) {
+      profileLogger.warn('安全规则配置文件不存在，使用默认规则', {
+        path: this.configPath,
+        error: error.message
+      });
+      this.rules = DEFAULT_GUARDRAIL_RULES;
+      return this.rules;
+    }
+  }
+
+  /**
+   * 重新加载安全规则配置（用于热更新）
+   */
+  async reloadRules() {
+    this.rules = null;
+    return await this.loadRules();
+  }
+
+  /**
+   * 获取护栏配置
+   */
+  async getGuardrails(userId, customRules = []) {
+    const rules = await this.loadRules();
     return {
-      rules: [...this.rules, ...customRules],
+      rules: [...rules, ...customRules],
       defaultRuleSet: 'balanced',
-      groupSettings: {
-        autoStrictMode: true,
-        defaultDisclosureLevel: 'lowest_common',
-        conflictResolution: 'block_content'
-      }
+      groupSettings: this.groupSettings
     };
   }
 
-  getTrustLevel(specificRelation) {
-    for (const [level, relations] of Object.entries(RELATION_TRUST_LEVELS)) {
-      if (relations.includes(specificRelation)) return level;
+  /**
+   * 获取参与者的信任等级
+   * V2: 直接从 relationMeta.trustLevel 读取，无需硬编码映射
+   * @param {Object} participant - 参与者对象
+   * @returns {string} 信任等级
+   */
+  getTrustLevel(participant) {
+    // 从 relationshipWithOwner 中获取 trustLevel
+    const trustLevel = participant?.relationshipWithOwner?.trustLevel;
+
+    if (trustLevel) {
+      // 验证是否为有效的信任等级
+      const validLevels = ['tier1_intimate', 'tier2_close', 'tier3_familiar', 'tier4_acquaintance'];
+      if (validLevels.includes(trustLevel)) {
+        return trustLevel;
+      }
+    }
+
+    // 回退：基于 intimacyLevel 推断
+    const intimacyLevel = participant?.relationshipWithOwner?.intimacyLevel;
+    if (intimacyLevel) {
+      switch (intimacyLevel) {
+        case 'intimate': return 'tier1_intimate';
+        case 'close': return 'tier2_close';
+        case 'moderate': return 'tier3_familiar';
+        default: return 'tier4_acquaintance';
+      }
+    }
+
+    // 默认返回最低信任等级
+    return 'tier4_acquaintance';
+  }
+
+  /**
+   * 计算群组中所有参与者的信任等级
+   */
+  calculateGroupTrustLevels(participants) {
+    if (!participants || participants.length === 0) {
+      return ['tier4_acquaintance'];
+    }
+
+    return participants.map(p => this.getTrustLevel(p));
+  }
+
+  /**
+   * 获取群组中的最低信任等级
+   */
+  getLowestTrustLevel(trustLevels) {
+    const tierOrder = ['tier4_acquaintance', 'tier3_familiar', 'tier2_close', 'tier1_intimate'];
+    for (const tier of tierOrder) {
+      if (trustLevels.includes(tier)) return tier;
     }
     return 'tier4_acquaintance';
   }
 
-  generateGroupSafetyPrompt(guardrails, participants) {
+  /**
+   * 判断规则是否应该在当前群组中应用
+   */
+  shouldApplyRule(ruleTrustLevels, lowestGroupTier) {
+    if (!ruleTrustLevels || ruleTrustLevels.length === 0) return true;
+
+    const tierOrder = ['tier4_acquaintance', 'tier3_familiar', 'tier2_close', 'tier1_intimate'];
+    const lowestIndex = tierOrder.indexOf(lowestGroupTier);
+
+    for (const requiredTier of ruleTrustLevels) {
+      const requiredIndex = tierOrder.indexOf(requiredTier);
+      if (requiredIndex > lowestIndex) return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * 生成群组安全提示词
+   */
+  async generateGroupSafetyPrompt(guardrails, participants) {
+    // 确保规则已加载
+    const rules = guardrails?.rules || await this.loadRules();
+
     // 计算群组的最低信任等级
     const groupTrustLevels = this.calculateGroupTrustLevels(participants);
     const lowestTrustLevel = this.getLowestTrustLevel(groupTrustLevels);
 
+    profileLogger.info('生成群组安全提示词', {
+      participantCount: participants.length,
+      groupTrustLevels,
+      lowestTrustLevel
+    });
+
     // 根据群组信任等级过滤规则
-    const activeRules = guardrails.rules
+    const activeRules = rules
       .filter(r => {
         if (!r.enabled || r.type !== 'hard') return false;
-        // 检查规则的信任等级要求是否高于群组最低信任等级
         const ruleTrustLevels = r.allowedAudience?.trustLevels || [];
-        // 如果规则要求的信任等级高于群组最低等级，则在当前群组中需要应用该规则
         return this.shouldApplyRule(ruleTrustLevels, lowestTrustLevel);
       })
       .sort((a, b) => b.priority - a.priority);
@@ -136,11 +292,13 @@ class SafetyGuardrailsManager {
 
     let prompt = `## 🔒 安全约束（群组模式激活）
 
+### 当前群组信任等级
+最低信任等级：**${TRUST_LEVEL_DEFINITIONS[lowestTrustLevel]?.name || lowestTrustLevel}**
+
 ### 话题限制
 以下话题在当前群组中受到限制，请严格遵守：
 
 ${activeRules.map(rule => {
-  const allowedTo = rule.allowedAudience.specificRelations?.join('、') || '仅特定亲密关系';
   const actionText = {
     block: '完全不可讨论',
     redirect: '避免讨论，如触及请自然转移话题',
@@ -149,8 +307,7 @@ ${activeRules.map(rule => {
 
   return `**${rule.topic.description}**
 - 敏感关键词：${rule.topic.keywords.join('、')}
-- 允许对象：${allowedTo}
-- 处理方式：${actionText}`;
+- 处理方式：${actionText}${rule.action.vagueTemplate ? `\n- 模糊回应模板："${rule.action.vagueTemplate}"` : ''}${rule.action.redirectHint ? `\n- 转移方向：${rule.action.redirectHint}` : ''}`;
 }).join('\n\n')}
 
 ### 群组隐私原则
@@ -163,53 +320,33 @@ ${activeRules.map(rule => {
   }
 
   /**
-   * 计算群组中所有参与者的信任等级
-   * @param {Array} participants - 参与者列表
-   * @returns {string[]} 信任等级数组
+   * 保存安全规则配置
    */
-  calculateGroupTrustLevels(participants) {
-    if (!participants || participants.length === 0) return ['tier4_acquaintance'];
+  async saveRules(config) {
+    try {
+      const configDir = path.dirname(this.configPath);
+      await fsPromises.mkdir(configDir, { recursive: true });
 
-    return participants.map(p => {
-      const relation = p.relationshipWithOwner?.specificRelation || p.relation;
-      return this.getTrustLevel(relation);
-    });
-  }
+      const dataToSave = {
+        version: '1.0.0',
+        updatedAt: new Date().toISOString(),
+        description: '全局安全护栏规则配置',
+        trustLevelDefinitions: TRUST_LEVEL_DEFINITIONS,
+        rules: config.rules,
+        groupSettings: config.groupSettings || this.groupSettings
+      };
 
-  /**
-   * 获取群组中的最低信任等级
-   * @param {string[]} trustLevels - 信任等级数组
-   * @returns {string} 最低信任等级
-   */
-  getLowestTrustLevel(trustLevels) {
-    const tierOrder = ['tier4_acquaintance', 'tier3_familiar', 'tier2_close', 'tier1_intimate'];
-    for (const tier of tierOrder) {
-      if (trustLevels.includes(tier)) return tier;
+      await fsPromises.writeFile(this.configPath, JSON.stringify(dataToSave, null, 2), 'utf-8');
+
+      // 清除缓存，下次加载时重新读取
+      this.rules = null;
+
+      profileLogger.info('安全规则配置已保存', { path: this.configPath });
+      return { success: true, path: this.configPath };
+    } catch (error) {
+      profileLogger.error('保存安全规则配置失败', { error: error.message });
+      throw error;
     }
-    return 'tier4_acquaintance';
-  }
-
-  /**
-   * 判断规则是否应该在当前群组中应用
-   * @param {string[]} ruleTrustLevels - 规则要求的信任等级
-   * @param {string} lowestGroupTier - 群组最低信任等级
-   * @returns {boolean} 是否应用规则
-   */
-  shouldApplyRule(ruleTrustLevels, lowestGroupTier) {
-    if (!ruleTrustLevels || ruleTrustLevels.length === 0) return true;
-
-    const tierOrder = ['tier4_acquaintance', 'tier3_familiar', 'tier2_close', 'tier1_intimate'];
-    const lowestIndex = tierOrder.indexOf(lowestGroupTier);
-
-    // 如果群组中有低信任等级成员，规则要求的信任等级越高，越需要应用
-    // 例如：tier1 专属话题在 tier4 成员在场时需要被限制
-    for (const requiredTier of ruleTrustLevels) {
-      const requiredIndex = tierOrder.indexOf(requiredTier);
-      // 如果规则要求的信任等级高于群组最低等级，则需要应用该规则
-      if (requiredIndex > lowestIndex) return true;
-    }
-
-    return false;
   }
 }
 

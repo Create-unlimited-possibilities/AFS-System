@@ -13,9 +13,13 @@ import questionsRouter from './modules/qa/routes/questions.js';
 import chatRouter from './modules/chat/route.js';
 import rolecardRouter from './modules/rolecard/route.js';
 import sentimentRouter from './modules/sentiment/route.js';
+import { regionsRouter } from './modules/common/china-regions/index.js';
 
 // Auth middleware
 import { protect } from './modules/auth/middleware.js';
+
+// Logging
+import logger, { requestLogger, apiLogger } from './core/utils/logger.js';
 
 // Core services
 import AutoHookRegistry from './core/hooks/registry.js';
@@ -30,11 +34,14 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// 请求日志中间件
+app.use(requestLogger);
+
 mongoose.connect(process.env.MONGO_URI)
-  .catch(err => console.error('MongoDB 连接失败:', err));
+  .catch(err => logger.error('MongoDB 连接失败:', { error: err.message }));
 
 mongoose.connection.once('open', async () => {
-  console.log('MongoDB 已连接');
+  logger.info('MongoDB 已连接');
 
   const syncQueue = new SimpleSyncQueue(dualStorage);
   SimpleSyncQueue.instance = syncQueue;
@@ -44,10 +51,11 @@ mongoose.connection.once('open', async () => {
   const hookRegistry = new AutoHookRegistry(syncQueue);
   await hookRegistry.registerAll();
 
-  console.log('自动挂钩已注册');
+  logger.info('自动挂钩已注册');
 });
 
 app.use('/api/auth', authRouter);
+app.use('/api/regions', regionsRouter);  // 中国行政区划（公开访问）
 
 app.get('/api/health', (req, res) => {
   res.json({
@@ -69,5 +77,5 @@ app.use('/api/sentiment', protect, sentimentRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`后端运行中 → http://localhost:${PORT}`);
+  logger.info(`后端运行中 → http://localhost:${PORT}`);
 });

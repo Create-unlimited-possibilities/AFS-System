@@ -505,7 +505,7 @@ export default class AnswerService {
       userId,
       targetUserId,
       isSelfAnswer: false
-    }).populate('questionId');
+    });
   }
 
   async getAssistQuestions(userId, targetUserId, relationType) {

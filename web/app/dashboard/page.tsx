@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/lib/api'
-import { User, FileText, MessageSquare, Users, Copy, Check } from 'lucide-react'
+import { User, FileText, MessageSquare, Users, Copy, Check, Settings } from 'lucide-react'
 
 interface Stats {
   totalQuestions: number
@@ -354,6 +355,17 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )}
+              <Link href="/profile" className="block">
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <Settings className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs font-medium text-gray-500 block">个人档案</label>
+                    <p className="text-gray-900 font-medium">设置个人资料</p>
+                  </div>
+                </div>
+              </Link>
             </CardContent>
           </Card>
 

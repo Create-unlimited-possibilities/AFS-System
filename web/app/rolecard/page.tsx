@@ -44,16 +44,9 @@ export default function RolecardPage() {
     }
   }, [hasHydrated, user])
 
-  useEffect(() => {
-    console.log('[RolecardPage] stats状态变化:', JSON.stringify(stats, null, 2))
-  }, [stats])
-
   const fetchData = async () => {
     try {
       setLoading(true)
-
-      console.log('[RolecardPage] fetchData 开始执行')
-      console.log('[RolecardPage] 当前user对象:', JSON.stringify(user, null, 2))
 
       // 使用与 dashboard 相同的统计方法
       const [roleCardRes, guidelinesRes, basicRes, emotionalRes] = await Promise.all([
@@ -62,10 +55,6 @@ export default function RolecardPage() {
         api.get('/questions?layer=basic&role=elder'),
         api.get('/questions?layer=emotional&role=elder'),
       ])
-
-      console.log('[RolecardPage] API响应 basicRes:', JSON.stringify(basicRes, null, 2))
-      console.log('[RolecardPage] API响应 emotionalRes:', JSON.stringify(emotionalRes, null, 2))
-      console.log('[RolecardPage] API响应 guidelinesRes:', JSON.stringify(guidelinesRes, null, 2))
 
       // 更新用户数据（确保companionChat字段存在）
       if (guidelinesRes.success && guidelinesRes.data?.user && user) {
@@ -81,7 +70,6 @@ export default function RolecardPage() {
           lastLogin: user.lastLogin
         }
         setUser(updatedUser)
-        console.log('[RolecardPage] Updated user with companionChat data')
       }
 
       // API 直接返回后端响应，所以是 roleCardRes.roleCard 而不是 roleCardRes.data?.roleCard
@@ -95,13 +83,8 @@ export default function RolecardPage() {
       const emotionalTotal = emotionalRes.data?.questions?.length || 0
       const emotionalAnswered = emotionalRes.data?.answered || 0
 
-      console.log('[RolecardPage] 计算后的basic:', { total: basicTotal, answered: basicAnswered })
-      console.log('[RolecardPage] 计算后的emotional:', { total: emotionalTotal, answered: emotionalAnswered })
-
       // 从user对象获取memoryTokenCount
       const memoryTokenCount = user?.companionChat?.roleCard?.memoryTokenCount || 0
-
-      console.log('[RolecardPage] memoryTokenCount:', memoryTokenCount)
 
       setStats({
         basicProgress: { total: basicTotal, answered: basicAnswered },
@@ -109,13 +92,6 @@ export default function RolecardPage() {
         totalAnswers: basicAnswered + emotionalAnswered,
         memoryTokenCount,
       })
-
-      console.log('[RolecardPage] 设置stats:', JSON.stringify({
-        basicProgress: { total: basicTotal, answered: basicAnswered },
-        emotionalProgress: { total: emotionalTotal, answered: emotionalAnswered },
-        totalAnswers: basicAnswered + emotionalAnswered,
-        memoryTokenCount,
-      }, null, 2))
 
       await fetchVectorIndexStatus()
     } catch (error) {
@@ -229,15 +205,12 @@ export default function RolecardPage() {
 
   const fetchVectorIndexStatus = async () => {
     try {
-      console.log('[DEBUG] 开始获取向量索引状态')
       const res = await api.get<VectorIndexStatusResponse>('/rolecard/vector-index/status')
-      console.log('[DEBUG] API响应:', res)
       if (res.success && res.data?.status) {
         setVectorIndexStatus(res.data.status)
-        console.log('[DEBUG] vectorIndexStatus已更新:', res.data.status)
       }
     } catch (error) {
-      console.error('[DEBUG] 获取向量索引状态失败:', error)
+      console.error('[RolecardPage] 获取向量索引状态失败:', error)
     }
   }
 

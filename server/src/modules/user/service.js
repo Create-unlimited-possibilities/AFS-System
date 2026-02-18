@@ -1,5 +1,9 @@
 import User from './model.js';
 import bcrypt from 'bcryptjs';
+import DualStorage from '../../core/storage/dual.js';
+
+// 创建 DualStorage 实例
+const dualStorage = new DualStorage();
 
 class UserService {
   async getAllUsers(filters = {}) {
@@ -115,6 +119,73 @@ class UserService {
     ]);
 
     return { total, active, inactive };
+  }
+
+  /**
+   * 获取用户个人档案
+   * @param {string} userId - 用户ID
+   */
+  async getProfile(userId) {
+    const user = await User.findById(userId).select('name email profile uniqueCode');
+    if (!user) {
+      throw new Error('用户不存在');
+    }
+    return user;
+  }
+
+  /**
+   * 更新用户个人档案
+   * @param {string} userId - 用户ID
+   * @param {object} profileData - 档案数据
+   */
+  async updateProfile(userId, profileData) {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new Error('用户不存在');
+    }
+
+    // 更新档案字段
+    const allowedFields = [
+      'gender', 'birthDate', 'birthHour',
+      'birthPlace', 'residence',
+      'nationality', 'ethnicity', 'occupation', 'education',
+      'maritalStatus', 'children', 'height', 'appearanceFeatures'
+    ];
+
+    // 初始化 profile 对象（如果不存在）
+    if (!user.profile) {
+      user.profile = {};
+    }
+
+    // 只更新允许的字段
+    for (const field of allowedFields) {
+      if (profileData[field] !== undefined) {
+        user.profile[field] = profileData[field];
+      }
+    }
+
+    // 更新元数据
+    user.profile.updatedAt = new Date();
+
+    // 保存到 MongoDB
+    await user.save();
+
+    // 同步到文件系统（双重存储）
+    try {
+      await dualStorage.saveUserProfile(userId, {
+        ...user.profile.toObject(),
+        userId,
+        name: user.name,
+        email: user.email,
+        uniqueCode: user.uniqueCode,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('[UserService] 同步档案到文件系统失败:', error);
+      // 文件系统存储失败不影响主流程
+    }
+
+    return user;
   }
 }
 

@@ -50,7 +50,59 @@ createdAt: {
   lastLogin: {
     type: Date
   },
-  
+
+  // ========== 个人档案 ==========
+  profile: {
+    // 必填字段
+    gender: {
+      type: String,
+      enum: ['男', '女', '其他'],
+      default: undefined
+    },
+    birthDate: {
+      type: Date,
+      default: undefined
+    },
+    birthHour: {
+      type: Number,
+      min: 0,
+      max: 23,
+      default: undefined
+    },
+    birthPlace: {
+      provinceCode: String,
+      provinceName: String,
+      cityCode: String,
+      cityName: String
+    },
+    residence: {
+      provinceCode: String,
+      provinceName: String,
+      cityCode: String,
+      cityName: String
+    },
+
+    // 选填字段
+    nationality: String,
+    ethnicity: String,
+    occupation: String,
+    education: String,
+    maritalStatus: {
+      type: String,
+      enum: ['未婚', '已婚', '离异', '丧偶'],
+      default: undefined
+    },
+    children: {
+      sons: { type: Number, default: 0 },
+      daughters: { type: Number, default: 0 }
+    },
+    height: Number,
+    appearanceFeatures: String,
+
+    // 元数据
+    updatedAt: Date
+  },
+
   // ========== AI陪伴聊天功能 ==========
   companionChat: {
     // ========== 角色卡（个人画像） ==========

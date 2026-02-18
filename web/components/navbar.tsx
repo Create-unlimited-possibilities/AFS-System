@@ -1,11 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Home, MessageSquare, Users, FileText, LogOut, User, Sparkles, MessageCircle } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
 import { useEffect } from 'react'
+import { useNavigationGuard } from '@/components/NavigationGuardContext'
 
 const navItems = [
   { href: '/', label: '首页', icon: Home },
@@ -19,11 +20,23 @@ const navItems = [
 
 export default function Navbar() {
   const pathname = usePathname()
+  const router = useRouter()
   const { user, isAuthenticated, logout } = useAuthStore()
+  const { checkAndBlock } = useNavigationGuard()
 
   const handleLogout = () => {
     logout()
     window.location.href = '/login'
+  }
+
+  const handleNavClick = (e: React.MouseEvent, href: string) => {
+    e.preventDefault()
+    const isBlocked = checkAndBlock(href, () => {
+      router.push(href)
+    })
+    if (!isBlocked) {
+      router.push(href)
+    }
   }
 
   return (
@@ -41,7 +54,7 @@ export default function Navbar() {
                   const Icon = item.icon
                   const isActive = pathname === item.href
                   return (
-                    <Link key={item.href} href={item.href}>
+                    <Link key={item.href} href={item.href} onClick={(e) => handleNavClick(e, item.href)}>
                       <Button
                         variant={isActive ? 'default' : 'ghost'}
                         size="sm"

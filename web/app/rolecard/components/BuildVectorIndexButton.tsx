@@ -30,11 +30,6 @@ export default function BuildVectorIndexButton({
   const canBuild = status?.canBuild;
   const isReady = status?.exists;
 
-  console.log('[BuildVectorIndexButton] status:', status);
-  console.log('[BuildVectorIndexButton] canBuild:', canBuild);
-  console.log('[BuildVectorIndexButton] isDisabled:', isDisabled, 'isBuilding:', isBuilding, '!canBuild:', !canBuild);
-  console.log('[BuildVectorIndexButton] 最终disabled:', isDisabled || isBuilding || !canBuild);
-
   return (
     <Button
       onClick={onClick}
