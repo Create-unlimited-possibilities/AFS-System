@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { User, Heart, Shield, Settings, Users, Brain, BookOpen, MessageCircle, Quote, Calendar, MapPin, Briefcase, Sparkles, Eye } from 'lucide-react'
 import RelationLayerDetailModal from './RelationLayerDetailModal'
+import RelationHelpPopover from './RelationHelpPopover'
 
 // V2 角色卡类型定义 - 与后端实际数据结构一致
 interface RoleCardV2 {
@@ -549,10 +550,13 @@ export default function RoleCardViewerV2({ roleCard }: RoleCardViewerV2Props) {
       {relationList.length > 0 && (
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Users className="h-5 w-5 text-green-600" />
-              关系层 ({relationList.length}个)
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Users className="h-5 w-5 text-green-600" />
+                关系层 ({relationList.length}个)
+              </CardTitle>
+              <RelationHelpPopover />
+            </div>
             <CardDescription>基于B/C套问答提取的关系特定信息</CardDescription>
           </CardHeader>
           <CardContent>
