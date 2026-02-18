@@ -1,32 +1,16 @@
 /**
  * CoreLayerGenerator V2 单元测试
- * 测试核心层生成器的 A 套答案收集、LLM 响应解析、核心层验证
+ * 测试核心层生成器的 A 套答案收集、LLM 响应解析、JSON 重试机制
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 
 // 创建模拟 LLM 响应
 const mockLLMResponse = () => JSON.stringify({
-  personalityTraits: {
-    boundaryThickness: 'medium',
-    discretionLevel: 'good',
-    impulsiveSpeech: 'occasional',
-    emotionalExpression: 'moderate',
-    socialCautiousness: 'moderate'
+  extractedFields: {
+    personalityTraits: '测试人格特征内容'
   },
-  communicationStyle: {
-    tonePattern: '温和亲切',
-    preferredTopics: ['家庭', '健康'],
-    avoidedTopics: [],
-    humorStyle: 'light',
-    verbosity: 'moderate'
-  },
-  selfPerception: {
-    selfDescriptionKeywords: ['务实', '坚韧'],
-    coreValues: ['家庭和睦'],
-    lifePriorities: ['家人健康']
-  },
-  behavioralIndicators: []
+  confidence: 'high'
 });
 
 // Mock dependencies BEFORE importing the module
@@ -38,26 +22,45 @@ vi.mock('../../../core/llm/multi.js', () => ({
   }
 }));
 
-vi.mock('../../answer/model.js', () => ({
+vi.mock('../../qa/models/answer.js', () => ({
   default: {
     find: vi.fn(() => ({
       populate: vi.fn(() => ({
         sort: vi.fn(() => [])
       }))
-    }))
+    })),
+    countDocuments: vi.fn().mockResolvedValue(10)
+  }
+}));
+
+vi.mock('../../qa/models/question.js', () => ({
+  default: {
+    countDocuments: vi.fn().mockResolvedValue(10)
   }
 }));
 
 vi.mock('../../../core/storage/dual.js', () => ({
-  default: class MockDualStorage {}
+  default: class MockDualStorage {
+    async saveCoreLayer() {}
+  }
 }));
 
 vi.mock('../../user/model.js', () => ({
-  default: {}
+  default: {
+    findById: vi.fn().mockResolvedValue({
+      _id: 'test-user',
+      name: '测试用户',
+      profile: {
+        gender: '男',
+        birthDate: '1960-01-01',
+        residence: { cityName: '北京' }
+      }
+    })
+  }
 }));
 
 vi.mock('../../../core/utils/logger.js', () => ({
-  default: {
+  profileLogger: {
     info: vi.fn(),
     error: vi.fn(),
     warn: vi.fn()
@@ -65,7 +68,7 @@ vi.mock('../../../core/utils/logger.js', () => ({
 }));
 
 // Import AFTER mocks are set up
-import CoreLayerGenerator from '../../../src/modules/rolecard/v2/coreLayerGenerator.js';
+import CoreLayerGenerator, { validateASetCompletion } from '../../../src/modules/rolecard/v2/coreLayerGenerator.js';
 
 describe('CoreLayerGenerator V2', () => {
   let generator;
@@ -79,338 +82,266 @@ describe('CoreLayerGenerator V2', () => {
     vi.restoreAllMocks();
   });
 
-  describe('parseLLMResponse() 方法', () => {
+  describe('parseJsonResponse() 方法', () => {
     it('应正确解析 JSON 字符串响应', () => {
       const response = JSON.stringify({
-        personalityTraits: {
-          boundaryThickness: 'medium',
-          discretionLevel: 'good',
-          impulsiveSpeech: 'occasional',
-          emotionalExpression: 'moderate',
-          socialCautiousness: 'moderate'
+        extractedFields: {
+          personalityTraits: '测试内容'
         },
-        communicationStyle: {
-          tonePattern: '温和',
-          preferredTopics: ['家庭'],
-          avoidedTopics: [],
-          humorStyle: 'light',
-          verbosity: 'moderate'
-        },
-        selfPerception: {
-          selfDescriptionKeywords: ['务实'],
-          coreValues: ['家庭'],
-          lifePriorities: ['健康']
-        }
+        confidence: 'high'
       });
 
-      const result = generator.parseLLMResponse(response);
+      const result = generator.parseJsonResponse(response);
 
       expect(result).toBeDefined();
-      expect(result.personalityTraits.boundaryThickness).toBe('medium');
+      expect(result.extractedFields.personalityTraits).toBe('测试内容');
     });
 
     it('应从包含其他文本的响应中提取 JSON', () => {
       const response = `这是一些额外的文本
 \`\`\`json
 {
-  "personalityTraits": {
-    "boundaryThickness": "thick",
-    "discretionLevel": "excellent",
-    "impulsiveSpeech": "rare",
-    "emotionalExpression": "reserved",
-    "socialCautiousness": "high"
+  "extractedFields": {
+    "personalityTraits": "从混合文本中提取"
   },
-  "communicationStyle": {
-    "tonePattern": "严肃",
-    "preferredTopics": ["工作"],
-    "avoidedTopics": [],
-    "humorStyle": "none",
-    "verbosity": "concise"
-  },
-  "selfPerception": {
-    "selfDescriptionKeywords": ["认真"],
-    "coreValues": ["诚信"],
-    "lifePriorities": ["事业"]
-  }
+  "confidence": "medium"
 }
 \`\`\`
 更多文本`;
 
-      const result = generator.parseLLMResponse(response);
+      const result = generator.parseJsonResponse(response);
 
       expect(result).toBeDefined();
-      expect(result.personalityTraits.boundaryThickness).toBe('thick');
+      expect(result.extractedFields.personalityTraits).toBe('从混合文本中提取');
     });
 
     it('应接受已解析的对象', () => {
       const response = {
-        personalityTraits: {
-          boundaryThickness: 'thin',
-          discretionLevel: 'poor',
-          impulsiveSpeech: 'frequent',
-          emotionalExpression: 'expressive',
-          socialCautiousness: 'low'
+        extractedFields: {
+          personalityTraits: '直接对象'
         },
-        communicationStyle: {
-          tonePattern: '活泼',
-          preferredTopics: ['娱乐'],
-          avoidedTopics: [],
-          humorStyle: 'heavy',
-          verbosity: 'elaborate'
-        },
-        selfPerception: {
-          selfDescriptionKeywords: ['开朗'],
-          coreValues: ['快乐'],
-          lifePriorities: ['享受生活']
-        }
+        confidence: 'high'
       };
 
-      const result = generator.parseLLMResponse(response);
+      const result = generator.parseJsonResponse(response);
 
       expect(result).toBeDefined();
-      expect(result.personalityTraits.boundaryThickness).toBe('thin');
+      expect(result.extractedFields.personalityTraits).toBe('直接对象');
     });
 
-    it('无效 JSON 应抛出错误', () => {
+    it('无效 JSON 应返回 null', () => {
       const response = '这不是有效的 JSON';
 
-      expect(() => generator.parseLLMResponse(response)).toThrow('核心层解析失败');
+      const result = generator.parseJsonResponse(response);
+
+      expect(result).toBeNull();
+    });
+
+    it('null 响应应返回 null', () => {
+      const result = generator.parseJsonResponse(null);
+      expect(result).toBeNull();
+    });
+
+    it('空字符串响应应返回 null', () => {
+      const result = generator.parseJsonResponse('');
+      expect(result).toBeNull();
     });
   });
 
-  describe('validateCoreLayer() 方法', () => {
-    it('有效的核心层应通过验证', () => {
-      const coreLayer = {
-        personalityTraits: {
-          boundaryThickness: 'medium',
-          discretionLevel: 'good',
-          impulsiveSpeech: 'occasional',
-          emotionalExpression: 'moderate',
-          socialCautiousness: 'moderate'
-        },
-        communicationStyle: {
-          tonePattern: '温和',
-          preferredTopics: [],
-          avoidedTopics: [],
-          humorStyle: 'light',
-          verbosity: 'moderate'
-        },
-        selfPerception: {
-          selfDescriptionKeywords: ['务实'],
-          coreValues: [],
-          lifePriorities: []
-        }
-      };
+  describe('callLLMWithRetry() 方法', () => {
+    it('首次成功应直接返回结果', async () => {
+      const mockResponse = { extractedFields: { personalityTraits: 'test' } };
 
-      expect(() => generator.validateCoreLayer(coreLayer)).not.toThrow();
+      vi.spyOn(generator.llmClient, 'generate').mockResolvedValueOnce(JSON.stringify(mockResponse));
+
+      const result = await generator.callLLMWithRetry('test prompt', { temperature: 0.3 });
+
+      expect(result).toEqual(mockResponse);
+      expect(generator.llmClient.generate).toHaveBeenCalledTimes(1);
     });
 
-    it('缺少 personalityTraits.boundaryThickness 应抛出错误', () => {
-      const coreLayer = {
-        personalityTraits: {
-          discretionLevel: 'good',
-          impulsiveSpeech: 'occasional',
-          emotionalExpression: 'moderate',
-          socialCautiousness: 'moderate'
-        },
-        communicationStyle: { tonePattern: '温和' },
-        selfPerception: { selfDescriptionKeywords: ['务实'] }
-      };
+    it('首次失败第二次成功应返回结果', async () => {
+      const mockResponse = { extractedFields: { personalityTraits: 'test' } };
 
-      expect(() => generator.validateCoreLayer(coreLayer)).toThrow('缺少必要字段');
+      // 第一次返回无效 JSON
+      vi.spyOn(generator.llmClient, 'generate')
+        .mockResolvedValueOnce('invalid json{{{')
+        .mockResolvedValueOnce(JSON.stringify(mockResponse));
+
+      const result = await generator.callLLMWithRetry('test prompt', { temperature: 0.3 });
+
+      expect(result).toEqual(mockResponse);
+      expect(generator.llmClient.generate).toHaveBeenCalledTimes(2);
     });
 
-    it('缺少 communicationStyle.tonePattern 应抛出错误', () => {
-      const coreLayer = {
-        personalityTraits: {
-          boundaryThickness: 'medium',
-          discretionLevel: 'good',
-          impulsiveSpeech: 'occasional',
-          emotionalExpression: 'moderate',
-          socialCautiousness: 'moderate'
-        },
-        communicationStyle: {},
-        selfPerception: { selfDescriptionKeywords: ['务实'] }
-      };
+    it('达到最大重试次数应返回 null', async () => {
+      // 所有调用都返回无效 JSON
+      vi.spyOn(generator.llmClient, 'generate').mockResolvedValue('invalid json{{{');
 
-      expect(() => generator.validateCoreLayer(coreLayer)).toThrow('缺少必要字段');
+      const result = await generator.callLLMWithRetry('test prompt', { temperature: 0.3 }, 3);
+
+      expect(result).toBeNull();
+      expect(generator.llmClient.generate).toHaveBeenCalledTimes(3);
     });
 
-    it('缺少 selfPerception.selfDescriptionKeywords 应抛出错误', () => {
-      const coreLayer = {
-        personalityTraits: {
-          boundaryThickness: 'medium',
-          discretionLevel: 'good',
-          impulsiveSpeech: 'occasional',
-          emotionalExpression: 'moderate',
-          socialCautiousness: 'moderate'
-        },
-        communicationStyle: { tonePattern: '温和' },
-        selfPerception: {}
-      };
+    it('LLM 调用抛出错误应继续重试', async () => {
+      const mockResponse = { extractedFields: { personalityTraits: 'test' } };
 
-      expect(() => generator.validateCoreLayer(coreLayer)).toThrow('缺少必要字段');
+      vi.spyOn(generator.llmClient, 'generate')
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockResolvedValueOnce(JSON.stringify(mockResponse));
+
+      const result = await generator.callLLMWithRetry('test prompt', { temperature: 0.3 });
+
+      expect(result).toEqual(mockResponse);
+      expect(generator.llmClient.generate).toHaveBeenCalledTimes(2);
     });
 
-    it('所有有效的枚举值应通过验证', () => {
-      const coreLayer = {
-        personalityTraits: {
-          boundaryThickness: 'thick',
-          discretionLevel: 'excellent',
-          impulsiveSpeech: 'rare',
-          emotionalExpression: 'reserved',
-          socialCautiousness: 'high'
-        },
-        communicationStyle: {
-          tonePattern: '严肃',
-          preferredTopics: [],
-          avoidedTopics: [],
-          humorStyle: 'none',
-          verbosity: 'concise'
-        },
-        selfPerception: {
-          selfDescriptionKeywords: ['认真'],
-          coreValues: [],
-          lifePriorities: []
-        }
-      };
+    it('自定义最大重试次数应生效', async () => {
+      vi.spyOn(generator.llmClient, 'generate').mockResolvedValue('invalid json{{{');
 
-      expect(() => generator.validateCoreLayer(coreLayer)).not.toThrow();
+      const result = await generator.callLLMWithRetry('test prompt', { temperature: 0.3 }, 2);
+
+      expect(result).toBeNull();
+      expect(generator.llmClient.generate).toHaveBeenCalledTimes(2);
     });
 
-    it('无效的枚举值应产生警告但不应抛出错误', () => {
-      const coreLayer = {
-        personalityTraits: {
-          boundaryThickness: 'invalid_value',
-          discretionLevel: 'good',
-          impulsiveSpeech: 'occasional',
-          emotionalExpression: 'moderate',
-          socialCautiousness: 'moderate'
-        },
-        communicationStyle: {
-          tonePattern: '温和',
-          preferredTopics: [],
-          avoidedTopics: [],
-          humorStyle: 'invalid',
-          verbosity: 'moderate'
-        },
-        selfPerception: {
-          selfDescriptionKeywords: ['务实'],
-          coreValues: [],
-          lifePriorities: []
-        }
-      };
+    it('响应为对象时应直接返回', async () => {
+      const mockResponse = { extractedFields: { personalityTraits: 'test' } };
 
-      // 不应抛出错误，只是警告
-      expect(() => generator.validateCoreLayer(coreLayer)).not.toThrow();
+      vi.spyOn(generator.llmClient, 'generate').mockResolvedValueOnce(mockResponse);
+
+      const result = await generator.callLLMWithRetry('test prompt', { temperature: 0.3 });
+
+      expect(result).toEqual(mockResponse);
+      expect(generator.llmClient.generate).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('generate() 方法（集成测试模拟）', () => {
-    it('答案不足时应抛出错误', async () => {
-      // Mock collectASetAnswers 返回空数组
-      vi.spyOn(generator, 'collectASetAnswers').mockResolvedValue([]);
-
-      await expect(generator.generate('test-user')).rejects.toThrow('A套题答案不足');
-    });
-
-    it('答案少于10个时应抛出错误', async () => {
-      // Mock 5 个答案
-      vi.spyOn(generator, 'collectASetAnswers').mockResolvedValue([
-        { _id: '1', questionText: 'Q1', answerText: 'A1' },
-        { _id: '2', questionText: 'Q2', answerText: 'A2' },
-        { _id: '3', questionText: 'Q3', answerText: 'A3' },
-        { _id: '4', questionText: 'Q4', answerText: 'A4' },
-        { _id: '5', questionText: 'Q5', answerText: 'A5' }
-      ]);
-
-      await expect(generator.generate('test-user')).rejects.toThrow('A套题答案不足');
-    });
-
-    // 注意：此测试需要 Ollama 服务可用
-    // 在 Docker 环境中运行，或设置 OLLAMA_BASE_URL=http://localhost:11434
-    it.skip('有足够答案时应生成核心层（需要 Ollama 服务）', async () => {
-      const mockAnswers = Array.from({ length: 15 }, (_, i) => ({
-        _id: `answer-${i}`,
-        questionId: `question-${i}`,
-        questionText: `问题 ${i}`,
-        questionLayer: 'basic',
-        answerText: `答案 ${i}`,
-        significance: '测试'
-      }));
-
-      vi.spyOn(generator, 'collectASetAnswers').mockResolvedValue(mockAnswers);
-
-      const result = await generator.generate('test-user');
-
-      expect(result).toBeDefined();
-      expect(result.version).toBe('2.0.0');
-      expect(result.generatedAt).toBeDefined();
-      expect(result.sourceQuestionCount).toBe(15);
-      expect(result.personalityTraits).toBeDefined();
-    }, 60000);
-  });
-
-  describe('边界情况测试', () => {
-    it('应处理空的 personalityTraits 对象', () => {
-      const coreLayer = {
-        personalityTraits: {},
-        communicationStyle: { tonePattern: '温和' },
-        selfPerception: { selfDescriptionKeywords: ['务实'] }
+  describe('processOneAnswer() 方法', () => {
+    it('应成功处理有效答案', async () => {
+      const mockResponse = {
+        extractedFields: {
+          personality: '从答案中提取的人格特征'
+        },
+        confidence: 'high'
       };
 
-      expect(() => generator.validateCoreLayer(coreLayer)).toThrow();
+      vi.spyOn(generator.llmClient, 'generate').mockResolvedValueOnce(JSON.stringify(mockResponse));
+
+      const item = {
+        questionId: 'q1',
+        questionText: '测试问题',
+        answerText: '测试答案',
+        significance: '高'
+      };
+
+      await generator.processOneAnswer(item);
+
+      expect(generator.fieldFragments.personality.length).toBe(1);
+      expect(generator.fieldFragments.personality[0].content).toBe('从答案中提取的人格特征');
     });
 
-    it('应处理 null 响应', () => {
-      expect(() => generator.parseLLMResponse(null)).toThrow();
+    it('解析失败应使用重试机制', async () => {
+      const mockResponse = {
+        extractedFields: {
+          personality: '重试后提取的内容'
+        },
+        confidence: 'medium'
+      };
+
+      // 第一次失败，第二次成功
+      vi.spyOn(generator.llmClient, 'generate')
+        .mockResolvedValueOnce('invalid json')
+        .mockResolvedValueOnce(JSON.stringify(mockResponse));
+
+      const item = {
+        questionId: 'q1',
+        questionText: '测试问题',
+        answerText: '测试答案',
+        significance: '高'
+      };
+
+      await generator.processOneAnswer(item);
+
+      expect(generator.fieldFragments.personality.length).toBe(1);
+      expect(generator.llmClient.generate).toHaveBeenCalledTimes(2);
     });
 
-    it('应处理空字符串响应', () => {
-      expect(() => generator.parseLLMResponse('')).toThrow();
-    });
+    it('LLM 调用异常不应中断流程', async () => {
+      vi.spyOn(generator.llmClient, 'generate').mockRejectedValue(new Error('LLM error'));
 
-    it('应处理嵌套 JSON 响应', () => {
-      const response = JSON.stringify({
-        data: {
-          personalityTraits: {
-            boundaryThickness: 'medium',
-            discretionLevel: 'good',
-            impulsiveSpeech: 'occasional',
-            emotionalExpression: 'moderate',
-            socialCautiousness: 'moderate'
-          },
-          communicationStyle: { tonePattern: '温和' },
-          selfPerception: { selfDescriptionKeywords: ['务实'] }
-        }
-      });
+      const item = {
+        questionId: 'q1',
+        questionText: '测试问题',
+        answerText: '测试答案',
+        significance: '高'
+      };
 
-      // 应该能解析（即使结构不完全匹配）
-      expect(() => generator.parseLLMResponse(response)).toBeDefined();
+      // 不应抛出错误
+      await expect(generator.processOneAnswer(item)).resolves.not.toThrow();
     });
   });
 
-  describe('实际数据格式测试', () => {
-    // 注意：此测试需要 Ollama 服务可用
-    it.skip('应生成符合 V2 规范的核心层（需要 Ollama 服务）', async () => {
-      const mockAnswers = Array.from({ length: 15 }, (_, i) => ({
-        _id: `answer-${i}`,
-        questionId: `question-${i}`,
-        questionText: `问题 ${i}`,
-        questionLayer: i < 10 ? 'basic' : 'emotional',
-        answerText: `这是一个详细的答案内容，描述了用户的人格特征 ${i}`,
-        significance: '测试用例'
-      }));
+  describe('reset() 方法', () => {
+    it('应重置所有字段片段', () => {
+      generator.fieldFragments.personality.push({ content: 'test' });
+      generator.fieldFragments.communicationStyle.push({ content: 'test2' });
 
-      vi.spyOn(generator, 'collectASetAnswers').mockResolvedValue(mockAnswers);
+      generator.reset();
 
-      const result = await generator.generate('test-user');
+      expect(generator.fieldFragments.personality.length).toBe(0);
+      expect(generator.fieldFragments.communicationStyle.length).toBe(0);
+    });
+  });
 
-      // 验证 V2 规范字段
-      expect(result.version).toBe('2.0.0');
-      expect(result.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-      expect(Array.isArray(result.sourceQuestionIds)).toBe(true);
-      expect(result.sourceQuestionIds.length).toBe(15);
-    }, 60000);
+  describe('buildBasicIdentity() 方法', () => {
+    it('应从用户档案构建基础身份', () => {
+      const user = {
+        name: '张三',
+        profile: {
+          gender: '男',
+          birthDate: '1960-01-01',
+          residence: { cityName: '北京' },
+          occupation: '退休教师',
+          maritalStatus: '已婚'
+        }
+      };
+
+      const result = generator.buildBasicIdentity(user);
+
+      expect(result.raw.name).toBe('张三');
+      expect(result.raw.gender).toBe('男');
+      expect(result.summary).toContain('张三');
+    });
+  });
+
+  describe('generateBasicIdentitySummary() 方法', () => {
+    it('应生成包含基本信息的摘要', () => {
+      const profile = {
+        gender: '男',
+        occupation: '教师',
+        residence: { cityName: '上海' }
+      };
+
+      const result = generator.generateBasicIdentitySummary('李四', profile, 65);
+
+      expect(result).toContain('李四');
+      expect(result).toContain('男');
+      expect(result).toContain('教师');
+      expect(result).toContain('上海');
+    });
+
+    it('应正确处理子女信息', () => {
+      const profile = {
+        gender: '女',
+        children: { sons: 1, daughters: 2 }
+      };
+
+      const result = generator.generateBasicIdentitySummary('王五', profile, 70);
+
+      expect(result).toContain('1子');
+      expect(result).toContain('2女');
+    });
   });
 });
