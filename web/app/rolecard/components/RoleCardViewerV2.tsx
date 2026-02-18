@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { User, Heart, Shield, Settings, Users, Brain, BookOpen, MessageCircle, Quote, Calendar, MapPin, Briefcase, Sparkles, Eye } from 'lucide-react'
 import RelationLayerDetailModal from './RelationLayerDetailModal'
 import RelationHelpPopover from './RelationHelpPopover'
+import SafetyGuardrailsHelpPopover from './SafetyGuardrailsHelpPopover'
 
 // V2 角色卡类型定义 - 与后端实际数据结构一致
 interface RoleCardV2 {
@@ -626,10 +627,13 @@ export default function RoleCardViewerV2({ roleCard }: RoleCardViewerV2Props) {
       {safetyGuardrails?.rules && safetyGuardrails.rules.length > 0 && (
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Shield className="h-5 w-5 text-amber-600" />
-              安全护栏 ({safetyGuardrails.rules.length}条规则)
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Shield className="h-5 w-5 text-amber-600" />
+                安全护栏 ({safetyGuardrails.rules.length}条规则)
+              </CardTitle>
+              <SafetyGuardrailsHelpPopover />
+            </div>
             <CardDescription>群组对话中的隐私保护规则</CardDescription>
           </CardHeader>
           <CardContent>
