@@ -776,6 +776,58 @@ class RoleCardController {
       res.status(500).json({ success: false, error: error.message });
     }
   }
+
+  /**
+   * 单独生成核心层（SSE）
+   */
+  async generateCoreLayerStream(req, res) {
+    const userId = req.user.id;
+
+    // 设置 SSE 响应头
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+
+    const sendProgress = (data) => {
+      try {
+        res.write(`event: progress\n`);
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      } catch (error) {
+        logger.error('[RoleCardController] SSE 写入失败:', error);
+      }
+    };
+
+    try {
+      sendProgress({ stage: 'start', message: '开始生成核心层', percentage: 0 });
+
+      const coreLayer = await this.coreGenerator.generate(userId, (progress) => {
+        sendProgress({
+          stage: 'extracting',
+          message: `提取答案 ${progress.current}/${progress.total}`,
+          percentage: Math.round(progress.current / progress.total * 80),
+          detail: progress
+        });
+      });
+
+      // 保存核心层
+      await this.dualStorage.saveCoreLayer(userId, coreLayer);
+
+      // 创建并保存校准层
+      const calibration = CalibrationLayerManager.createInitialCalibrationLayer(coreLayer);
+      await this.dualStorage.saveCalibrationLayer?.(userId, calibration);
+
+      sendProgress({ stage: 'complete', message: '核心层生成完成', percentage: 100 });
+
+      res.write(`event: done\n`);
+      res.write(`data: ${JSON.stringify({ success: true })}\n\n`);
+      res.end();
+    } catch (error) {
+      logger.error('[RoleCardController] 核心层生成失败:', error);
+      sendProgress({ stage: 'error', message: error.message, percentage: 0 });
+      res.end();
+    }
+  }
 }
 
 export default new RoleCardController();

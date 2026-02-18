@@ -43,4 +43,9 @@ router.get('/layers/status', protect, (req, res) => {
   rolecardController.getLayersStatus(req, res);
 });
 
+// 单独生成核心层（SSE）
+router.post('/layers/core/stream', protect, (req, res) => {
+  rolecardController.generateCoreLayerStream(req, res);
+});
+
 export default router;
