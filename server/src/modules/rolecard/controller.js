@@ -918,6 +918,117 @@ class RoleCardController {
       res.end();
     }
   }
+
+  /**
+   * 批量生成未生成的层（SSE）
+   */
+  async generateBatchStream(req, res) {
+    const userId = req.user.id;
+    const { layers } = req.body; // ['relation:xxx', 'relation:yyy']
+
+    // 设置 SSE 响应头
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+
+    const sendProgress = (data) => {
+      try {
+        res.write(`event: progress\n`);
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      } catch (error) {
+        logger.error('[RoleCardController] SSE 写入失败:', error);
+      }
+    };
+
+    try {
+      // 验证 layers 参数
+      if (!layers || !Array.isArray(layers) || layers.length === 0) {
+        sendProgress({
+          stage: 'error',
+          message: '无效的层列表参数',
+          percentage: 0,
+          current: 0,
+          total: 0
+        });
+        res.write(`event: error\n`);
+        res.write(`data: ${JSON.stringify({
+          success: false,
+          error: 'layers 参数必须是非空数组',
+          stage: 'validation'
+        })}\n\n`);
+        res.end();
+        return;
+      }
+
+      const total = layers.length;
+      let completed = 0;
+
+      sendProgress({
+        stage: 'start',
+        message: `开始批量生成 ${total} 个层`,
+        percentage: 0,
+        current: 0,
+        total
+      });
+
+      for (const layerSpec of layers) {
+        const [type, id] = layerSpec.split(':');
+
+        if (type === 'relation') {
+          const relation = await AssistRelation.findOne({
+            _id: id,
+            targetId: userId
+          }).populate('assistantId');
+
+          if (relation) {
+            sendProgress({
+              stage: 'generating',
+              message: `正在生成 ${relation.assistantId?.name || '协助者'} 的关系层`,
+              percentage: Math.round(completed / total * 100),
+              current: completed,
+              total
+            });
+
+            const layer = await this.relationGenerator.generateOne(userId, relation);
+            if (layer) {
+              await this.dualStorage.saveRelationLayer(userId, id, layer);
+            }
+          }
+        }
+
+        completed++;
+        sendProgress({
+          stage: 'progress',
+          message: `完成 ${completed}/${total}`,
+          percentage: Math.round(completed / total * 100),
+          current: completed,
+          total
+        });
+      }
+
+      sendProgress({
+        stage: 'complete',
+        message: '批量生成完成',
+        percentage: 100,
+        current: total,
+        total
+      });
+
+      res.write(`event: done\n`);
+      res.write(`data: ${JSON.stringify({ success: true })}\n\n`);
+      res.end();
+    } catch (error) {
+      logger.error('[RoleCardController] 批量生成失败:', error);
+      res.write(`event: error\n`);
+      res.write(`data: ${JSON.stringify({
+        success: false,
+        error: error.message,
+        stage: 'batch_generation'
+      })}\n\n`);
+      res.end();
+    }
+  }
 }
 
 export default new RoleCardController();

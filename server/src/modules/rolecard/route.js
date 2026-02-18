@@ -53,4 +53,9 @@ router.post('/layers/relation/:relationId/stream', protect, (req, res) => {
   rolecardController.generateRelationLayerStream(req, res);
 });
 
+// 批量生成未生成的层（SSE）
+router.post('/layers/batch/stream', protect, (req, res) => {
+  rolecardController.generateBatchStream(req, res);
+});
+
 export default router;
