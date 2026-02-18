@@ -8,12 +8,12 @@ import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 import type { RoleCardExtended, AssistantGuideline, User, VectorIndexStatus, VectorIndexStatusResponse } from '@/types'
-import { Sparkles, Copy, CheckCircle, AlertCircle, User as UserIcon, Loader2, RefreshCw } from 'lucide-react'
+import { Sparkles, Copy, CheckCircle, AlertCircle, User as UserIcon, Loader2, Settings } from 'lucide-react'
 import CloudPattern from '@/components/decorations/CloudPattern'
 import GenerateButton from './components/GenerateButton'
 import BuildVectorIndexButton from './components/BuildVectorIndexButton'
 import RoleCardViewerV2 from './components/RoleCardViewerV2'
-import GuidelinesViewer from './components/GuidelinesViewer'
+import RegenerateModal from './components/RegenerateModal'
 import { buildVectorIndex } from '@/lib/api'
 import type { VectorIndexBuildProgress } from '@/types'
 
@@ -27,7 +27,6 @@ interface Stats {
 export default function RolecardPage() {
   const { user, hasHydrated, setUser } = useAuthStore()
   const [roleCard, setRoleCard] = useState<RoleCardExtended | undefined>(undefined)
-  const [guidelines, setGuidelines] = useState<AssistantGuideline[] | undefined>(undefined)
   const [stats, setStats] = useState<Stats | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
@@ -37,6 +36,7 @@ export default function RolecardPage() {
   const [buildProgress, setBuildProgress] = useState<VectorIndexBuildProgress | undefined>(undefined)
   const [vectorIndexStatus, setVectorIndexStatus] = useState<VectorIndexStatus | undefined>(undefined)
   const [relationStats, setRelationStats] = useState<{ success: number; skipped: number; failed: number } | undefined>(undefined)
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false)
 
   useEffect(() => {
     if (hasHydrated && user) {
@@ -84,12 +84,9 @@ export default function RolecardPage() {
         console.log('[RolecardPage] Updated user with companionChat data')
       }
 
-      if (roleCardRes.success && roleCardRes.data?.roleCard) {
-        setRoleCard(roleCardRes.data.roleCard)
-      }
-
-      if (guidelinesRes.success && guidelinesRes.data?.user?.companionChat?.assistantsGuidelines) {
-        setGuidelines(guidelinesRes.data.user.companionChat.assistantsGuidelines)
+      // API 直接返回后端响应，所以是 roleCardRes.roleCard 而不是 roleCardRes.data?.roleCard
+      if (roleCardRes.success && (roleCardRes as any).roleCard) {
+        setRoleCard((roleCardRes as any).roleCard)
       }
 
       // 使用后端返回的准确数据
@@ -466,15 +463,16 @@ export default function RolecardPage() {
                     status={vectorIndexStatus}
                     onClick={handleBuildVectorIndex}
                   />
+                  {/* 管理角色卡按钮 */}
                   {roleCard && (
                     <Button
                       variant="outline"
-                      onClick={handleGenerateRoleCard}
-                      disabled={generating}
+                      size="lg"
                       className="gap-2"
+                      onClick={() => setShowRegenerateModal(true)}
                     >
-                      <RefreshCw className={`h-4 w-4 ${generating ? 'animate-spin' : ''}`} />
-                      重新生成
+                      <Settings className="h-5 w-5" />
+                      <span>管理角色卡</span>
                     </Button>
                   )}
                 </div>
@@ -510,12 +508,16 @@ export default function RolecardPage() {
                 </CardContent>
               </Card>
             )}
-
-            {/* 对话准则 */}
-            <GuidelinesViewer guidelines={guidelines} isLoading={loading} />
           </div>
         </div>
       </main>
+
+      {/* 管理弹窗 */}
+      <RegenerateModal
+        isOpen={showRegenerateModal}
+        onClose={() => setShowRegenerateModal(false)}
+        onComplete={fetchData}
+      />
     </div>
   )
 }
