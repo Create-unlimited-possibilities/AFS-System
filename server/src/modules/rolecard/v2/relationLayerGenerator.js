@@ -115,11 +115,13 @@ class RelationLayerGenerator {
     const relationId = relation._id.toString();
     const assistantId = relation.assistantId?._id?.toString() || relation.assistantId?.toString();
     const assistantName = relation.assistantId?.name || '协助者';
-    // 具体关系描述（如"儿子"、"同事"）- 用于 prompt 上下文
-    const specificRelation = relation.specificRelation || '朋友';
 
     // 关系类型（家人/朋友）- 直接使用数据库中必填的 relationshipType 字段
     const relationType = relation.relationshipType;
+
+    // 具体关系描述（如"儿子"、"同事"）- 用于 prompt 上下文
+    // 如果未填写，根据关系类型使用默认值
+    const specificRelation = relation.specificRelation || (relationType === 'family' ? '家人' : '朋友');
 
     profileLogger.info('开始生成单个关系层', {
       userId,
