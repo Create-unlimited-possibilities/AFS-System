@@ -165,6 +165,17 @@ function Badge({ children, className = '' }: { children: React.ReactNode; classN
   )
 }
 
+// 亲密程度英文转中文
+function translateIntimacyLevel(level: string): string {
+  const map: Record<string, string> = {
+    'distant': '疏远',
+    'casual': '普通',
+    'close': '亲密',
+    'intimate': '非常亲密',
+  }
+  return map[level] || level
+}
+
 export default function RoleCardViewerV2({ roleCard }: RoleCardViewerV2Props) {
   const { coreLayer, relationLayers, safetyGuardrails, calibration, generatedAt } = roleCard
 
@@ -590,7 +601,7 @@ export default function RoleCardViewerV2({ roleCard }: RoleCardViewerV2Props) {
                   </div>
                   {relation.relationMeta?.intimacyLevel && (
                     <div className="text-sm text-gray-600 mb-2">
-                      亲密程度: {relation.relationMeta.intimacyLevel}
+                      亲密程度: {translateIntimacyLevel(relation.relationMeta.intimacyLevel)}
                     </div>
                   )}
                   {relation.relationshipBasis?.summary && (

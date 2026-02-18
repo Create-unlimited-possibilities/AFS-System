@@ -52,6 +52,17 @@ function Badge({ children, className = '' }: { children: React.ReactNode; classN
   )
 }
 
+// 亲密程度英文转中文
+function translateIntimacyLevel(level: string): string {
+  const map: Record<string, string> = {
+    'distant': '疏远',
+    'casual': '普通',
+    'close': '亲密',
+    'intimate': '非常亲密',
+  }
+  return map[level] || level
+}
+
 function SectionCard({
   icon: Icon,
   title,
@@ -187,7 +198,7 @@ export default function RelationLayerDetailModal({ isOpen, onClose, relation }: 
           {relation.relationMeta?.intimacyLevel && (
             <div className="flex items-center gap-2 text-sm text-gray-600 px-1">
               <Heart className="h-4 w-4 text-pink-500" />
-              <span>亲密程度: <span className="font-medium text-gray-700">{relation.relationMeta.intimacyLevel}</span></span>
+              <span>亲密程度: <span className="font-medium text-gray-700">{translateIntimacyLevel(relation.relationMeta.intimacyLevel)}</span></span>
             </div>
           )}
 

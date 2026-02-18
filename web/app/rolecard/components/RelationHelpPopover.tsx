@@ -58,13 +58,13 @@ export default function RelationHelpPopover() {
 
   return (
     <div className="relative" ref={popoverRef}>
-      {/* Trigger Button */}
+      {/* Trigger Button - 最小 44x44px 触摸区域 */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="p-1.5 rounded-full hover:bg-red-50 transition-colors cursor-pointer"
+        className="p-2.5 rounded-full hover:bg-red-50 transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
         title="查看关系层说明"
       >
-        <HelpCircle className="h-4 w-4 text-red-500" />
+        <HelpCircle className="h-5 w-5 text-red-500" />
       </button>
 
       {/* Popover */}
