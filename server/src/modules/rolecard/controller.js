@@ -8,11 +8,14 @@
 
 import {
   CoreLayerGenerator,
-  RelationLayerGenerator,
-  SafetyGuardrailsManager,
-  CalibrationLayerManager
+  RelationLayerGenerator
 } from './v2/index.js';
+// 导入实例（default export）而非类
+import SafetyGuardrailsManager from './v2/safetyGuardrails.js';
+import CalibrationLayerManager from './v2/calibrationLayer.js';
 import User from '../user/model.js';
+import AssistRelation from '../assist/model.js';
+import Answer from '../qa/models/answer.js';
 import DualStorage from '../../core/storage/dual.js';
 import logger from '../../core/utils/logger.js';
 import VectorIndexService from '../../core/storage/vector.js';
@@ -30,22 +33,263 @@ class RoleCardController {
   async generateRoleCard(req, res) {
     const userId = req.user.id;
 
-    logger.info(`[RoleCardController] 开始生成V2角色卡 - User: ${userId}`);
+    logger.info(`[RoleCardController] ========== 开始生成V2角色卡 ==========`);
+    logger.info(`[RoleCardController] User: ${userId}`);
 
     try {
       // 1. 生成核心层
+      logger.info(`[RoleCardController] 步骤 1/7: 生成核心层 (从A套问答提取人格特质)`);
       const coreLayer = await this.coreGenerator.generate(userId);
+      logger.info(`[RoleCardController] ✓ 核心层生成完成`);
 
       // 2. 生成关系层
+      logger.info(`[RoleCardController] 步骤 2/7: 生成关系层 (从B/C套问答提取关系信息)`);
       const relationResults = await this.relationGenerator.generateAll(userId);
+      logger.info(`[RoleCardController] ✓ 关系层生成完成 - 成功: ${relationResults.success.length}, 跳过: ${relationResults.skipped.length}, 失败: ${relationResults.failed.length}`);
+      if (relationResults.skipped.length > 0) {
+        logger.info(`[RoleCardController] 跳过的关系层: ${JSON.stringify(relationResults.skipped)}`);
+      }
+      if (relationResults.failed.length > 0) {
+        logger.warn(`[RoleCardController] 关系层失败详情: ${JSON.stringify(relationResults.failed)}`);
+      }
 
       // 3. 获取安全护栏
-      const guardrails = SafetyGuardrailsManager.getGuardrails(userId);
+      logger.info(`[RoleCardController] 步骤 3/7: 获取安全护栏规则`);
+      const guardrails = await SafetyGuardrailsManager.getGuardrails(userId);
+      logger.info(`[RoleCardController] ✓ 安全护栏规则获取完成 - 规则数: ${guardrails.rules.length}`);
 
       // 4. 创建校准层
+      logger.info(`[RoleCardController] 步骤 4/7: 创建校准层`);
       const calibration = CalibrationLayerManager.createInitialCalibrationLayer(coreLayer);
+      logger.info(`[RoleCardController] ✓ 校准层创建完成`);
 
       // 5. 组装完整角色卡
+      logger.info(`[RoleCardController] 步骤 5/7: 组装完整角色卡`);
+      const roleCardV2 = {
+        version: '2.0.0',
+        userId,
+        coreLayer,
+        relationLayers: relationResults.success.reduce((acc, layer) => {
+          acc[layer.relationId] = layer;
+          return acc;
+        }, {}),
+        safetyGuardrails: guardrails,
+        calibration,
+        generatedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      logger.info(`[RoleCardController] ✓ 角色卡组装完成`);
+
+      // 6. 保存到文件系统（分层独立存储）
+      logger.info(`[RoleCardController] 步骤 6/7: 保存到文件系统`);
+      // 6.1 保存核心层
+      await this.dualStorage.saveCoreLayer(userId, coreLayer);
+      // 6.2 保存关系层（每个协助者独立文件）
+      for (const layer of relationResults.success) {
+        await this.dualStorage.saveRelationLayer(userId, layer.relationId, layer);
+      }
+      // 6.3 保存完整角色卡（作为备份/兼容）
+      await this.dualStorage.saveRoleCardV2(userId, roleCardV2);
+      logger.info(`[RoleCardController] ✓ 文件系统保存完成 - 核心层 + ${relationResults.success.length}个关系层`);
+
+      // 7. 更新 MongoDB（兼容旧版）
+      logger.info(`[RoleCardController] 步骤 7/7: 同步更新 MongoDB`);
+      await User.updateOne(
+        { _id: userId },
+        {
+          $set: {
+            'companionChat.roleCardV2': roleCardV2,
+            'companionChat.roleCard': {
+              // V2 字段映射
+              personality: coreLayer.personality?.summary || '',
+              background: coreLayer.backgroundStory?.summary || coreLayer.selfPerception?.summary || '',
+              interests: coreLayer.interests?.keyPoints || [],
+              communicationStyle: coreLayer.communicationStyle?.summary || '',
+              values: coreLayer.values?.keyPoints || [],
+              emotionalNeeds: coreLayer.emotionalNeeds?.keyPoints || [],
+              lifeMilestones: coreLayer.lifeMilestones?.keyPoints || [],
+              preferences: coreLayer.preferences?.keyPoints || [],
+              strangerInitialSentiment: 50,
+              generatedAt: new Date(),
+              updatedAt: new Date()
+            }
+          }
+        }
+      );
+      logger.info(`[RoleCardController] ✓ MongoDB 更新完成`);
+
+      logger.info(`[RoleCardController] ========== V2角色卡生成成功 ==========`);
+      logger.info(`[RoleCardController] 总结: 核心层✓, 关系层${relationResults.success.length}个✓(跳过${relationResults.skipped.length}个), 安全护栏✓, 校准层✓, 存储✓`);
+
+      res.json({
+        success: true,
+        data: {
+          roleCard: roleCardV2,
+          relationStats: {
+            success: relationResults.success.length,
+            skipped: relationResults.skipped.length,
+            skippedDetails: relationResults.skipped,
+            failed: relationResults.failed.length,
+            failures: relationResults.failed
+          }
+        }
+      });
+
+    } catch (error) {
+      logger.error(`[RoleCardController] ========== 角色卡生成失败 ==========`);
+      logger.error(`[RoleCardController] 错误类型: ${error.constructor.name}`);
+      logger.error(`[RoleCardController] 错误信息: ${error.message}`);
+      logger.error(`[RoleCardController] 错误堆栈: ${error.stack}`);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * 生成角色卡 V2（带 SSE 进度推送）
+   */
+  async generateRoleCardWithProgress(req, res) {
+    const userId = req.user.id;
+
+    // 设置 SSE 响应头
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+
+    // 进度回调函数
+    const sendProgress = (data) => {
+      try {
+        res.write(`event: progress\n`);
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      } catch (error) {
+        logger.error('[RoleCardController] SSE 写入失败:', error);
+      }
+    };
+
+    try {
+      logger.info(`[RoleCardController] ========== 开始生成V2角色卡 (SSE) ==========`);
+      logger.info(`[RoleCardController] User: ${userId}`);
+
+      // 发送开始事件
+      sendProgress({
+        step: 0,
+        total: 7,
+        stage: 'init',
+        message: '开始生成角色卡',
+        percentage: 0
+      });
+
+      // 1. 生成核心层
+      sendProgress({
+        step: 1,
+        total: 7,
+        stage: 'core_layer',
+        message: '正在生成核心层（从A套问答提取人格特质）',
+        percentage: 14
+      });
+
+      const coreLayer = await this.coreGenerator.generate(userId, (progress) => {
+        sendProgress({
+          step: 1,
+          total: 7,
+          stage: 'core_layer_extraction',
+          message: `核心层提取中: ${progress.current}/${progress.total}`,
+          percentage: 14 + Math.round(progress.current / progress.total * 14),
+          detail: progress
+        });
+      });
+
+      sendProgress({
+        step: 1,
+        total: 7,
+        stage: 'core_layer_done',
+        message: '核心层生成完成',
+        percentage: 28
+      });
+
+      // 2. 生成关系层
+      sendProgress({
+        step: 2,
+        total: 7,
+        stage: 'relation_layer',
+        message: '正在生成关系层（从B/C套问答提取关系信息）',
+        percentage: 28
+      });
+
+      const relationResults = await this.relationGenerator.generateAll(userId, (progress) => {
+        sendProgress({
+          step: 2,
+          total: 7,
+          stage: 'relation_layer_generation',
+          message: `关系层生成中: ${progress.current}/${progress.total}`,
+          percentage: 28 + Math.round(progress.current / progress.total * 28),
+          detail: progress
+        });
+      });
+
+      sendProgress({
+        step: 2,
+        total: 7,
+        stage: 'relation_layer_done',
+        message: `关系层生成完成 - 成功: ${relationResults.success.length}`,
+        percentage: 56,
+        stats: {
+          success: relationResults.success.length,
+          skipped: relationResults.skipped.length,
+          failed: relationResults.failed.length
+        }
+      });
+
+      // 3. 获取安全护栏
+      sendProgress({
+        step: 3,
+        total: 7,
+        stage: 'safety_guardrails',
+        message: '正在获取安全护栏规则',
+        percentage: 56
+      });
+
+      const guardrails = await SafetyGuardrailsManager.getGuardrails(userId);
+
+      sendProgress({
+        step: 3,
+        total: 7,
+        stage: 'safety_guardrails_done',
+        message: `安全护栏规则获取完成`,
+        percentage: 64
+      });
+
+      // 4. 创建校准层
+      sendProgress({
+        step: 4,
+        total: 7,
+        stage: 'calibration_layer',
+        message: '正在创建校准层',
+        percentage: 64
+      });
+
+      const calibration = CalibrationLayerManager.createInitialCalibrationLayer(coreLayer);
+
+      sendProgress({
+        step: 4,
+        total: 7,
+        stage: 'calibration_layer_done',
+        message: '校准层创建完成',
+        percentage: 72
+      });
+
+      // 5. 组装完整角色卡
+      sendProgress({
+        step: 5,
+        total: 7,
+        stage: 'assembling',
+        message: '正在组装完整角色卡',
+        percentage: 72
+      });
+
       const roleCardV2 = {
         version: '2.0.0',
         userId,
@@ -60,25 +304,60 @@ class RoleCardController {
         updatedAt: new Date().toISOString()
       };
 
+      sendProgress({
+        step: 5,
+        total: 7,
+        stage: 'assembling_done',
+        message: '角色卡组装完成',
+        percentage: 80
+      });
+
       // 6. 保存到文件系统
+      sendProgress({
+        step: 6,
+        total: 7,
+        stage: 'saving',
+        message: '正在保存到文件系统',
+        percentage: 80
+      });
+
+      await this.dualStorage.saveCoreLayer(userId, coreLayer);
+      for (const layer of relationResults.success) {
+        await this.dualStorage.saveRelationLayer(userId, layer.relationId, layer);
+      }
       await this.dualStorage.saveRoleCardV2(userId, roleCardV2);
 
-      // 7. 更新 MongoDB（兼容旧版）
+      sendProgress({
+        step: 6,
+        total: 7,
+        stage: 'saving_done',
+        message: `文件系统保存完成 - 核心层 + ${relationResults.success.length}个关系层`,
+        percentage: 90
+      });
+
+      // 7. 更新 MongoDB
+      sendProgress({
+        step: 7,
+        total: 7,
+        stage: 'mongodb_sync',
+        message: '正在同步更新 MongoDB',
+        percentage: 90
+      });
+
       await User.updateOne(
         { _id: userId },
         {
           $set: {
             'companionChat.roleCardV2': roleCardV2,
             'companionChat.roleCard': {
-              personality: coreLayer.personalityTraits ?
-                `边界意识:${coreLayer.personalityTraits.boundaryThickness}, 守密程度:${coreLayer.personalityTraits.discretionLevel}` : '',
-              background: coreLayer.selfPerception?.coreValues?.join('、') || '',
-              interests: coreLayer.communicationStyle?.preferredTopics || [],
-              communicationStyle: coreLayer.communicationStyle?.tonePattern || '',
-              values: coreLayer.selfPerception?.coreValues || [],
-              emotionalNeeds: coreLayer.selfPerception?.lifePriorities || [],
-              lifeMilestones: [],
-              preferences: coreLayer.communicationStyle?.avoidedTopics || [],
+              personality: coreLayer.personality?.summary || '',
+              background: coreLayer.backgroundStory?.summary || coreLayer.selfPerception?.summary || '',
+              interests: coreLayer.interests?.keyPoints || [],
+              communicationStyle: coreLayer.communicationStyle?.summary || '',
+              values: coreLayer.values?.keyPoints || [],
+              emotionalNeeds: coreLayer.emotionalNeeds?.keyPoints || [],
+              lifeMilestones: coreLayer.lifeMilestones?.keyPoints || [],
+              preferences: coreLayer.preferences?.keyPoints || [],
               strangerInitialSentiment: 50,
               generatedAt: new Date(),
               updatedAt: new Date()
@@ -87,26 +366,45 @@ class RoleCardController {
         }
       );
 
-      logger.info(`[RoleCardController] V2角色卡生成成功 - User: ${userId}`);
+      sendProgress({
+        step: 7,
+        total: 7,
+        stage: 'mongodb_sync_done',
+        message: 'MongoDB 更新完成',
+        percentage: 100
+      });
 
-      res.json({
+      // 发送完成事件
+      res.write(`event: done\n`);
+      res.write(`data: ${JSON.stringify({
         success: true,
+        message: '角色卡生成完成',
         data: {
           roleCard: roleCardV2,
           relationStats: {
             success: relationResults.success.length,
+            skipped: relationResults.skipped.length,
+            skippedDetails: relationResults.skipped,
             failed: relationResults.failed.length,
             failures: relationResults.failed
           }
         }
-      });
+      })}\n\n`);
+
+      logger.info(`[RoleCardController] ========== V2角色卡生成成功 (SSE) ==========`);
 
     } catch (error) {
-      logger.error('[RoleCardController] 生成角色卡失败:', error);
-      res.status(500).json({
+      logger.error(`[RoleCardController] ========== 角色卡生成失败 (SSE) ==========`);
+      logger.error(`[RoleCardController] 错误: ${error.message}`);
+
+      res.write(`event: error\n`);
+      res.write(`data: ${JSON.stringify({
         success: false,
-        error: error.message
-      });
+        error: error.message,
+        stage: 'unknown'
+      })}\n\n`);
+    } finally {
+      res.end();
     }
   }
 
@@ -402,6 +700,80 @@ class RoleCardController {
         success: false,
         error: error.message
       });
+    }
+  }
+
+  /**
+   * 获取各层生成状态
+   */
+  async getLayersStatus(req, res) {
+    const userId = req.user.id;
+
+    try {
+      // 获取核心层状态
+      const coreLayer = await this.dualStorage.loadCoreLayer(userId);
+
+      // 获取关系层状态
+      const relationLayers = await this.dualStorage.loadAllRelationLayers(userId);
+
+      // 获取所有协助关系
+      const relations = await AssistRelation.find({ targetId: userId })
+        .populate('assistantId', 'name');
+
+      // 获取每个协助者的答案数量
+      const relationsWithStatus = await Promise.all(relations.map(async (relation) => {
+        const relationId = relation._id.toString();
+        const assistantId = relation.assistantId?._id?.toString();
+
+        // 统计答案数量
+        const answerCount = await Answer.countDocuments({
+          userId: assistantId,
+          targetUserId: userId,
+          isSelfAnswer: false
+        });
+
+        const existingLayer = relationLayers[relationId];
+
+        let status;
+        if (existingLayer) {
+          status = 'generated';
+        } else if (answerCount < 3) {
+          status = 'insufficient_answers';
+        } else {
+          status = 'not_generated';
+        }
+
+        return {
+          relationId,
+          assistantId,
+          assistantName: relation.assistantId?.name || '协助者',
+          specificRelation: relation.specificRelation || '',
+          relationshipType: relation.relationshipType,
+          status,
+          answerCount,
+          generatedAt: existingLayer?.generatedAt
+        };
+      }));
+
+      res.json({
+        success: true,
+        data: {
+          coreLayer: {
+            exists: !!coreLayer,
+            generatedAt: coreLayer?.generatedAt
+          },
+          calibrationLayer: {
+            exists: !!coreLayer // 校准层跟随核心层
+          },
+          safetyGuardrails: {
+            loaded: true // 全局配置始终加载
+          },
+          relations: relationsWithStatus
+        }
+      });
+    } catch (error) {
+      logger.error('[RoleCardController] 获取层状态失败:', error);
+      res.status(500).json({ success: false, error: error.message });
     }
   }
 }

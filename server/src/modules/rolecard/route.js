@@ -4,8 +4,14 @@ import { protect } from '../auth/middleware.js';
 
 const router = express.Router();
 
+// 普通生成（无进度）
 router.post('/generate', protect, (req, res) => {
   rolecardController.generateRoleCard(req, res);
+});
+
+// SSE 生成（带进度推送）
+router.post('/generate/stream', protect, (req, res) => {
+  rolecardController.generateRoleCardWithProgress(req, res);
 });
 
 router.get('/', protect, (req, res) => {
@@ -30,6 +36,11 @@ router.post('/vector-index/build', protect, (req, res) => {
 
 router.get('/vector-index/status', protect, (req, res) => {
   rolecardController.getVectorIndexStatus(req, res);
+});
+
+// 获取各层生成状态
+router.get('/layers/status', protect, (req, res) => {
+  rolecardController.getLayersStatus(req, res);
 });
 
 export default router;
