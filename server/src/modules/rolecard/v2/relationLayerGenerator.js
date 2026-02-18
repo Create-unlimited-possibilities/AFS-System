@@ -108,16 +108,18 @@ class RelationLayerGenerator {
    * 为单个协助者生成关系层
    * @param {string} userId - 目标用户ID
    * @param {Object} relation - 协助关系对象
+   * @param {Function} onProgress - 进度回调函数 (progress) => {}
    * @returns {Promise<Object|null>} 关系层数据，如果答案不足返回 null
    */
-  async generateOne(userId, relation) {
+  async generateOne(userId, relation, onProgress = null) {
     const relationId = relation._id.toString();
     const assistantId = relation.assistantId?._id?.toString() || relation.assistantId?.toString();
     const assistantName = relation.assistantId?.name || '协助者';
-    const specificRelation = relation.relationType || relation.specificRelation || '朋友';
+    // 具体关系描述（如"儿子"、"同事"）- 用于 prompt 上下文
+    const specificRelation = relation.specificRelation || '朋友';
 
-    // 确定关系类型（家人/朋友）
-    const relationType = this.classifyRelationType(specificRelation);
+    // 关系类型（家人/朋友）- 直接使用数据库中必填的 relationshipType 字段
+    const relationType = relation.relationshipType;
 
     profileLogger.info('开始生成单个关系层', {
       userId,
@@ -161,6 +163,15 @@ class RelationLayerGenerator {
           relationId,
           questionId: item.questionId
         });
+
+        // 发送进度
+        if (onProgress) {
+          onProgress({
+            current: i + 1,
+            total: answersWithQuestions.length,
+            questionId: item.questionId
+          });
+        }
 
         await this.processOneAnswer(item, relationType, assistantName, specificRelation);
       }

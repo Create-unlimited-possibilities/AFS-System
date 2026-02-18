@@ -832,6 +832,92 @@ class RoleCardController {
       res.end();
     }
   }
+
+  /**
+   * 单独生成某个关系层（SSE）
+   */
+  async generateRelationLayerStream(req, res) {
+    const userId = req.user.id;
+    const { relationId } = req.params;
+
+    // 设置 SSE 响应头
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+
+    const sendProgress = (data) => {
+      try {
+        res.write(`event: progress\n`);
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      } catch (error) {
+        logger.error('[RoleCardController] SSE 写入失败:', error);
+      }
+    };
+
+    try {
+      // 获取协助关系
+      const relation = await AssistRelation.findOne({
+        _id: relationId,
+        targetId: userId
+      }).populate('assistantId');
+
+      if (!relation) {
+        res.write(`event: error\n`);
+        res.write(`data: ${JSON.stringify({
+          success: false,
+          error: '协助关系不存在',
+          stage: 'validation'
+        })}\n\n`);
+        res.end();
+        return;
+      }
+
+      sendProgress({
+        stage: 'start',
+        message: `开始生成 ${relation.assistantId?.name} 的关系层`,
+        percentage: 0
+      });
+
+      const layer = await this.relationGenerator.generateOne(userId, relation, (progress) => {
+        sendProgress({
+          stage: 'extracting',
+          message: `处理答案 ${progress.current}/${progress.total}`,
+          percentage: Math.round(progress.current / progress.total * 80),
+          detail: progress
+        });
+      });
+
+      if (!layer) {
+        res.write(`event: error\n`);
+        res.write(`data: ${JSON.stringify({
+          success: false,
+          error: 'insufficient_answers',
+          stage: 'generation'
+        })}\n\n`);
+        res.end();
+        return;
+      }
+
+      // 保存关系层
+      await this.dualStorage.saveRelationLayer(userId, relationId, layer);
+
+      sendProgress({ stage: 'complete', message: '关系层生成完成', percentage: 100 });
+
+      res.write(`event: done\n`);
+      res.write(`data: ${JSON.stringify({ success: true })}\n\n`);
+      res.end();
+    } catch (error) {
+      logger.error('[RoleCardController] 关系层生成失败:', error);
+      res.write(`event: error\n`);
+      res.write(`data: ${JSON.stringify({
+        success: false,
+        error: error.message,
+        stage: 'relation_layer'
+      })}\n\n`);
+      res.end();
+    }
+  }
 }
 
 export default new RoleCardController();

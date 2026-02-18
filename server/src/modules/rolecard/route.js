@@ -48,4 +48,9 @@ router.post('/layers/core/stream', protect, (req, res) => {
   rolecardController.generateCoreLayerStream(req, res);
 });
 
+// 单独生成某个关系层（SSE）
+router.post('/layers/relation/:relationId/stream', protect, (req, res) => {
+  rolecardController.generateRelationLayerStream(req, res);
+});
+
 export default router;
