@@ -419,6 +419,19 @@ class RoleCardController {
       const roleCardV2 = await this.dualStorage.loadRoleCardV2(userId);
 
       if (roleCardV2) {
+        // 从 User 模型获取 memoryTokenCount 并合并到 calibration 数据
+        const user = await User.findById(userId).select('companionChat.roleCard.memoryTokenCount');
+
+        if (user?.companionChat?.roleCard?.memoryTokenCount) {
+          if (!roleCardV2.calibration) {
+            roleCardV2.calibration = { currentState: {} };
+          }
+          if (!roleCardV2.calibration.currentState) {
+            roleCardV2.calibration.currentState = {};
+          }
+          roleCardV2.calibration.currentState.totalTokens = user.companionChat.roleCard.memoryTokenCount;
+        }
+
         return res.json({
           success: true,
           roleCard: roleCardV2,
