@@ -813,9 +813,8 @@ class RoleCardController {
       // 保存核心层
       await this.dualStorage.saveCoreLayer(userId, coreLayer);
 
-      // 创建并保存校准层
+      // 创建校准层（校准层随核心层一起存储，无需单独保存）
       const calibration = CalibrationLayerManager.createInitialCalibrationLayer(coreLayer);
-      await this.dualStorage.saveCalibrationLayer?.(userId, calibration);
 
       sendProgress({ stage: 'complete', message: '核心层生成完成', percentage: 100 });
 
@@ -824,7 +823,12 @@ class RoleCardController {
       res.end();
     } catch (error) {
       logger.error('[RoleCardController] 核心层生成失败:', error);
-      sendProgress({ stage: 'error', message: error.message, percentage: 0 });
+      res.write(`event: error\n`);
+      res.write(`data: ${JSON.stringify({
+        success: false,
+        error: error.message,
+        stage: 'core_layer'
+      })}\n\n`);
       res.end();
     }
   }
