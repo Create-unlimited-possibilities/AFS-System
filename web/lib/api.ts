@@ -205,6 +205,39 @@ export async function regenerateAssistantGuidelines(assistantId: string, token?:
   return post<{ success: boolean }>(`/rolecard/assistants/${assistantId}/regenerate`, {}, token);
 }
 
+// 获取各层状态 - 用于重新生成模态框
+export async function getLayersStatus(token?: string): Promise<ApiResponse<{
+  coreLayer: { exists: boolean; generatedAt?: string };
+  calibrationLayer: { exists: boolean };
+  safetyGuardrails: { loaded: boolean };
+  relations: Array<{
+    relationId: string;
+    assistantId: string;
+    assistantName: string;
+    specificRelation: string;
+    relationshipType: 'family' | 'friend';
+    status: 'generated' | 'not_generated' | 'insufficient_answers';
+    answerCount: number;
+    generatedAt?: string;
+  }>;
+}>> {
+  return get<{
+    coreLayer: { exists: boolean; generatedAt?: string };
+    calibrationLayer: { exists: boolean };
+    safetyGuardrails: { loaded: boolean };
+    relations: Array<{
+      relationId: string;
+      assistantId: string;
+      assistantName: string;
+      specificRelation: string;
+      relationshipType: 'family' | 'friend';
+      status: 'generated' | 'not_generated' | 'insufficient_answers';
+      answerCount: number;
+      generatedAt?: string;
+    }>;
+  }>('/rolecard/layers/status', token);
+}
+
 // ============================================
 // AI陪伴功能 - 对话相关API
 // ============================================
