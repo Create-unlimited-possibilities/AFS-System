@@ -422,6 +422,14 @@ class RoleCardController {
         // 从 User 模型获取 memoryTokenCount 并合并到 calibration 数据
         const user = await User.findById(userId).select('companionChat.roleCard.memoryTokenCount');
 
+        logger.info('[RoleCardController] 获取角色卡 - User data:', {
+          userId,
+          hasUser: !!user,
+          hasCompanionChat: !!user?.companionChat,
+          hasRoleCard: !!user?.companionChat?.roleCard,
+          memoryTokenCount: user?.companionChat?.roleCard?.memoryTokenCount
+        });
+
         if (user?.companionChat?.roleCard?.memoryTokenCount) {
           if (!roleCardV2.calibration) {
             roleCardV2.calibration = { currentState: {} };
@@ -430,7 +438,13 @@ class RoleCardController {
             roleCardV2.calibration.currentState = {};
           }
           roleCardV2.calibration.currentState.totalTokens = user.companionChat.roleCard.memoryTokenCount;
+          logger.info('[RoleCardController] 已合并 memoryTokenCount:', roleCardV2.calibration.currentState.totalTokens);
         }
+
+        // 禁用缓存，确保总是返回最新数据
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
 
         return res.json({
           success: true,
