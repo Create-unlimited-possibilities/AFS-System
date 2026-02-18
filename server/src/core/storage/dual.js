@@ -467,6 +467,19 @@ export default class DualStorage {
       const data = await fsPromises.readFile(filePath, 'utf-8');
       const roleCard = JSON.parse(data);
       console.log(`[DualStorage] V2角色卡已加载: ${filePath}`);
+
+      // 合并单独的关系层文件
+      const individualLayers = await this.loadAllRelationLayers(userId);
+      if (Object.keys(individualLayers).length > 0) {
+        // 确保 relationLayers 对象存在
+        if (!roleCard.relationLayers) {
+          roleCard.relationLayers = {};
+        }
+        // 合并单独的关系层（单独文件优先，因为它们是最新生成的）
+        roleCard.relationLayers = { ...roleCard.relationLayers, ...individualLayers };
+        console.log(`[DualStorage] 已合并 ${Object.keys(individualLayers).length} 个关系层到角色卡`);
+      }
+
       return roleCard;
     } catch (error) {
       console.warn(`[DualStorage] V2角色卡加载失败 ${userId}:`, error.message);
@@ -519,6 +532,44 @@ export default class DualStorage {
     } catch (error) {
       console.warn(`[DualStorage] 关系层加载失败 ${userId}:`, error.message);
       return {};
+    }
+  }
+
+  /**
+   * 保存核心层 V2
+   */
+  async saveCoreLayer(userId, coreLayer) {
+    await this.initialize();
+
+    const userPath = path.join(this.basePath, String(userId));
+    await fsPromises.mkdir(userPath, { recursive: true });
+
+    const filePath = path.join(userPath, 'core-layer.json');
+
+    try {
+      await fsPromises.writeFile(filePath, JSON.stringify(coreLayer, null, 2), 'utf-8');
+      console.log(`[DualStorage] 核心层已保存: ${filePath}`);
+      return { success: true, filePath };
+    } catch (error) {
+      console.error(`[DualStorage] 核心层保存失败:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 加载核心层 V2
+   */
+  async loadCoreLayer(userId) {
+    const filePath = path.join(this.basePath, String(userId), 'core-layer.json');
+
+    try {
+      const data = await fsPromises.readFile(filePath, 'utf-8');
+      const coreLayer = JSON.parse(data);
+      console.log(`[DualStorage] 核心层已加载: ${filePath}`);
+      return coreLayer;
+    } catch (error) {
+      console.warn(`[DualStorage] 核心层加载失败 ${userId}:`, error.message);
+      return null;
     }
   }
 }
