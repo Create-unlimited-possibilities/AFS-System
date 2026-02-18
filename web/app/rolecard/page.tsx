@@ -8,11 +8,11 @@ import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 import type { RoleCardExtended, AssistantGuideline, User, VectorIndexStatus, VectorIndexStatusResponse } from '@/types'
-import { Sparkles, Copy, CheckCircle, AlertCircle, User as UserIcon, Loader2 } from 'lucide-react'
+import { Sparkles, Copy, CheckCircle, AlertCircle, User as UserIcon, Loader2, RefreshCw } from 'lucide-react'
 import CloudPattern from '@/components/decorations/CloudPattern'
 import GenerateButton from './components/GenerateButton'
 import BuildVectorIndexButton from './components/BuildVectorIndexButton'
-import RoleCardEditor from './components/RoleCardEditor'
+import RoleCardViewerV2 from './components/RoleCardViewerV2'
 import GuidelinesViewer from './components/GuidelinesViewer'
 import { buildVectorIndex } from '@/lib/api'
 import type { VectorIndexBuildProgress } from '@/types'
@@ -32,11 +32,11 @@ export default function RolecardPage() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [editMode, setEditMode] = useState(false)
   const [generateProgress, setGenerateProgress] = useState<{ current: number; total: number; message: string } | undefined>(undefined)
   const [buildingIndex, setBuildingIndex] = useState(false)
   const [buildProgress, setBuildProgress] = useState<VectorIndexBuildProgress | undefined>(undefined)
   const [vectorIndexStatus, setVectorIndexStatus] = useState<VectorIndexStatus | undefined>(undefined)
+  const [relationStats, setRelationStats] = useState<{ success: number; skipped: number; failed: number } | undefined>(undefined)
 
   useEffect(() => {
     if (hasHydrated && user) {
@@ -133,22 +133,97 @@ export default function RolecardPage() {
 
     try {
       setGenerating(true)
-      setGenerateProgress({ current: 0, total: 5, message: '正在收集答案...' })
+      setRelationStats(undefined)
+      setGenerateProgress({
+        current: 0,
+        total: 7,
+        message: '开始生成角色卡...'
+      })
 
-      const res = await api.post<{ roleCard: RoleCardExtended; tokenCount: number; assistantsProcessed: number; processingTime: number }>('/rolecard/generate', {})
-
-      if (res.success && res.data) {
-        setRoleCard(res.data.roleCard)
-        setGenerateProgress({ current: 5, total: 5, message: '完成！' })
-
-        setTimeout(() => {
-          setGenerateProgress(undefined)
-          fetchData() // 重新获取对话准则
-        }, 2000)
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('未登录')
       }
+
+      // 使用 SSE 接口
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/rolecard/generate/stream`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+      })
+
+      if (!response.ok) {
+        throw new Error('请求失败')
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('无法读取响应流')
+      }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let currentEventType = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          const trimmedLine = line.trim()
+
+          if (trimmedLine.startsWith('event: ')) {
+            currentEventType = trimmedLine.substring(7).trim()
+          } else if (trimmedLine.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(trimmedLine.substring(6).trim())
+
+              if (currentEventType === 'progress') {
+                setGenerateProgress({
+                  current: data.step || 0,
+                  total: data.total || 7,
+                  message: data.message || '处理中...'
+                })
+              } else if (currentEventType === 'done') {
+                if (data.success && data.data?.roleCard) {
+                  setRoleCard(data.data.roleCard)
+                  if (data.data.relationStats) {
+                    setRelationStats(data.data.relationStats)
+                  }
+                  setGenerateProgress({
+                    current: 7,
+                    total: 7,
+                    message: '生成完成！'
+                  })
+
+                  setTimeout(() => {
+                    setGenerateProgress(undefined)
+                    fetchData()
+                  }, 2000)
+                }
+              } else if (currentEventType === 'error') {
+                throw new Error(data.error || '生成失败')
+              }
+            } catch (parseError) {
+              console.error('[RolecardPage] JSON 解析失败:', parseError)
+            }
+
+            currentEventType = ''
+          }
+        }
+      }
+
     } catch (error) {
       console.error('生成角色卡失败:', error)
-      alert('生成角色卡失败，请重试')
+      const errorMessage = error instanceof Error ? error.message : '生成角色卡失败，请重试'
+      alert(errorMessage)
       setGenerateProgress(undefined)
     } finally {
       setGenerating(false)
@@ -160,9 +235,9 @@ export default function RolecardPage() {
       console.log('[DEBUG] 开始获取向量索引状态')
       const res = await api.get<VectorIndexStatusResponse>('/rolecard/vector-index/status')
       console.log('[DEBUG] API响应:', res)
-      if (res.success && res.status) {
-        setVectorIndexStatus(res.status)
-        console.log('[DEBUG] vectorIndexStatus已更新:', res.status)
+      if (res.success && res.data?.status) {
+        setVectorIndexStatus(res.data.status)
+        console.log('[DEBUG] vectorIndexStatus已更新:', res.data.status)
       }
     } catch (error) {
       console.error('[DEBUG] 获取向量索引状态失败:', error)
@@ -227,20 +302,6 @@ export default function RolecardPage() {
       } catch (error) {
         console.error('复制失败:', error)
       }
-    }
-  }
-
-  const handleSaveRoleCard = async (updatedData: Partial<RoleCardExtended>) => {
-    try {
-      const res = await api.put<RoleCardExtended>('/rolecard', updatedData)
-      if (res.success && res.data) {
-        setRoleCard(res.data)
-        setEditMode(false)
-        alert('保存成功！')
-      }
-    } catch (error) {
-      console.error('保存角色卡失败:', error)
-      alert('保存失败，请重试')
     }
   }
 
@@ -382,7 +443,7 @@ export default function RolecardPage() {
                   </div>
                   {roleCard && (
                     <span className="text-xs px-3 py-1 bg-green-100 text-green-700 rounded-full font-medium">
-                      ✓ 已生成
+                      ✓ 已生成 (V2)
                     </span>
                   )}
                 </div>
@@ -391,7 +452,7 @@ export default function RolecardPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex gap-4">
+                <div className="flex gap-4 flex-wrap">
                   <GenerateButton
                     isGenerating={generating}
                     isDisabled={!isFullyAnswered()}
@@ -408,43 +469,50 @@ export default function RolecardPage() {
                   {roleCard && (
                     <Button
                       variant="outline"
-                      onClick={() => setEditMode(!editMode)}
-                      className="flex-1"
+                      onClick={handleGenerateRoleCard}
+                      disabled={generating}
+                      className="gap-2"
                     >
-                      {editMode ? '完成编辑' : '编辑角色卡'}
+                      <RefreshCw className={`h-4 w-4 ${generating ? 'animate-spin' : ''}`} />
+                      重新生成
                     </Button>
                   )}
                 </div>
+
+                {/* 关系层统计 */}
+                {relationStats && (
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg text-sm">
+                    <span className="font-medium">关系层生成结果：</span>
+                    <span className="text-green-600 ml-2">成功 {relationStats.success}</span>
+                    {relationStats.skipped > 0 && (
+                      <span className="text-yellow-600 ml-2">跳过 {relationStats.skipped}</span>
+                    )}
+                    {relationStats.failed > 0 && (
+                      <span className="text-red-600 ml-2">失败 {relationStats.failed}</span>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* 编辑模式：显示编辑器 */}
-            {editMode && roleCard && (
-              <RoleCardEditor
-                roleCard={roleCard}
-                onSave={handleSaveRoleCard}
-                onCancel={() => setEditMode(false)}
-                readOnly={false}
-              />
+            {/* 角色卡详情 (V2) */}
+            {roleCard && (
+              <Card className="hover:shadow-xl transition-all duration-300 animate-slide-up" style={{ animationDelay: '0.3s' }}>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <UserIcon className="h-5 w-5 text-orange-600" />
+                    角色卡详情
+                  </CardTitle>
+                  <CardDescription>基于分层架构的 V2 角色卡</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <RoleCardViewerV2 roleCard={roleCard as any} />
+                </CardContent>
+              </Card>
             )}
 
-            {/* 非编辑模式：显示详情 */}
-            {!editMode && (
-              <>
-                {/* 角色卡详情 */}
-                {roleCard && (
-                  <RoleCardEditor
-                    roleCard={roleCard}
-                    onSave={() => {}}
-                    onCancel={() => {}}
-                    readOnly={true}
-                  />
-                )}
-
-                {/* 对话准则 */}
-                <GuidelinesViewer guidelines={guidelines} isLoading={loading} />
-              </>
-            )}
+            {/* 对话准则 */}
+            <GuidelinesViewer guidelines={guidelines} isLoading={loading} />
           </div>
         </div>
       </main>
