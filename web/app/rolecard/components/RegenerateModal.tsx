@@ -159,8 +159,7 @@ export default function RegenerateModal({ isOpen, onClose, onComplete }: Regener
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      },
-      credentials: 'include'
+      }
     }).then(response => {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -206,8 +205,7 @@ export default function RegenerateModal({ isOpen, onClose, onComplete }: Regener
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      },
-      credentials: 'include'
+      }
     }).then(response => {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -263,7 +261,6 @@ export default function RegenerateModal({ isOpen, onClose, onComplete }: Regener
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      credentials: 'include',
       body: JSON.stringify({ layers: pendingRelations })
     }).then(response => {
       if (!response.ok) {
