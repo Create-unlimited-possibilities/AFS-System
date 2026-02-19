@@ -17,6 +17,7 @@ import chatRouter from './modules/chat/route.js';
 import rolecardRouter from './modules/rolecard/route.js';
 import sentimentRouter from './modules/sentiment/route.js';
 import { regionsRouter } from './modules/common/china-regions/index.js';
+import memoryRouter from './modules/memory/route.js';
 
 // Auth middleware
 import { protect } from './modules/auth/middleware.js';
@@ -77,6 +78,7 @@ app.use('/api/questions', protect, questionsRouter);
 app.use('/api/chat', protect, chatRouter);
 app.use('/api/rolecard', protect, rolecardRouter);
 app.use('/api/sentiment', protect, sentimentRouter);
+app.use('/api/memory', memoryRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
