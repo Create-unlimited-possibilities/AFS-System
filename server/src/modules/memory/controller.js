@@ -3,11 +3,13 @@
  * Handles API endpoints for memory indexing status and management
  *
  * @author AFS Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 
 import MemoryStore from './MemoryStore.js';
 import Indexer from './Indexer.js';
+import PendingTopicsManager from './PendingTopicsManager.js';
+import ProactiveMessagingManager from './ProactiveMessagingManager.js';
 import logger from '../../core/utils/logger.js';
 
 // Create module-specific logger
@@ -20,6 +22,8 @@ const ctrlLogger = {
 // Singleton instances
 const memoryStore = new MemoryStore();
 const indexer = new Indexer();
+const pendingTopicsManager = new PendingTopicsManager();
+const proactiveManager = new ProactiveMessagingManager();
 
 /**
  * Get indexing status for the current user
@@ -355,11 +359,278 @@ export async function getMemoryStats(req, res) {
   }
 }
 
+/**
+ * Check if should send a proactive message
+ * GET /api/memory/proactive/check/:withUserId
+ */
+export async function checkProactive(req, res) {
+  try {
+    const userId = (req.user.id || req.user._id)?.toString();
+    const { withUserId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID not found in request'
+      });
+    }
+
+    if (!withUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'withUserId parameter is required'
+      });
+    }
+
+    const decision = await proactiveManager.shouldSendProactive(userId, withUserId);
+
+    ctrlLogger.info(`Checked proactive timing for user ${userId} with ${withUserId}`, {
+      shouldSend: decision.shouldSend
+    });
+
+    return res.json({
+      success: true,
+      data: decision
+    });
+  } catch (error) {
+    ctrlLogger.error(`Failed to check proactive: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to check proactive timing',
+      error: error.message
+    });
+  }
+}
+
+/**
+ * Generate a proactive message
+ * POST /api/memory/proactive/generate/:withUserId
+ */
+export async function generateProactive(req, res) {
+  try {
+    const userId = (req.user.id || req.user._id)?.toString();
+    const { withUserId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID not found in request'
+      });
+    }
+
+    if (!withUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'withUserId parameter is required'
+      });
+    }
+
+    const result = await proactiveManager.generateProactiveMessage(userId, withUserId);
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        message: result.error || 'Failed to generate proactive message'
+      });
+    }
+
+    ctrlLogger.info(`Generated proactive message for user ${userId} with ${withUserId}`);
+
+    return res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    ctrlLogger.error(`Failed to generate proactive message: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to generate proactive message',
+      error: error.message
+    });
+  }
+}
+
+/**
+ * Get proactive messaging status
+ * GET /api/memory/proactive/status/:withUserId
+ */
+export async function getProactiveStatus(req, res) {
+  try {
+    const userId = (req.user.id || req.user._id)?.toString();
+    const { withUserId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID not found in request'
+      });
+    }
+
+    if (!withUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'withUserId parameter is required'
+      });
+    }
+
+    const status = await proactiveManager.getProactiveStatus(userId, withUserId);
+
+    return res.json({
+      success: true,
+      data: status
+    });
+  } catch (error) {
+    ctrlLogger.error(`Failed to get proactive status: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get proactive status',
+      error: error.message
+    });
+  }
+}
+
+/**
+ * Get pending topics from dedicated manager
+ * GET /api/memory/pending-topics/v2
+ */
+export async function getPendingTopicsV2(req, res) {
+  try {
+    const userId = (req.user.id || req.user._id)?.toString();
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID not found in request'
+      });
+    }
+
+    const topics = await pendingTopicsManager.getPendingTopics(userId);
+    const stats = await pendingTopicsManager.getTopicStats(userId);
+
+    return res.json({
+      success: true,
+      data: {
+        topics,
+        stats
+      }
+    });
+  } catch (error) {
+    ctrlLogger.error(`Failed to get pending topics v2: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get pending topics',
+      error: error.message
+    });
+  }
+}
+
+/**
+ * Add a new pending topic
+ * POST /api/memory/pending-topics
+ */
+export async function addPendingTopic(req, res) {
+  try {
+    const userId = (req.user.id || req.user._id)?.toString();
+    const { topic, context, suggestedFollowUp, withUserId, conversationId, urgency } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID not found in request'
+      });
+    }
+
+    if (!topic || !withUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'topic and withUserId are required'
+      });
+    }
+
+    const newTopic = await pendingTopicsManager.addTopic(userId, {
+      topic,
+      context,
+      suggestedFollowUp,
+      withUserId,
+      conversationId,
+      urgency
+    });
+
+    ctrlLogger.info(`Added pending topic for user ${userId}`);
+
+    return res.json({
+      success: true,
+      data: newTopic
+    });
+  } catch (error) {
+    ctrlLogger.error(`Failed to add pending topic: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to add pending topic',
+      error: error.message
+    });
+  }
+}
+
+/**
+ * Clear a pending topic from dedicated manager
+ * DELETE /api/memory/pending-topics/v2/:topicId
+ */
+export async function clearPendingTopicV2(req, res) {
+  try {
+    const userId = (req.user.id || req.user._id)?.toString();
+    const { topicId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID not found in request'
+      });
+    }
+
+    if (!topicId) {
+      return res.status(400).json({
+        success: false,
+        message: 'topicId parameter is required'
+      });
+    }
+
+    const cleared = await pendingTopicsManager.clearTopic(userId, topicId);
+
+    if (!cleared) {
+      return res.status(404).json({
+        success: false,
+        message: 'Topic not found'
+      });
+    }
+
+    ctrlLogger.info(`Cleared pending topic ${topicId} for user ${userId}`);
+
+    return res.json({
+      success: true,
+      data: { topicId, cleared: true }
+    });
+  } catch (error) {
+    ctrlLogger.error(`Failed to clear pending topic v2: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to clear pending topic',
+      error: error.message
+    });
+  }
+}
+
 export default {
   getIndexStatus,
   checkBusy,
   getPendingTopics,
   clearPendingTopic,
   triggerIndexing,
-  getMemoryStats
+  getMemoryStats,
+  checkProactive,
+  generateProactive,
+  getProactiveStatus,
+  getPendingTopicsV2,
+  addPendingTopic,
+  clearPendingTopicV2
 };
