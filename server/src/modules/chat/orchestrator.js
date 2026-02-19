@@ -17,6 +17,8 @@ import { contextBuilderNode } from './nodes/contextBuilder.js';
 import { responseGeneratorNode } from './nodes/responseGenerator.js';
 import { memoryUpdaterNode } from './nodes/memoryUpdater.js';
 import { outputFormatterNode } from './nodes/outputFormatter.js';
+import { tokenMonitorNode } from './nodes/tokenMonitor.js';
+import { tokenResponseNode } from './nodes/tokenResponse.js';
 import ChatSession from './model.js';
 import User from '../user/model.js';
 import AssistRelation from '../assist/model.js';
@@ -29,10 +31,12 @@ class ChatGraphOrchestrator {
       input_processor: inputProcessorNode,
       relation_confirm: relationConfirmNode,
       rolecard_assemble: roleCardAssembleNode,
+      token_monitor: tokenMonitorNode,
       rag_retriever: ragRetrieverNode,
       sentiment_analyzer: sentimentAnalyzerNode,
       context_builder: contextBuilderNode,
       response_generator: responseGeneratorNode,
+      token_response: tokenResponseNode,
       memory_updater: memoryUpdaterNode,
       output_formatter: outputFormatterNode
     };
