@@ -10,13 +10,15 @@ import MemoryExtractor from './MemoryExtractor.js';
 import Compressor from './Compressor.js';
 import Scheduler from './Scheduler.js';
 import PendingTopicsManager from './PendingTopicsManager.js';
+import ProactiveMessagingManager from './ProactiveMessagingManager.js';
 
 export {
   MemoryStore,
   MemoryExtractor,
   Compressor,
   Scheduler,
-  PendingTopicsManager
+  PendingTopicsManager,
+  ProactiveMessagingManager
 };
 
 export default {
@@ -24,5 +26,6 @@ export default {
   MemoryExtractor,
   Compressor,
   Scheduler,
-  PendingTopicsManager
+  PendingTopicsManager,
+  ProactiveMessagingManager
 };
