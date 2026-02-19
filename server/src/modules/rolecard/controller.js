@@ -21,6 +21,7 @@ import logger from '../../core/utils/logger.js';
 import VectorIndexService from '../../core/storage/vector.js';
 import MemoryExtractor from '../memory/MemoryExtractor.js';
 import MemoryStore from '../memory/MemoryStore.js';
+import AnswerService from '../qa/services/answer.js';
 
 class RoleCardController {
   constructor() {
@@ -693,17 +694,33 @@ class RoleCardController {
     };
 
     try {
-      const FileStorage = (await import('../../core/storage/file.js')).default;
-      const fileStorage = new FileStorage();
+      // 检查是否完整回答了A套问题（复用生成角色卡的检测逻辑）
+      const answerService = new AnswerService();
+      const progress = await answerService.getSelfProgress(userId);
 
-      const memories = await fileStorage.loadUserMemories(userId);
+      const basicComplete = progress.basic.answered >= progress.basic.total;
+      const emotionalComplete = progress.emotional.answered >= progress.emotional.total;
+      const isFullyAnswered = basicComplete && emotionalComplete;
 
-      if (memories.A_set.length === 0) {
+      if (!isFullyAnswered) {
+        const basicProgress = `${progress.basic.answered}/${progress.basic.total}`;
+        const emotionalProgress = `${progress.emotional.answered}/${progress.emotional.total}`;
         res.write(`event: error\n`);
-        res.write(`data: ${JSON.stringify({ success: false, error: '请先完成至少一个A套问题' })}\n\n`);
+        res.write(`data: ${JSON.stringify({
+          success: false,
+          error: `请先完成全部A套问题`,
+          details: {
+            basic: basicProgress,
+            emotional: emotionalProgress
+          }
+        })}\n\n`);
         res.end();
         return;
       }
+
+      const FileStorage = (await import('../../core/storage/file.js')).default;
+      const fileStorage = new FileStorage();
+      const memories = await fileStorage.loadUserMemories(userId);
 
       const vectorService = new VectorIndexService();
 
@@ -751,9 +768,16 @@ class RoleCardController {
 
       const roleCardV2 = await this.dualStorage.loadRoleCardV2(userId);
       const hasRoleCard = !!roleCardV2;
-      const canBuild = memories.A_set.length > 0 && !exists;
 
-      logger.info(`[RoleCardController] 向量索引状态 - User: ${userId}, hasRoleCard: ${hasRoleCard}, exists: ${exists}, canBuild: ${canBuild}`);
+      // 使用与生成角色卡相同的检测逻辑
+      const answerService = new AnswerService();
+      const progress = await answerService.getSelfProgress(userId);
+      const basicComplete = progress.basic.answered >= progress.basic.total;
+      const emotionalComplete = progress.emotional.answered >= progress.emotional.total;
+      const isFullyAnswered = basicComplete && emotionalComplete;
+      const canBuild = isFullyAnswered && !exists;
+
+      logger.info(`[RoleCardController] 向量索引状态 - User: ${userId}, hasRoleCard: ${hasRoleCard}, exists: ${exists}, canBuild: ${canBuild}, isFullyAnswered: ${isFullyAnswered}`);
 
       res.json({
         success: true,
@@ -762,6 +786,11 @@ class RoleCardController {
           memoryCount,
           hasRoleCard,
           canBuild,
+          progress: {
+            basic: progress.basic,
+            emotional: progress.emotional,
+            isFullyAnswered
+          },
           ...stats
         }
       });
