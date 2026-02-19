@@ -19,12 +19,49 @@ import Answer from '../qa/models/answer.js';
 import DualStorage from '../../core/storage/dual.js';
 import logger from '../../core/utils/logger.js';
 import VectorIndexService from '../../core/storage/vector.js';
+import MemoryExtractor from '../memory/MemoryExtractor.js';
+import MemoryStore from '../memory/MemoryStore.js';
 
 class RoleCardController {
   constructor() {
     this.coreGenerator = new CoreLayerGenerator();
     this.relationGenerator = new RelationLayerGenerator();
     this.dualStorage = new DualStorage();
+    this.memoryExtractor = new MemoryExtractor();
+    this.memoryStore = new MemoryStore();
+  }
+
+  /**
+   * Process pending memories in background (non-blocking)
+   * @param {string} userId - User ID
+   * @param {Object} roleCard - Generated role card
+   */
+  processPendingMemoriesBackground(userId, roleCard) {
+    // Run in background without blocking the response
+    setImmediate(async () => {
+      try {
+        logger.info(`[RoleCardController] Starting background pending memory processing for user ${userId}`);
+
+        const results = await this.memoryExtractor.processPendingMemories(
+          userId,
+          roleCard,
+          this.memoryStore
+        );
+
+        logger.info(`[RoleCardController] Background memory processing completed`, {
+          userId,
+          processed: results.processed,
+          failed: results.failed,
+          total: results.total
+        });
+      } catch (error) {
+        // Log error but don't affect the main response
+        logger.error(`[RoleCardController] Background memory processing failed`, {
+          userId,
+          error: error.message
+        });
+      }
+    });
   }
 
   /**
@@ -117,6 +154,10 @@ class RoleCardController {
         }
       );
       logger.info(`[RoleCardController] ✓ MongoDB 更新完成`);
+
+      // 8. Process pending memories in background (non-blocking)
+      logger.info(`[RoleCardController] 步骤 8: 启动待处理记忆的后台处理`);
+      this.processPendingMemoriesBackground(userId, roleCardV2);
 
       logger.info(`[RoleCardController] ========== V2角色卡生成成功 ==========`);
       logger.info(`[RoleCardController] 总结: 核心层✓, 关系层${relationResults.success.length}个✓(跳过${relationResults.skipped.length}个), 安全护栏✓, 校准层✓, 存储✓`);
@@ -373,6 +414,9 @@ class RoleCardController {
         message: 'MongoDB 更新完成',
         percentage: 100
       });
+
+      // Process pending memories in background (non-blocking)
+      this.processPendingMemoriesBackground(userId, roleCardV2);
 
       // 发送完成事件
       res.write(`event: done\n`);
