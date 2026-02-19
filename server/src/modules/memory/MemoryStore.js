@@ -166,6 +166,16 @@ class MemoryStore {
 
       memoryLogger.info(`Memory saved successfully: ${memoryId}`, { filePath });
 
+      // Add file path to memory for indexing
+      memory._filePath = filePath;
+
+      // Auto-index if enabled
+      if (autoIndex) {
+        this.triggerIndexing(userId, memory).catch(error => {
+          memoryLogger.error(`Auto-indexing failed for ${memoryId}:`, { error: error.message });
+        });
+      }
+
       return { memoryId, filePath, memory };
     } catch (error) {
       memoryLogger.error(`Failed to save memory: ${error.message}`, { error: error.stack });
@@ -596,6 +606,68 @@ class MemoryStore {
     }
 
     return result;
+  }
+
+  /**
+   * Trigger indexing for a newly saved memory
+   * @param {string} userId - User ID
+   * @param {Object} memory - Memory object with _filePath
+   * @returns {Promise<Object>} Indexing result
+   */
+  async triggerIndexing(userId, memory) {
+    try {
+      const Indexer = (await import('./Indexer.js')).default;
+      const indexer = new Indexer();
+
+      // Add userId to memory for indexing
+      const memoryWithUserId = {
+        ...memory,
+        userId
+      };
+
+      const result = await indexer.indexConversationMemory(userId, memoryWithUserId);
+
+      if (result.success && !result.queued && memory._filePath) {
+        await this.markAsIndexed(memory._filePath);
+        memoryLogger.info(`Memory ${memory.memoryId} indexed successfully`);
+      }
+
+      return result;
+    } catch (error) {
+      memoryLogger.error(`Failed to trigger indexing for ${memory.memoryId}:`, { error: error.message });
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Find a memory file by memory ID
+   * @param {string} userId - User ID
+   * @param {string} memoryId - Memory ID to find
+   * @returns {Promise<{filePath: string, memory: Object}|null>}
+   */
+  async findMemoryFile(userId, memoryId) {
+    try {
+      const allMemories = await this.loadUserMemories(userId);
+
+      for (const [, memories] of Object.entries(allMemories)) {
+        for (const memory of memories) {
+          if (memory.memoryId === memoryId) {
+            return {
+              filePath: memory._filePath,
+              memory
+            };
+          }
+        }
+      }
+
+      return null;
+    } catch (error) {
+      memoryLogger.error(`Failed to find memory file: ${error.message}`, { memoryId });
+      return null;
+    }
   }
 }
 
