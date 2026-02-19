@@ -3,6 +3,9 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 
+// Memory scheduler
+import { getScheduler } from './modules/memory/Scheduler.js';
+
 // Module routes
 import authRouter from './modules/auth/route.js';
 import usersRouter from './modules/user/route.js';
@@ -78,4 +81,11 @@ app.use('/api/sentiment', protect, sentimentRouter);
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   logger.info(`后端运行中 → http://localhost:${PORT}`);
+
+  // Start memory compression scheduler
+  const scheduler = getScheduler();
+  scheduler.start();
+  logger.info('Memory compression scheduler started', {
+    nextRunTime: scheduler.getStatus().nextRunTime
+  });
 });
