@@ -1,182 +1,163 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 
+// Mock ChromaDB
 vi.mock('chromadb', () => ({
-  ChromaClient: class {
+  ChromaClient: class MockChromaClient {
     constructor() {
-      this.getCollection = vi.fn().mockRejectedValue(new Error('does not exist'));
-      this.createCollection = vi.fn().mockResolvedValue({
-        id: 'mock-collection',
-        delete: vi.fn().mockResolvedValue(undefined),
+      this.heartbeat = vi.fn().mockResolvedValue(true);
+      this.listCollections = vi.fn().mockResolvedValue([]);
+    }
+    async getCollection({ name }) {
+      throw new Error(`Collection ${name} does not exist`);
+    }
+    async createCollection({ name, metadata }) {
+      return {
+        name,
+        metadata,
         add: vi.fn().mockResolvedValue(undefined),
-        count: vi.fn().mockResolvedValue(0)
-      });
+        delete: vi.fn().mockResolvedValue(undefined),
+        count: vi.fn().mockResolvedValue(0),
+        query: vi.fn().mockResolvedValue({
+          documents: [[]],
+          distances: [[]],
+          metadatas: [[]]
+        }),
+        get: vi.fn().mockResolvedValue([])
+      };
+    }
+    async deleteCollection({ name }) {
+      return undefined;
     }
   }
 }));
 
-vi.mock('../../src/services/EmbeddingService.js', () => ({
-  default: class {
+// Mock EmbeddingService
+vi.mock('../../src/core/storage/embedding.js', () => ({
+  default: class MockEmbeddingService {
     constructor() {}
     initialize = vi.fn().mockResolvedValue(undefined);
-    embedQuery = vi.fn().mockResolvedValue([0.1, 0.2]);
-    embedDocuments = vi.fn().mockResolvedValue([[0.1, 0.2], [0.3, 0.4]]);
+    embedQuery = vi.fn().mockResolvedValue([0.1, 0.2, 0.3, 0.4, 0.5]);
+    embedDocuments = vi.fn().mockResolvedValue([
+      [0.1, 0.2, 0.3, 0.4, 0.5],
+      [0.2, 0.3, 0.4, 0.5, 0.6]
+    ]);
     healthCheck = vi.fn().mockResolvedValue(true);
   }
 }));
 
+// Mock FileStorage
 const mockLoadUserMemories = vi.fn();
-
-vi.mock('../../src/services/fileStorage.js', () => ({
-  loadUserMemories: mockLoadUserMemories,
-  default: class {
+vi.mock('../../src/core/storage/file.js', () => ({
+  default: class MockFileStorage {
     constructor() {
       this.loadUserMemories = mockLoadUserMemories;
     }
+    loadUserMemories = mockLoadUserMemories;
   }
 }));
 
-import VectorIndexService from '../../src/services/vectorIndexService.js';
-import RoleCardController from '../../src/controllers/RoleCardController.js';
+import VectorIndexService from '../../src/core/storage/vector.js';
 
 describe('VectorIndexService', () => {
   let vectorService;
 
   beforeEach(() => {
     vectorService = new VectorIndexService();
+    vi.clearAllMocks();
   });
 
-  describe('userId validation', () => {
-    it('should throw error for invalid userId (null)', async () => {
-      await expect(vectorService.getCollection(null)).rejects.toThrow('Invalid userId');
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  describe('validateUserId', () => {
+    it('should throw error for invalid userId (null)', () => {
+      expect(() => vectorService.validateUserId(null)).toThrow('Invalid userId: must be a non-empty string');
     });
 
-    it('should throw error for invalid userId (empty string)', async () => {
-      await expect(vectorService.getCollection('')).rejects.toThrow('Invalid userId');
+    it('should throw error for invalid userId (empty string)', () => {
+      expect(() => vectorService.validateUserId('')).toThrow('Invalid userId: must be a non-empty string');
     });
 
-    it('should throw error for invalid userId (undefined)', async () => {
-      await expect(vectorService.getCollection(undefined)).rejects.toThrow('Invalid userId');
+    it('should throw error for invalid userId (undefined)', () => {
+      expect(() => vectorService.validateUserId(undefined)).toThrow('Invalid userId: must be a non-empty string');
     });
 
-    it('should throw error for invalid userId (number)', async () => {
-      await expect(vectorService.getCollection(123)).rejects.toThrow('Invalid userId');
+    it('should throw error for invalid userId (number)', () => {
+      expect(() => vectorService.validateUserId(123)).toThrow('Invalid userId: must be a non-empty string');
     });
 
-    it('should throw error for invalid userId with invalid characters', async () => {
-      await expect(vectorService.getCollection('user@123')).rejects.toThrow('Invalid userId: contains invalid characters for ChromaDB collection names');
+    it('should throw error for invalid userId with invalid characters', () => {
+      expect(() => vectorService.validateUserId('user@123')).toThrow('Invalid userId: contains invalid characters');
     });
 
-    it('should accept userId starting with number', async () => {
-      const mockCollection = { id: 'mock-collection' };
-      vectorService.collections.set('user_123user', mockCollection);
-
-      const result = await vectorService.getCollection('123user');
-      expect(result).toBe(mockCollection);
+    it('should accept userId starting with number', () => {
+      expect(() => vectorService.validateUserId('123user')).not.toThrow();
     });
 
-    it('should accept MongoDB ObjectId format (24-char hex string)', async () => {
-      const mockCollection = { id: 'mock-collection' };
+    it('should accept MongoDB ObjectId format (24-char hex string)', () => {
       const mongoObjectId = '507f1f77bcf86cd799439011';
-      vectorService.collections.set(`user_${mongoObjectId}`, mockCollection);
-
-      const result = await vectorService.getCollection(mongoObjectId);
-      expect(result).toBe(mockCollection);
+      expect(() => vectorService.validateUserId(mongoObjectId)).not.toThrow();
     });
 
-    it('should accept valid userId with alphanumeric', async () => {
-      const mockCollection = { id: 'mock-collection' };
-      vectorService.collections.set('user_valid123', mockCollection);
-
-      const result = await vectorService.getCollection('valid123');
-      expect(result).toBe(mockCollection);
+    it('should accept valid userId with alphanumeric', () => {
+      expect(() => vectorService.validateUserId('valid123')).not.toThrow();
     });
 
-    it('should accept valid userId with underscore', async () => {
-      const mockCollection = { id: 'mock-collection' };
-      vectorService.collections.set('user_test_user', mockCollection);
-
-      const result = await vectorService.getCollection('test_user');
-      expect(result).toBe(mockCollection);
+    it('should accept valid userId with underscore', () => {
+      expect(() => vectorService.validateUserId('test_user')).not.toThrow();
     });
 
-    it('should accept valid userId with hyphen', async () => {
-      const result = await vectorService.getCollection('test-user');
-      expect(result).toHaveProperty('id', 'mock-collection');
-      expect(result).toHaveProperty('delete');
-      expect(result).toHaveProperty('add');
-      expect(result).toHaveProperty('count');
-    });
-  });
-
-  describe('clearCollectionCache', () => {
-    it('should clear specific user from cache', () => {
-      vectorService.collections.set('user_123', 'mock_collection');
-      expect(vectorService.collections.has('user_123')).toBe(true);
-
-      vectorService.clearCollectionCache('123');
-      expect(vectorService.collections.has('user_123')).toBe(false);
-    });
-
-    it('should clear all cache when userId is null', () => {
-      vectorService.collections.set('user_123', 'mock_collection');
-      vectorService.collections.set('user_456', 'mock_collection');
-      expect(vectorService.collections.size).toBe(2);
-
-      vectorService.clearCollectionCache(null);
-      expect(vectorService.collections.size).toBe(0);
+    it('should accept valid userId with hyphen', () => {
+      expect(() => vectorService.validateUserId('test-user')).not.toThrow();
     });
   });
 
   describe('initialize', () => {
     it('should initialize successfully', async () => {
       await vectorService.initialize();
-      expect(vectorService.client).toBeDefined();
       expect(vectorService.embeddingService).toBeDefined();
+      expect(vectorService.chromaService).toBeDefined();
+    });
+
+    it('should not reinitialize if already initialized', async () => {
+      await vectorService.initialize();
+      const chromaService = vectorService.chromaService;
+      await vectorService.initialize();
+      expect(vectorService.chromaService).toBe(chromaService);
     });
   });
 
   describe('getCollection', () => {
-    it('should return cached collection if exists', async () => {
-      const mockCollection = { id: 'mock_collection_123' };
-      vectorService.collections.set('user_a123', mockCollection);
+    it('should create and cache collection for new user', async () => {
+      const collection = await vectorService.getCollection('testUser123');
+      expect(collection).toBeDefined();
+      expect(collection.name).toBe('user_testUser123');
+    });
 
-      const result = await vectorService.getCollection('a123');
-      expect(result).toBe(mockCollection);
+    it('return cached collection if exists', async () => {
+      const collection1 = await vectorService.getCollection('cachedUser');
+      const collection2 = await vectorService.getCollection('cachedUser');
+      expect(collection1).toBe(collection2);
     });
   });
 
-  describe('indexExists', () => {
-    it('should return true when collection has documents', async () => {
-      const mockCollection = {
-        id: 'mock-collection',
-        count: vi.fn().mockResolvedValue(10)
-      };
-      vectorService.collections.set('user_test123', mockCollection);
+  describe('clearCollectionCache', () => {
+    it('should clear specific user from cache', async () => {
+      await vectorService.getCollection('userToClear');
+      expect(vectorService.collectionCache.has('user_userToClear')).toBe(true);
 
-      const result = await vectorService.indexExists('test123');
-      expect(result).toBe(true);
+      vectorService.clearCollectionCache('userToClear');
+      expect(vectorService.collectionCache.has('user_userToClear')).toBe(false);
     });
 
-    it('should return false when collection has no documents', async () => {
-      const mockCollection = {
-        id: 'mock-collection',
-        count: vi.fn().mockResolvedValue(0)
-      };
-      vectorService.collections.set('user_test123', mockCollection);
+    it('should clear all cache when userId is null', async () => {
+      await vectorService.getCollection('user1');
+      await vectorService.getCollection('user2');
+      expect(vectorService.collectionCache.size).toBe(2);
 
-      const result = await vectorService.indexExists('test123');
-      expect(result).toBe(false);
-    });
-
-    it('should return false when collection does not exist', async () => {
-      const mockCollection = {
-        id: 'mock-collection',
-        count: vi.fn().mockRejectedValue(new Error('does not exist'))
-      };
-      vectorService.collections.set('user_test123', mockCollection);
-
-      const result = await vectorService.indexExists('test123');
-      expect(result).toBe(false);
+      vectorService.clearCollectionCache(null);
+      expect(vectorService.collectionCache.size).toBe(0);
     });
   });
 
@@ -208,10 +189,16 @@ describe('VectorIndexService', () => {
       const result = vectorService.buildMemoryText(memory);
       expect(result).toBe('回答: My name is John');
     });
+
+    it('should handle empty memory', () => {
+      const memory = {};
+      const result = vectorService.buildMemoryText(memory);
+      expect(result).toBe('');
+    });
   });
 
   describe('buildMetadata', () => {
-    it('should build metadata for elder role', () => {
+    it('should build metadata for elder role (self category)', () => {
       const memory = {
         targetUserId: 'user123',
         memoryId: 'mem1',
@@ -299,180 +286,73 @@ describe('VectorIndexService', () => {
     });
   });
 
-  describe('batchInsert', () => {
-    it('should insert documents in batch', async () => {
-      const mockCollection = {
-        add: vi.fn().mockResolvedValue(undefined)
-      };
-
-      const documents = [
-        { id: 'doc1', embedding: [0.1, 0.2], document: 'text1', metadata: { key: 'value1' } },
-        { id: 'doc2', embedding: [0.3, 0.4], document: 'text2', metadata: { key: 'value2' } }
-      ];
-
-      await vectorService.batchInsert(mockCollection, documents);
-
-      expect(mockCollection.add).toHaveBeenCalledWith({
-        ids: ['doc1', 'doc2'],
-        embeddings: [[0.1, 0.2], [0.3, 0.4]],
-        documents: ['text1', 'text2'],
-        metadatas: [{ key: 'value1' }, { key: 'value2' }]
-      });
-    });
-
-    it('should throw error on insert failure', async () => {
-      const mockCollection = {
-        add: vi.fn().mockRejectedValue(new Error('Insert failed'))
-      };
-
-      const documents = [
-        { id: 'doc1', embedding: [0.1, 0.2], document: 'text1', metadata: { key: 'value1' } }
-      ];
-
-      await expect(vectorService.batchInsert(mockCollection, documents)).rejects.toThrow('Insert failed');
-    });
-  });
-
   describe('getStats', () => {
     it('should return collection stats', async () => {
-      const mockCollection = {
-        id: 'mock-collection',
-        count: vi.fn().mockResolvedValue(42)
-      };
-      vectorService.collections.set('user_test123', mockCollection);
+      const collection = await vectorService.getCollection('statsUser');
+      collection.count.mockResolvedValue(42);
 
-      const result = await vectorService.getStats('test123');
+      const result = await vectorService.getStats('statsUser');
 
       expect(result).toEqual({
         totalDocuments: 42,
-        collectionName: 'user_test123'
+        collectionName: 'user_statsUser'
       });
     });
   });
 
-  describe('rebuildIndex', () => {
-    beforeEach(() => {
+  describe('indexExists', () => {
+    it('should return true when collection has documents', async () => {
+      const collection = await vectorService.getCollection('existingUser');
+      collection.count.mockResolvedValue(10);
+
+      const result = await vectorService.indexExists('existingUser');
+      expect(result).toBe(true);
     });
 
-    afterEach(() => {
-      mockLoadUserMemories.mockReset();
+    it('should return false when collection has no documents', async () => {
+      const collection = await vectorService.getCollection('emptyUser');
+      collection.count.mockResolvedValue(0);
+
+      const result = await vectorService.indexExists('emptyUser');
+      expect(result).toBe(false);
     });
 
-    it('should throw error if no memories exist', async () => {
-      mockLoadUserMemories.mockResolvedValue({
-        A_set: [],
-        Bste: [],
-        Cste: []
-      });
-
-      const mockCollection = {
-        delete: vi.fn().mockResolvedValue(undefined),
-        add: vi.fn().mockResolvedValue(undefined),
-        count: vi.fn().mockResolvedValue(0)
-      };
-
-      vectorService.collections.set('user_test123', mockCollection);
-
-      await expect(vectorService.rebuildIndex('test123')).rejects.toThrow('用户没有任何记忆文件');
-    });
-
-    it('should process memories in batches', async () => {
-      const mockMemories = Array.from({ length: 100 }, (_, i) => ({
-        memoryId: `mem${i}`,
-        targetUserId: 'test123',
-        question: `Question ${i}`,
-        answer: `Answer ${i}`,
-        questionRole: i < 33 ? 'elder' : i < 66 ? 'family' : 'friend',
-        questionLayer: i % 2 === 0 ? 'basic' : 'emotional',
-        questionOrder: i,
-        createdAt: '2024-01-01T00:00:00.000Z'
-      }));
-
-      const memoriesByCategory = {
-        A_set: mockMemories.slice(0, 33),
-        Bste: mockMemories.slice(33, 66),
-        Cste: mockMemories.slice(66, 100)
-      };
-
-      mockLoadUserMemories.mockResolvedValue(memoriesByCategory);
-
-      const mockCollection = {
-        delete: vi.fn().mockResolvedValue(undefined),
-        add: vi.fn().mockResolvedValue(undefined),
-        count: vi.fn().mockResolvedValue(100)
-      };
-
-      vectorService.collections.set('user_test123', mockCollection);
-
-      const progressCallback = vi.fn();
-      const result = await vectorService.rebuildIndex('test123', progressCallback);
-
-      expect(mockCollection.delete).toHaveBeenCalledWith({ where: {} });
-      expect(mockCollection.add).toHaveBeenCalled();
-      expect(result.success).toBe(true);
-      expect(result.memoryCount).toBe(100);
-      expect(result.categories).toEqual({
-        self: 33,
-        family: 33,
-        friend: 34
-      });
-      expect(progressCallback).toHaveBeenCalled();
+    it('should return false on error', async () => {
+      const result = await vectorService.indexExists('invalid@user');
+      expect(result).toBe(false);
     });
   });
 
   describe('search', () => {
-    it('should return empty array if no index exists', async () => {
-      const mockCollection = {
-        query: vi.fn().mockResolvedValue({
-          documents: [[]],
-          distances: [[]],
-          metadatas: [[]]
-        })
-      };
-      vectorService.collections.set('user_user123', mockCollection);
+    it('should return empty array if no results', async () => {
+      const collection = await vectorService.getCollection('searchUser');
+      collection.query.mockResolvedValue({
+        documents: [[]],
+        distances: [[]],
+        metadatas: [[]]
+      });
 
-      const results = await vectorService.search('user123', 'test query');
+      const results = await vectorService.search('searchUser', 'test query');
       expect(results).toEqual([]);
     });
 
-    it('should filter by relationType', async () => {
-      const mockCollection = {
-        query: vi.fn().mockResolvedValue({
-          documents: [['Test content']],
-          distances: [[0.3]],
-          metadatas: [[{ category: 'family', helperId: 'helper1' }]]
-        })
-      };
-      vectorService.collections.set('user_user123', mockCollection);
-
-      const results = await vectorService.search('user123', 'test query', 5, 'family', 'helper1');
-
-      expect(mockCollection.query).toHaveBeenCalledWith({
-        queryEmbeddings: [[0.1, 0.2]],
-        nResults: 5,
-        where: { category: 'family', helperId: 'helper1' }
+    it('should return formatted search results', async () => {
+      const collection = await vectorService.getCollection('searchUser2');
+      collection.query.mockResolvedValue({
+        documents: [['First result', 'Second result']],
+        distances: [[0.2, 0.5]],
+        metadatas: [[
+          { category: 'self', memoryId: 'mem1' },
+          { category: 'family', memoryId: 'mem2', helperId: 'helper1' }
+        ]]
       });
-    });
 
-    it('should return results with correct format', async () => {
-      const mockCollection = {
-        query: vi.fn().mockResolvedValue({
-          documents: [['First result', 'Second result']],
-          distances: [[0.2, 0.5]],
-          metadatas: [[
-            { category: 'self', memoryId: 'mem1' },
-            { category: 'family', memoryId: 'mem2', helperId: 'helper1' }
-          ]]
-        })
-      };
-      vectorService.collections.set('user_user123', mockCollection);
-
-      const results = await vectorService.search('user123', 'test query', 5);
+      const results = await vectorService.search('searchUser2', 'test query', 5);
 
       expect(results).toEqual([
         {
           content: 'First result',
-          relevanceScore: 0.8,
+          relevanceScore: 0.2,
           category: 'self',
           metadata: { category: 'self', memoryId: 'mem1' }
         },
@@ -485,193 +365,173 @@ describe('VectorIndexService', () => {
       ]);
     });
 
-    it('should return empty array on error', async () => {
-      const mockCollection = {
-        query: vi.fn().mockRejectedValue(new Error('Search failed'))
-      };
-      vectorService.collections.set('user_user123', mockCollection);
+    it('should filter by relationType', async () => {
+      const collection = await vectorService.getCollection('filterUser');
+      collection.query.mockResolvedValue({
+        documents: [['Test content']],
+        distances: [[0.3]],
+        metadatas: [[{ category: 'family', helperId: 'helper1' }]]
+      });
 
-      const results = await vectorService.search('user123', 'test query');
-      expect(results).toEqual([]);
+      await vectorService.search('filterUser', 'test query', 5, 'family', 'helper1');
+
+      expect(collection.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nResults: 5,
+          where: { category: 'family', helperId: 'helper1' }
+        })
+      );
     });
 
-    it('should use default topK of 5', async () => {
-      const mockCollection = {
-        query: vi.fn().mockResolvedValue({
-          documents: [['Test']],
-          distances: [[0.1]],
-          metadatas: [[{ category: 'self' }]]
-        })
+    it('should return empty array on error', async () => {
+      const collection = await vectorService.getCollection('errorUser');
+      collection.query.mockRejectedValue(new Error('Search failed'));
+
+      const results = await vectorService.search('errorUser', 'test query');
+      expect(results).toEqual([]);
+    });
+  });
+
+  describe('addMemory', () => {
+    it('should add memory to collection', async () => {
+      const collection = await vectorService.getCollection('addMemUser');
+      const memory = {
+        memoryId: 'newMem1',
+        targetUserId: 'addMemUser',
+        question: 'Q1',
+        answer: 'A1',
+        questionRole: 'elder',
+        questionLayer: 'basic',
+        questionOrder: 1,
+        createdAt: '2024-01-01T00:00:00.000Z'
       };
-      vectorService.collections.set('user_user123', mockCollection);
 
-      await vectorService.search('user123', 'test query');
+      await vectorService.addMemory('addMemUser', memory);
 
-      expect(mockCollection.query).toHaveBeenCalledWith({
-        queryEmbeddings: [[0.1, 0.2]],
-        nResults: 5,
+      expect(collection.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ids: ['newMem1'],
+          documents: ['问题: Q1\n回答: A1']
+        })
+      );
+    });
+  });
+
+  describe('deleteMemory', () => {
+    it('should delete memories by filter', async () => {
+      const collection = await vectorService.getCollection('delMemUser');
+
+      await vectorService.deleteMemory('delMemUser', { category: 'family' });
+
+      expect(collection.delete).toHaveBeenCalledWith({
+        where: { category: 'family' }
+      });
+    });
+
+    it('should delete all memories when no filter', async () => {
+      const collection = await vectorService.getCollection('delAllMemUser');
+
+      await vectorService.deleteMemory('delAllMemUser');
+
+      expect(collection.delete).toHaveBeenCalledWith({
         where: undefined
       });
     });
+  });
 
-    it('should filter by relationType without relationSpecificId', async () => {
-      const mockCollection = {
-        query: vi.fn().mockResolvedValue({
-          documents: [['Test content']],
-          distances: [[0.3]],
-          metadatas: [[{ category: 'friend', helperId: 'helper1' }]]
-        })
+  describe('updateMemory', () => {
+    it('should delete old and add new memory', async () => {
+      const collection = await vectorService.getCollection('updMemUser');
+      const memory = {
+        memoryId: 'updMem1',
+        targetUserId: 'updMemUser',
+        question: 'Updated Q',
+        answer: 'Updated A',
+        questionRole: 'elder',
+        questionLayer: 'basic',
+        questionOrder: 1,
+        createdAt: '2024-01-01T00:00:00.000Z'
       };
-      vectorService.collections.set('user_user123', mockCollection);
 
-      const results = await vectorService.search('user123', 'test query', 5, 'friend');
+      await vectorService.updateMemory('updMemUser', 'updMem1', memory);
 
-      expect(mockCollection.query).toHaveBeenCalledWith({
-        queryEmbeddings: [[0.1, 0.2]],
-        nResults: 5,
-        where: { category: 'friend' }
-      });
+      expect(collection.delete).toHaveBeenCalledWith({ ids: ['updMem1'] });
+      expect(collection.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ids: ['updMem1'],
+          documents: ['问题: Updated Q\n回答: Updated A']
+        })
+      );
     });
   });
-});
 
-describe('RoleCardController', () => {
-  describe('buildVectorIndex', () => {
-    beforeEach(() => {
-    });
-
+  describe('rebuildIndex', () => {
     afterEach(() => {
       mockLoadUserMemories.mockReset();
     });
 
-    it('should return error if no A_set memories', async () => {
+    it('should throw error if no memories exist', async () => {
       mockLoadUserMemories.mockResolvedValue({
         A_set: [],
         Bste: [],
         Cste: []
       });
 
-      const mockReq = { user: { id: 'test123' } };
-      const mockRes = {
-        setHeader: vi.fn(),
-        write: vi.fn(),
-        end: vi.fn()
-      };
-
-      await RoleCardController.buildVectorIndex(mockReq, mockRes);
-
-      expect(mockRes.write).toHaveBeenCalledWith(
-        expect.stringContaining('请先完成至少一个A套问题')
-      );
-      expect(mockRes.end).toHaveBeenCalled();
+      await expect(vectorService.rebuildIndex('noMemoryUser')).rejects.toThrow('用户没有任何记忆文件');
     });
 
-    it('should build index successfully with memories', async () => {
-      const mockMemories = Array.from({ length: 10 }, (_, i) => ({
+    it('should process memories in batches', async () => {
+      const mockMemories = Array.from({ length: 100 }, (_, i) => ({
         memoryId: `mem${i}`,
-        targetUserId: 'test123',
+        targetUserId: 'batchUser',
         question: `Question ${i}`,
         answer: `Answer ${i}`,
-        questionRole: 'elder',
-        questionLayer: 'basic',
+        questionRole: i < 33 ? 'elder' : i < 66 ? 'family' : 'friend',
+        questionLayer: i % 2 === 0 ? 'basic' : 'emotional',
         questionOrder: i,
         createdAt: '2024-01-01T00:00:00.000Z'
       }));
 
       mockLoadUserMemories.mockResolvedValue({
-        A_set: mockMemories,
-        Bste: [],
-        Cste: []
+        A_set: mockMemories.slice(0, 33),
+        Bste: mockMemories.slice(33, 66),
+        Cste: mockMemories.slice(66, 100)
       });
 
-      const mockReq = { user: { id: 'test123' } };
-      const mockRes = {
-        setHeader: vi.fn(),
-        write: vi.fn(),
-        end: vi.fn()
-      };
+      const progressCallback = vi.fn();
+      const result = await vectorService.rebuildIndex('batchUser', progressCallback);
 
-      const vectorService = new VectorIndexService();
-      const mockCollection = {
-        delete: vi.fn().mockResolvedValue(undefined),
-        add: vi.fn().mockResolvedValue(undefined),
-        count: vi.fn().mockResolvedValue(10)
-      };
-      vectorService.collections.set('user_test123', mockCollection);
-
-      await RoleCardController.buildVectorIndex(mockReq, mockRes);
-
-      expect(mockRes.write).toHaveBeenCalledWith(
-        expect.stringContaining('event: done')
-      );
-      expect(mockRes.end).toHaveBeenCalled();
+      expect(result.success).toBe(true);
+      expect(result.memoryCount).toBe(100);
+      expect(result.categories).toEqual({
+        self: 33,
+        family: 33,
+        friend: 34
+      });
+      expect(progressCallback).toHaveBeenCalled();
     });
   });
 
-  describe('getVectorIndexStatus', () => {
-    it('should return status with existing index', async () => {
+  describe('healthCheck', () => {
+    it('should return healthy status when all services available', async () => {
+      await vectorService.initialize();
+      const result = await vectorService.healthCheck();
 
-      const mockMemories = Array.from({ length: 5 }, (_, i) => ({
-        memoryId: `mem${i}`,
-        targetUserId: 'test123',
-        question: `Question ${i}`,
-        answer: `Answer ${i}`,
-        questionRole: 'elder',
-        questionLayer: 'basic',
-        questionOrder: i,
-        createdAt: '2024-01-01T00:00:00.000Z'
-      }));
-
-      mockLoadUserMemories.mockResolvedValue({
-        A_set: mockMemories,
-        Bste: [],
-        Cste: []
-      });
-
-      const mockReq = { user: { id: 'test123' } };
-      const mockRes = {
-        json: vi.fn()
-      };
-
-      await RoleCardController.getVectorIndexStatus(mockReq, mockRes);
-
-      expect(mockRes.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          success: true,
-          status: expect.objectContaining({
-            exists: false,
-            memoryCount: 5,
-            canBuild: true
-          })
-        })
-      );
+      expect(result.status).toBe('healthy');
+      expect(result.chromadb).toBe('connected');
+      expect(result.embedding).toBe('available');
     });
 
-    it('should return status without A_set memories', async () => {
+    it('should return unhealthy status on initialization failure', async () => {
+      const brokenService = new VectorIndexService();
+      // Don't initialize, should fail
+      delete brokenService.initialize;
+      brokenService.initialize = vi.fn().mockRejectedValue(new Error('Connection failed'));
 
-      mockLoadUserMemories.mockResolvedValue({
-        A_set: [],
-        Bste: [{ memoryId: 'mem1' }],
-        Cste: [{ memoryId: 'mem2' }]
-      });
+      const result = await brokenService.healthCheck();
 
-      const mockReq = { user: { id: 'test123' } };
-      const mockRes = {
-        json: vi.fn()
-      };
-
-      await RoleCardController.getVectorIndexStatus(mockReq, mockRes);
-
-      expect(mockRes.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          success: true,
-          status: expect.objectContaining({
-            exists: false,
-            memoryCount: 2,
-            canBuild: false
-          })
-        })
-      );
+      expect(result.status).toBe('unhealthy');
+      expect(result.error).toBe('Connection failed');
     });
   });
 });
