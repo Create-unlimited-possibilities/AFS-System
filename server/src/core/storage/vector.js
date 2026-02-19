@@ -206,12 +206,35 @@ class VectorIndexService {
 
   /**
    * Build searchable text from memory object
+   * Supports both conversation memories and questionnaire memories
    * @param {Object} memory - Memory object
    * @returns {string} Searchable text
    */
   buildMemoryText(memory) {
     const parts = [];
 
+    // Conversation memory format
+    if (memory.content) {
+      // Use compressed > core > processed.summary > raw
+      if (memory.content.compressed) {
+        parts.push(memory.content.compressed);
+      } else if (memory.content.core) {
+        parts.push(memory.content.core);
+      } else if (memory.content.processed?.summary) {
+        parts.push(`摘要：${memory.content.processed.summary}`);
+        if (memory.content.processed.keyTopics) {
+          parts.push(`话题：${memory.content.processed.keyTopics.join('、')}`);
+        }
+        if (memory.content.processed.facts) {
+          parts.push(`事实：${memory.content.processed.facts.join('；')}`);
+        }
+      } else if (memory.content.raw) {
+        parts.push(memory.content.raw);
+      }
+      return parts.join('\n');
+    }
+
+    // Questionnaire format (existing)
     if (memory.question) {
       parts.push(`问题: ${memory.question}`);
     }
@@ -225,10 +248,44 @@ class VectorIndexService {
 
   /**
    * Build metadata from memory object
+   * Supports both conversation memories and questionnaire memories
    * @param {Object} memory - Memory object
    * @returns {Object} Metadata object
    */
   buildMetadata(memory) {
+    // Conversation memory format
+    if (memory.meta?.participants) {
+      const metadata = {
+        userId: memory.userId,
+        memoryId: memory.memoryId,
+        source: 'conversation',
+        participants: JSON.stringify(memory.meta.participants),
+        compressionStage: memory.meta.compressionStage || 'raw',
+        createdAt: memory.meta.createdAt,
+        category: this.inferCategory(memory),
+        tags: JSON.stringify(memory.tags || [])
+      };
+
+      // Add helper ID if available
+      const helperId = this.extractHelperId(memory);
+      if (helperId) {
+        metadata.helperId = helperId;
+      }
+
+      // Add message count if available
+      if (memory.meta.messageCount !== undefined) {
+        metadata.messageCount = memory.meta.messageCount;
+      }
+
+      // Add compression timestamp if available
+      if (memory.meta.compressedAt) {
+        metadata.compressedAt = memory.meta.compressedAt;
+      }
+
+      return metadata;
+    }
+
+    // Questionnaire format (existing)
     const metadata = {
       userId: memory.targetUserId,
       memoryId: memory.memoryId,
@@ -261,6 +318,56 @@ class VectorIndexService {
     }
 
     return metadata;
+  }
+
+  /**
+   * Infer category from participant roles in conversation memory
+   * @param {Object} memory - Memory object with participants
+   * @returns {string} Category (self, family, friend, unknown)
+   */
+  inferCategory(memory) {
+    if (!memory.meta?.participantRoles) {
+      return 'unknown';
+    }
+
+    const roles = memory.meta.participantRoles;
+    const userId = memory.userId;
+
+    // Find the other participant's role
+    for (const [participantId, role] of Object.entries(roles)) {
+      if (participantId !== userId) {
+        // Map role to category
+        if (role === 'family' || role === 'family_member') {
+          return 'family';
+        } else if (role === 'friend') {
+          return 'friend';
+        } else if (role === 'roleCard' || role === 'self') {
+          return 'self';
+        }
+      }
+    }
+
+    return 'unknown';
+  }
+
+  /**
+   * Extract helper ID from participants (the non-user participant)
+   * @param {Object} memory - Memory object with participants
+   * @returns {string|null} Helper ID or null
+   */
+  extractHelperId(memory) {
+    if (!memory.meta?.participants || !memory.userId) {
+      return null;
+    }
+
+    // Find the participant that is not the user
+    for (const participantId of memory.meta.participants) {
+      if (String(participantId) !== String(memory.userId)) {
+        return participantId;
+      }
+    }
+
+    return null;
   }
 
   /**
