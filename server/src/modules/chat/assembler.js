@@ -9,7 +9,8 @@
 import User from '../user/model.js';
 import ChatSession from './model.js';
 import DualStorage from '../../core/storage/dual.js';
-import { PromptAssembler, DynamicDataFetcher, CalibrationLayerManager } from '../rolecard/v2/index.js';
+import { PromptAssembler, DynamicDataFetcher } from '../rolecard/v2/index.js';
+import CalibrationLayerManager from '../rolecard/v2/calibrationLayer.js'; // 导入默认实例
 import SentimentManager from '../sentiment/manager.js';
 import logger from '../../core/utils/logger.js';
 
@@ -23,7 +24,7 @@ class RoleCardAssemblerV2 {
     this.promptAssembler = new PromptAssembler();
     this.dataFetcher = new DynamicDataFetcher();
     this.sentimentManager = new SentimentManager();
-    this.calibrationManager = CalibrationLayerManager;
+    this.calibrationManager = CalibrationLayerManager; // 已是实例，无需 new
   }
 
   /**

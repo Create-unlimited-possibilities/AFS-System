@@ -1,0 +1,127 @@
+{
+  "version": "1.0.0",
+  "updatedAt": "2026-02-17T00:00:00Z",
+  "description": "全局安全护栏规则配置",
+
+  "trustLevelDefinitions": {
+    "tier1_intimate": {
+      "name": "最亲密",
+      "description": "可以分享所有私密信息，包括财务、健康、情感秘密",
+      "characteristics": ["深度情感连接", "长期信任历史", "相互依赖"]
+    },
+    "tier2_close": {
+      "name": "亲近",
+      "description": "可以分享大部分个人事务，但某些极度私密话题会保留",
+      "characteristics": ["较强的情感连接", "经常交流", "相互支持"]
+    },
+    "tier3_familiar": {
+      "name": "一般熟悉",
+      "description": "有限度的信息分享，主要是日常话题",
+      "characteristics": ["有互动但不深入", "了解表面信息"]
+    },
+    "tier4_acquaintance": {
+      "name": "疏远/陌生人",
+      "description": "仅分享基本公共信息",
+      "characteristics": ["互动很少或不了解", "没有深入交流"]
+    }
+  },
+
+  "rules": [
+    {
+      "id": "rule_hard_001",
+      "type": "hard",
+      "topic": {
+        "category": "intimate_relations",
+        "keywords": ["性生活", "夫妻亲密", "床第", "性关系", "性事"],
+        "description": "夫妻/伴侣间的私密关系细节"
+      },
+      "allowedAudience": {
+        "trustLevels": ["tier1_intimate"]
+      },
+      "action": {
+        "type": "block",
+        "redirectHint": "转移到家庭日常话题"
+      },
+      "priority": 100,
+      "enabled": true
+    },
+    {
+      "id": "rule_hard_002",
+      "type": "hard",
+      "topic": {
+        "category": "financial_secrets",
+        "keywords": ["存款数额", "具体收入", "债务金额", "财产分配", "银行密码", "存折密码"],
+        "description": "具体的财务数字和财产细节"
+      },
+      "allowedAudience": {
+        "trustLevels": ["tier1_intimate"]
+      },
+      "action": {
+        "type": "vague_response",
+        "vagueTemplate": "关于钱的事，家里有安排的"
+      },
+      "priority": 90,
+      "enabled": true
+    },
+    {
+      "id": "rule_hard_003",
+      "type": "hard",
+      "topic": {
+        "category": "family_disputes",
+        "keywords": ["吵架", "矛盾", "不和", "闹翻", "关系不好", "争执"],
+        "description": "家庭内部的矛盾和冲突"
+      },
+      "allowedAudience": {
+        "trustLevels": ["tier1_intimate", "tier2_close"]
+      },
+      "action": {
+        "type": "redirect",
+        "redirectHint": "转移到积极的家庭话题"
+      },
+      "priority": 80,
+      "enabled": true
+    },
+    {
+      "id": "rule_soft_001",
+      "type": "soft",
+      "topic": {
+        "category": "health_concerns",
+        "keywords": ["病情", "生病", "身体问题", "疾病", "体检结果"],
+        "description": "健康和医疗相关话题"
+      },
+      "allowedAudience": {
+        "trustLevels": ["tier1_intimate", "tier2_close", "tier3_familiar"]
+      },
+      "action": {
+        "type": "vague_response",
+        "vagueTemplate": "年纪大了，小毛病是难免的"
+      },
+      "priority": 50,
+      "enabled": true
+    },
+    {
+      "id": "rule_soft_002",
+      "type": "soft",
+      "topic": {
+        "category": "past_failures",
+        "keywords": ["失败", "挫折", "不如意", "跌倒", "倒霉"],
+        "description": "过去的失败经历"
+      },
+      "allowedAudience": {
+        "trustLevels": ["tier1_intimate", "tier2_close"]
+      },
+      "action": {
+        "type": "vague_response",
+        "vagueTemplate": "人生总有起起落落，都过去了"
+      },
+      "priority": 40,
+      "enabled": true
+    }
+  ],
+
+  "groupSettings": {
+    "autoStrictMode": true,
+    "defaultDisclosureLevel": "lowest_common",
+    "conflictResolution": "block_content"
+  }
+}

@@ -1,16 +1,16 @@
 /**
  * 对话状态类
  * 用于LangGraph的对话流程管理
- * 
+ *
  * @author AFS Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 
 class ConversationState {
   constructor(initialData = {}) {
     this.userId = initialData.userId || '';
     this.userName = initialData.userName || '';
-    
+
     this.interlocutor = initialData.interlocutor || {
       id: '',
       relationType: 'stranger',
@@ -18,24 +18,23 @@ class ConversationState {
       nickname: '',
       sentimentScore: 50
     };
-    
+
     this.messages = initialData.messages || [];
-    
+
     this.retrievedMemories = initialData.retrievedMemories || [];
-    
+
     this.roleCard = initialData.roleCard || {
       personality: '',
       background: '',
       interests: [],
       communicationStyle: ''
     };
-    
+
     this.systemPrompt = initialData.systemPrompt || '';
-    this.roleCardMode = initialData.roleCardMode || 'dynamic';
-    
+
     this.currentInput = initialData.currentInput || '';
     this.generatedResponse = initialData.generatedResponse || '';
-    
+
     this.metadata = initialData.metadata || {};
     this.errors = initialData.errors || [];
   }
@@ -54,7 +53,6 @@ class ConversationState {
       retrievedMemories: this.retrievedMemories,
       roleCard: this.roleCard,
       systemPrompt: this.systemPrompt,
-      roleCardMode: this.roleCardMode,
       currentInput: this.currentInput,
       generatedResponse: this.generatedResponse,
       metadata: this.metadata,

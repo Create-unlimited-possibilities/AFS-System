@@ -38,16 +38,6 @@ const chatSessionSchema = new mongoose.Schema({
   },
   specificRelation: String,
 
-  // 角色卡模式：dynamic | static
-  roleCardMode: {
-    type: String,
-    enum: ['dynamic', 'static'],
-    default: 'dynamic'
-  },
-
-  // 静态角色卡（仅static模式）
-  systemPrompt: String,
-
   // 陌生人好感度
   sentimentScore: {
     type: Number,
@@ -107,6 +97,5 @@ const chatSessionSchema = new mongoose.Schema({
 // 复合索引
 chatSessionSchema.index({ targetUserId: 1, interlocutorUserId: 1, isActive: 1 });
 chatSessionSchema.index({ sessionId: 1, isActive: 1 });
-chatSessionSchema.index({ targetUserId: 1, roleCardMode: 1, isActive: 1 });
 
 export default mongoose.model('ChatSession', chatSessionSchema);

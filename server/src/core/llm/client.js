@@ -1,13 +1,16 @@
 /**
  * LLM 客户端工具
  * 统一的 LLM 调用接口，支持多种模型和错误处理
- * 
+ *
  * @author AFS Team
  * @version 1.0.0
  */
 
 import { ChatOllama } from '@langchain/ollama';
 import { BaseLanguageModel } from '@langchain/core/language_models/base';
+
+// 默认模型从环境变量读取
+const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'deepseek-r1:14b';
 
 /**
  * LLM 客户端类
@@ -16,16 +19,16 @@ import { BaseLanguageModel } from '@langchain/core/language_models/base';
 class LLMClient {
   /**
    * 构造函数
-   * @param {string} model - 模型名称，默认使用 qwen2.5
+   * @param {string} model - 模型名称，默认使用环境变量配置
    * @param {Object} options - 配置选项
    */
-  constructor(model = 'qwen2.5', options = {}) {
+  constructor(model = DEFAULT_MODEL, options = {}) {
     this.model = model;
     this.baseUrl = options.baseUrl || process.env.OLLAMA_BASE_URL || 'http://modelserver:11434';
     this.maxRetries = options.maxRetries || 3;
     this.timeout = options.timeout || 30000;
-    this.temperature = options.temperature || 0.7;
-    
+    this.temperature = options.temperature ?? (parseFloat(process.env.LLM_TEMPERATURE) || 0.7);
+
     // 初始化 ChatOllama 实例
     this.llm = new ChatOllama({
       model,
@@ -160,10 +163,10 @@ class LLMClient {
 
 /**
  * 创建默认 LLM 客户端实例
- * 使用系统默认配置
+ * 使用系统默认配置（从环境变量读取模型）
  */
 export const createDefaultLLMClient = () => {
-  return new LLMClient('qwen2.5', {
+  return new LLMClient(DEFAULT_MODEL, {
     temperature: 0.7,
     maxRetries: 3,
     timeout: 30000
@@ -175,7 +178,7 @@ export const createDefaultLLMClient = () => {
  * 使用适合情感分析的配置
  */
 export const createSentimentLLMClient = () => {
-  return new LLMClient('qwen2.5', {
+  return new LLMClient(DEFAULT_MODEL, {
     temperature: 0.1, // 低温度确保输出稳定
     maxRetries: 3,
     timeout: 10000

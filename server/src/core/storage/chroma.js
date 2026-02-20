@@ -1,76 +1,92 @@
 /**
  * ChromaDB Client Service
- * Wrapper for ChromaDB operations
+ * 直接使用 ChromaDB v2 API（不依赖 chromadb npm 包）
  *
  * @author AFS Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 
-import { ChromaClient } from 'chromadb';
 import logger from '../utils/logger.js';
+
+const CHROMA_TENANT = 'default_tenant';
+const CHROMA_DATABASE = 'default_database';
 
 class ChromaDBService {
   constructor() {
-    this.client = null;
-    this.url = process.env.CHROMA_URL || 'http://localhost:8000';
+    this.baseUrl = process.env.CHROMA_URL || 'http://localhost:8000';
+    this.apiBase = `${this.baseUrl}/api/v2/tenants/${CHROMA_TENANT}/databases/${CHROMA_DATABASE}`;
   }
 
   /**
-   * Initialize ChromaDB client
+   * Make HTTP request to ChromaDB v2 API
+   */
+  async request(endpoint, options = {}) {
+    const url = `${this.apiBase}${endpoint}`;
+    const response = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`ChromaDB API error: ${response.status} - ${text}`);
+    }
+
+    if (response.status === 204) return null;
+    return response.json();
+  }
+
+  /**
+   * Initialize - test connection
    */
   async initialize() {
-    if (this.client) return;
-
     try {
-      this.client = new ChromaClient({
-        path: this.url
-      });
-
-      // Test connection
-      await this.client.heartbeat();
-      logger.info(`[ChromaDBService] Connected to ChromaDB at ${this.url}`);
+      const collections = await this.listCollections();
+      logger.info(`[ChromaDBService] Connected to ChromaDB at ${this.baseUrl}, found ${collections.length} collections`);
     } catch (error) {
-      logger.error('[ChromaDBService] Failed to connect:', error);
+      logger.error('[ChromaDBService] Failed to connect:', error.message);
       throw error;
     }
   }
 
   /**
    * Get or create collection
-   * @param {string} name - Collection name
-   * @param {Object} metadata - Collection metadata
-   * @returns {Promise<Object>} Collection
    */
   async getCollection(name, metadata = {}) {
-    await this.initialize();
+    // Try to get existing collection
+    const collections = await this.listCollections();
+    const existing = collections.find(c => c.name === name);
 
-    try {
-      // Try to get existing collection
-      const collection = await this.client.getCollection({ name });
-      return collection;
-    } catch (error) {
-      // Collection doesn't exist, create it
-      logger.info(`[ChromaDBService] Creating collection: ${name}`);
-      const collection = await this.client.createCollection({
-        name,
-        metadata: {
-          description: `Memory collection for ${name}`,
-          ...metadata
-        }
-      });
-      return collection;
+    if (existing) {
+      return new ChromaCollection(this.apiBase, existing.id, existing.name);
     }
+
+    // Create new collection
+    logger.info(`[ChromaDBService] Creating collection: ${name}`);
+    const result = await this.request('/collections', {
+      method: 'POST',
+      body: JSON.stringify({ name, metadata: { description: `Memory collection for ${name}`, ...metadata } })
+    });
+
+    return new ChromaCollection(this.apiBase, result.id, result.name);
   }
 
   /**
    * Delete collection
-   * @param {string} name - Collection name
    */
   async deleteCollection(name) {
-    await this.initialize();
-
     try {
-      await this.client.deleteCollection({ name });
+      // First find the collection to get its UUID
+      const collections = await this.listCollections();
+      const collection = collections.find(c => c.name === name);
+
+      if (!collection) {
+        logger.warn(`[ChromaDBService] Collection not found: ${name}`);
+        return;
+      }
+
+      // Delete using UUID
+      await this.request(`/collections/${collection.id}`, { method: 'DELETE' });
       logger.info(`[ChromaDBService] Deleted collection: ${name}`);
     } catch (error) {
       logger.warn(`[ChromaDBService] Failed to delete collection ${name}:`, error.message);
@@ -79,26 +95,102 @@ class ChromaDBService {
 
   /**
    * List all collections
-   * @returns {Promise<Array>} Collection names
    */
   async listCollections() {
-    await this.initialize();
-    const collections = await this.client.listCollections();
-    return collections.map(c => c.name);
+    return this.request('/collections');
   }
 
   /**
    * Health check
-   * @returns {Promise<boolean>}
    */
   async healthCheck() {
     try {
-      await this.initialize();
-      await this.client.heartbeat();
+      await this.listCollections();
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
+  }
+}
+
+/**
+ * ChromaDB Collection wrapper
+ */
+class ChromaCollection {
+  constructor(apiBase, id, name) {
+    this.apiBase = apiBase;
+    this.id = id;
+    this.name = name;
+  }
+
+  /**
+   * Convert memoryId to valid UUID for ChromaDB v2
+   * Strips non-UUID prefix (e.g., "mem_" from "mem_xxx-xxx-xxx")
+   */
+  toValidUUID(id) {
+    // If already a valid UUID, return as-is
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(id)) return id;
+
+    // Strip prefix until we get to the UUID part
+    const uuidMatch = id.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    if (uuidMatch) return uuidMatch[0];
+
+    // Fallback: return as-is (will fail, but gives clear error)
+    return id;
+  }
+
+  async request(endpoint, options = {}) {
+    // ChromaDB v2 API requires collection UUID, not name
+    const url = `${this.apiBase}/collections/${this.id}${endpoint}`;
+    const response = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`ChromaDB API error: ${response.status} - ${text}`);
+    }
+
+    if (response.status === 204) return null;
+    return response.json();
+  }
+
+  async add({ ids, embeddings, documents, metadatas }) {
+    // ChromaDB v2 requires valid UUIDs - convert memoryIds
+    const validIds = ids.map(id => this.toValidUUID(id));
+
+    return this.request('/add', {
+      method: 'POST',
+      body: JSON.stringify({ ids: validIds, embeddings, documents, metadatas })
+    });
+  }
+
+  async query({ queryEmbeddings, nResults = 10, where }) {
+    return this.request('/query', {
+      method: 'POST',
+      body: JSON.stringify({ query_embeddings: queryEmbeddings, n_results: nResults, where })
+    });
+  }
+
+  async get({ ids, where, limit }) {
+    const body = {};
+    if (ids) body.ids = ids.map(id => this.toValidUUID(id));
+    if (where) body.where = where;
+    if (limit) body.limit = limit;
+    return this.request('/get', { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  async delete({ ids, where }) {
+    const body = {};
+    if (ids) body.ids = ids.map(id => this.toValidUUID(id));
+    if (where) body.where = where;
+    return this.request('/delete', { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  async count() {
+    return this.request('/count');
   }
 }
 

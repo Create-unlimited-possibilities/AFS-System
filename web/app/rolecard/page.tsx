@@ -206,8 +206,9 @@ export default function RolecardPage() {
   const fetchVectorIndexStatus = async () => {
     try {
       const res = await api.get<VectorIndexStatusResponse>('/rolecard/vector-index/status')
-      if (res.success && res.data?.status) {
-        setVectorIndexStatus(res.data.status)
+      // 后端直接返回 { success: true, status: {...} }，不在 data 里
+      if (res.success && (res as any).status) {
+        setVectorIndexStatus((res as any).status)
       }
     } catch (error) {
       console.error('[RolecardPage] 获取向量索引状态失败:', error)

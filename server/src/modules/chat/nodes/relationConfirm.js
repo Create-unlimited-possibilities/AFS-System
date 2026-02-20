@@ -1,9 +1,9 @@
 /**
  * 关系确认节点
  * 确认对话者关系（家人/朋友/陌生人）
- * 
+ *
  * @author AFS Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 
 import User from '../../user/model.js';
@@ -50,11 +50,6 @@ export async function relationConfirmNode(state) {
       logger.info(`[RelationConfirm] 找到协助关系 - 类型: ${relationType}, 具体关系: ${specificRelation}`);
     } else {
       logger.info('[RelationConfirm] 未找到协助关系，确认为陌生人');
-    }
-
-    // 方法B验证：必须是family或friend
-    if (state.roleCardMode === 'static' && (!assistRelation || (relationType === 'stranger'))) {
-      throw new Error('方法B模式仅支持协助者关系，当前为陌生人或未建立协助关系');
     }
 
     state.interlocutor.relationType = relationType;

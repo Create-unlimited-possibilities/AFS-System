@@ -1,7 +1,10 @@
 /**
- * 角色卡存储管理器
- * 管理方法B生成的角色卡文件（仅本地文件系统，不同步到MongoDB）
- * 
+ * 角色卡存储管理器（旧版，保留向后兼容）
+ * 管理 rolecard_v*.json 文件
+ *
+ * 注意：V2 系统使用 DualStorage (dual.js) 管理 rolecard-v2.json
+ * 此文件保留用于读取旧版角色卡或迁移用途
+ *
  * @author AFS Team
  * @version 1.0.0
  */
@@ -16,7 +19,8 @@ const ROLECARDS_DIR = isDocker
   : path.join(process.cwd(), 'server', 'storage', 'rolecards');
 
 /**
- * 角色卡存储类
+ * 角色卡存储类（旧版）
+ * @deprecated 请使用 DualStorage 处理 V2 角色卡
  */
 class RolecardStorage {
   constructor() {
@@ -24,7 +28,7 @@ class RolecardStorage {
   }
 
   /**
-   * 保存角色卡（方法B）
+   * 保存角色卡
    * @param {string} userId - 用户ID
    * @param {string} systemPrompt - 完整的system prompt（markdown格式）
    * @param {Object} metadata - 元数据
@@ -82,7 +86,7 @@ class RolecardStorage {
 
       const rolecard = await fs.readJson(latestPath);
       logger.info(`[RolecardStorage] 加载最新角色卡成功 - User: ${userId}, Version: ${rolecard.version}`);
-      
+
       return rolecard;
     } catch (error) {
       logger.error('[RolecardStorage] 获取最新角色卡失败:', error);
@@ -165,7 +169,7 @@ class RolecardStorage {
       const latestPath = path.join(userDir, 'rolecard_latest.json');
 
       await fs.copy(sourcePath, latestPath, { overwrite: true });
-      
+
       logger.debug(`[RolecardStorage] 更新latest副本成功 - User: ${userId}`);
     } catch (error) {
       logger.error('[RolecardStorage] 更新latest副本失败:', error);
