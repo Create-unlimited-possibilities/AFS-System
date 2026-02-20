@@ -42,7 +42,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex bg-gray-100" style={{ height: 'calc(100vh - 140px)' }}>
+    <div className="flex bg-gray-100 h-[calc(100dvh-140px)] md:h-[calc(100vh-140px)]">
       {/* 左侧导航栏 */}
       {showUserList && <Sidebar />}
 

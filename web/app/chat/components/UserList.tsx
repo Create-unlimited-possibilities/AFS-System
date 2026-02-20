@@ -31,7 +31,7 @@ export function UserList({
   onAddFriend
 }: UserListProps) {
   return (
-    <div className="w-80 bg-white border-r border-gray-200 flex flex-col shrink-0">
+    <div className="w-80 md:w-80 flex-1 md:flex-none bg-white border-r border-gray-200 flex flex-col shrink-0">
       {/* Header */}
       <div className="p-4 border-b border-gray-200 flex justify-between items-center">
         <h2 className="text-lg font-bold text-gray-900">聊天</h2>

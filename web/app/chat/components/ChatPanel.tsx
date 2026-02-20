@@ -56,7 +56,7 @@ export function ChatPanel({
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-50">
+    <div className="flex-1 w-full md:w-auto flex flex-col bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center shrink-0">
         {isMobile && onBack && (
