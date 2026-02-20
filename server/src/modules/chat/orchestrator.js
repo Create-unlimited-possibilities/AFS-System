@@ -1,9 +1,9 @@
 /**
  * LangGraph编排器
  * 管理对话流程的LangGraph实现
- * 
+ *
  * @author AFS Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 
 import ConversationState from './state/ConversationState.js';
@@ -23,7 +23,6 @@ import ChatSession from './model.js';
 import User from '../user/model.js';
 import AssistRelation from '../assist/model.js';
 import logger from '../../core/utils/logger.js';
-import RolecardStorage from '../../core/storage/rolecard.js';
 
 class ChatGraphOrchestrator {
   constructor() {
@@ -57,16 +56,10 @@ class ChatGraphOrchestrator {
       const {
         targetUserId,
         interlocutorUserId,
-        targetUniqueCode,
-        roleCardMode = 'dynamic',
-        systemPrompt: providedSystemPrompt
+        targetUniqueCode
       } = options;
 
       logger.info(`[ChatGraphOrchestrator] 创建会话 - Target: ${targetUserId}, Interlocutor: ${interlocutorUserId}`);
-
-      if (!['dynamic', 'static'].includes(roleCardMode)) {
-        throw new Error('roleCardMode必须是dynamic或static');
-      }
 
       const targetUser = await User.findById(targetUserId);
       const interlocutorUser = await User.findById(interlocutorUserId);
@@ -75,29 +68,61 @@ class ChatGraphOrchestrator {
         throw new Error('用户不存在');
       }
 
-      const sessionId = this.generateSessionId();
+      // 查找或创建模式：检查是否已存在该用户对的活跃会话
+      const existingSession = await ChatSession.findOne({
+        targetUserId,
+        interlocutorUserId,
+        isActive: true
+      });
 
-      let finalSystemPrompt = providedSystemPrompt;
+      if (existingSession) {
+        logger.info(`[ChatGraphOrchestrator] 找到现有会话 - Session: ${existingSession.sessionId}`);
 
-      if (roleCardMode === 'static' && !finalSystemPrompt) {
-        const rolecardStorage = new RolecardStorage();
-        const rolecard = await rolecardStorage.getLatestRolecard(targetUserId);
-
-        if (!rolecard) {
-          throw new Error(`方法B模式：未提供systemPrompt，且未找到该用户的角色卡文件 - User: ${targetUserId}`);
+        // 确保会话在内存中
+        if (!this.activeSessions.has(existingSession.sessionId)) {
+          this.activeSessions.set(existingSession.sessionId, {
+            state: new ConversationState({
+              userId: targetUserId,
+              userName: targetUser.name,
+              interlocutor: {
+                id: interlocutorUserId,
+                relationType: existingSession.relation
+              },
+              messages: existingSession.messages || [],
+              metadata: {
+                sessionId: existingSession.sessionId
+              }
+            }),
+            session: existingSession
+          });
         }
 
-        finalSystemPrompt = rolecard.systemPrompt;
-        logger.info(`[ChatGraphOrchestrator] 从文件加载角色卡 - User: ${targetUserId}, Version: ${rolecard.version}`);
+        return {
+          sessionId: existingSession.sessionId,
+          targetUser: {
+            id: targetUser._id,
+            name: targetUser.name,
+            uniqueCode: targetUniqueCode
+          },
+          interlocutorUser: {
+            id: interlocutorUser._id,
+            name: interlocutorUser.name
+          },
+          relation: {
+            type: existingSession.relation
+          },
+          isNew: false
+        };
       }
+
+      // 不存在现有会话，创建新会话
+      const sessionId = this.generateSessionId();
 
       const session = new ChatSession({
         sessionId,
         targetUserId,
         interlocutorUserId,
         relation: 'stranger',
-        roleCardMode,
-        systemPrompt: finalSystemPrompt,
         sentimentScore: 50,
         startedAt: new Date(),
         lastMessageAt: new Date(),
@@ -115,8 +140,6 @@ class ChatGraphOrchestrator {
             relationType: 'stranger'
           },
           messages: [],
-          roleCardMode,
-          systemPrompt: finalSystemPrompt,
           metadata: {
             sessionId
           }
@@ -138,9 +161,9 @@ class ChatGraphOrchestrator {
           name: interlocutorUser.name
         },
         relation: {
-          type: 'stranger',
-          roleCardMode
-        }
+          type: 'stranger'
+        },
+        isNew: true
       };
     } catch (error) {
       logger.error('[ChatGraphOrchestrator] 创建会话失败:', error);
@@ -231,10 +254,20 @@ class ChatGraphOrchestrator {
    * @returns {string} 下一个节点
    */
   getNextNode(currentNode, state) {
+    let nextNode = edges[currentNode];
+
+    // 如果当前节点有条件边，使用条件边
     if (conditionalEdges[currentNode]) {
-      return conditionalEdges[currentNode](state);
+      nextNode = conditionalEdges[currentNode](state);
     }
-    return edges[currentNode];
+
+    // 如果下一个节点也是条件路由（不是真正的节点），继续路由
+    // 例如: token_monitor -> route_by_relation -> rag_retriever
+    while (nextNode && conditionalEdges[nextNode] && !this.nodes[nextNode]) {
+      nextNode = conditionalEdges[nextNode](state);
+    }
+
+    return nextNode;
   }
 
   /**
