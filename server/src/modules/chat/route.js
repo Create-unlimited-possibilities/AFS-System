@@ -32,4 +32,8 @@ router.get('/sentiment/:strangerId', protect, (req, res) => {
   chatController.getStrangerSentiment(req, res);
 });
 
+router.get('/contacts', protect, (req, res) => {
+  chatController.getContacts(req, res);
+});
+
 export default router;

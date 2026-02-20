@@ -21,19 +21,7 @@ class ChatController {
   async createSessionByCode(req, res) {
     try {
       const { targetUniqueCode } = req.body;
-      const { roleCardMode = 'dynamic', systemPrompt } = req.body;
       const interlocutorUserId = req.user.id;
-
-      if (!['dynamic', 'static'].includes(roleCardMode)) {
-        return res.status(400).json({
-          success: false,
-          error: 'roleCardMode必须是dynamic或static'
-        });
-      }
-
-      if (roleCardMode === 'static' && !systemPrompt) {
-        logger.info('[ChatController] 方法B模式未提供systemPrompt，将尝试从文件加载');
-      }
 
       if (!targetUniqueCode) {
         return res.status(400).json({
@@ -60,9 +48,7 @@ class ChatController {
       const session = await orchestrator.createSession({
         targetUserId,
         interlocutorUserId,
-        targetUniqueCode,
-        roleCardMode,
-        systemPrompt
+        targetUniqueCode
       });
 
       if (assistRelation) {
@@ -300,6 +286,80 @@ class ChatController {
         success: false,
         error: error.message
       });
+    }
+  }
+
+  /**
+   * 获取所有联系人（家人/朋友 + 有会话的陌生人）
+   */
+  async getContacts(req, res) {
+    try {
+      const userId = req.user.id;
+
+      // 1. 获取家人/朋友关系
+      const relations = await AssistRelation.find({
+        assistantId: userId,
+        isActive: true
+      }).populate('targetId', 'name uniqueCode');
+
+      // 2. 获取所有会话（包含陌生人）
+      const sessions = await ChatSession.find({
+        interlocutorUserId: userId
+      }).populate('targetUserId', 'name uniqueCode');
+
+      // 3. 构建联系人 Map（去重）
+      const contactMap = new Map();
+
+      // 处理家人/朋友
+      for (const rel of relations) {
+        if (!rel.targetId) continue;
+        const targetId = rel.targetId._id.toString();
+        const session = sessions.find(s => s.targetUserId?._id?.toString() === targetId);
+
+        contactMap.set(targetId, {
+          targetUserId: targetId,
+          targetUserName: rel.targetId.name,
+          targetUniqueCode: rel.targetId.uniqueCode,
+          relationType: rel.relationshipType,
+          specificRelation: rel.specificRelation || '',
+          sessionId: session?.sessionId || null,
+          lastMessage: session?.messages?.slice(-1)[0]?.content || null,
+          lastMessageAt: session?.lastMessageAt || null,
+          sentimentScore: session?.sentimentScore || 50
+        });
+      }
+
+      // 处理陌生人（只添加不在 relations 中的）
+      for (const session of sessions) {
+        if (!session.targetUserId) continue;
+        const targetId = session.targetUserId._id.toString();
+
+        if (!contactMap.has(targetId)) {
+          contactMap.set(targetId, {
+            targetUserId: targetId,
+            targetUserName: session.targetUserId.name,
+            targetUniqueCode: session.targetUserId.uniqueCode,
+            relationType: 'stranger',
+            specificRelation: '',
+            sessionId: session.sessionId,
+            lastMessage: session.messages?.slice(-1)[0]?.content || null,
+            lastMessageAt: session.lastMessageAt || null,
+            sentimentScore: session.sentimentScore || 50
+          });
+        }
+      }
+
+      // 4. 转为数组并排序（有消息的在前，按时间降序）
+      const contacts = Array.from(contactMap.values()).sort((a, b) => {
+        if (!a.lastMessageAt) return 1;
+        if (!b.lastMessageAt) return -1;
+        return new Date(b.lastMessageAt) - new Date(a.lastMessageAt);
+      });
+
+      res.json({ success: true, contacts });
+    } catch (error) {
+      logger.error('[ChatController] 获取联系人失败:', error);
+      res.status(500).json({ success: false, error: error.message });
     }
   }
 }
