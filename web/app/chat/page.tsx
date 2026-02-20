@@ -42,7 +42,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="h-screen flex bg-gray-100">
+    <div className="h-full flex bg-gray-100">
       {/* 左侧导航栏 */}
       {showUserList && <Sidebar />}
 
