@@ -1,0 +1,10 @@
+{
+  "label": "Reference",
+  "position": 5,
+  "link": {
+    "type": "generated-index",
+    "title": "Reference",
+    "description": "Technical stack, configuration, and FAQ",
+    "slug": "/category/reference"
+  }
+}

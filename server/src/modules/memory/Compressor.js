@@ -7,7 +7,7 @@
  * @version 2.0.0
  */
 
-import LLMClient from '../../core/llm/client.js';
+import LLMClient, { createDefaultLLMClient } from '../../core/llm/client.js';
 import { buildCompressV1Prompt } from './prompts/compressV1.js';
 import { buildCompressV2Prompt } from './prompts/compressV2.js';
 import logger from '../../core/utils/logger.js';
@@ -21,13 +21,13 @@ const memoryLogger = {
 
 class Compressor {
   constructor() {
-    this.llmClient = new LLMClient(process.env.OLLAMA_MODEL || 'deepseek-r1:14b', {
-      temperature: 0.3,
-      timeout: 60000
-    });
+    // 使用统一的LLM配置
+    this.llmClient = createDefaultLLMClient();
+    this.compressionTemperature = 0.3;
     memoryLogger.info('Compressor initialized', {
-      model: this.llmClient.model,
-      temperature: 0.3
+      model: this.llmClient.getModelInfo().model,
+      backend: this.llmClient.getModelInfo().backend,
+      temperature: this.compressionTemperature
     });
   }
 

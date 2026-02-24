@@ -1,96 +1,112 @@
 import type {ReactNode} from 'react';
 import clsx from 'clsx';
 import Heading from '@theme/Heading';
+import Link from '@docusaurus/Link';
 import styles from './styles.module.css';
 
 type FeatureItem = {
   title: string;
   description: ReactNode;
   icon: string;
+  link?: string;
 };
 
 const FeatureList: FeatureItem[] = [
   {
-    title: '数字记忆保存',
-    icon: '📚',
+    title: 'User System',
+    icon: '👤',
+    link: '/docs/core/user/overview',
     description: (
       <>
-        结构化存储老人的人生故事和珍贵记忆，支持基础层次和情感层次的问题体系，
-        让每一个故事都被完整记录。
+        完整的用户认证系统，支持注册、登录、角色权限管理和家庭协助关系。
+        基于 JWT 的安全认证，完善的 RBAC 权限控制。
       </>
     ),
   },
   {
-    title: 'AI 陪伴对话',
+    title: 'Questionnaire',
+    icon: '📋',
+    link: '/docs/core/questionnaire/overview',
+    description: (
+      <>
+        结构化问卷系统，支持多层次问题设计。答案处理与评分机制，
+        灵活的问题类型配置，完善的问卷管理功能。
+      </>
+    ),
+  },
+  {
+    title: 'AI Chat',
     icon: '🤖',
+    link: '/docs/core/chat/overview',
     description: (
       <>
-        基于 LangGraph 的个性化 AI 对话体验，AI 能记住你是谁、理解你的故事，
-        以熟悉的方式与你交流。
+        基于 LangGraph 的智能对话编排系统。支持多节点处理流程、
+        RAG 检索增强生成，个性化 AI 陪伴对话体验。
       </>
     ),
   },
   {
-    title: '家庭协作',
-    icon: '👨‍👩‍👧‍👦',
+    title: 'Memory',
+    icon: '🧠',
+    link: '/docs/core/memory/overview',
     description: (
       <>
-        支持多人协作完善记忆档案，家人和朋友可以协助回答问题，
-        共同构建完整的人生记录。
+        智能记忆系统，支持记忆提取、压缩和向量存储。
+        使用 ChromaDB 进行语义检索，实现基于上下文的智能问答。
       </>
     ),
   },
   {
-    title: '角色卡生成',
+    title: 'RoleCard',
     icon: '🎭',
+    link: '/docs/core/rolecard/overview',
     description: (
       <>
-        AI 自动分析用户回答，生成个性化角色描述，包含性格特征、背景故事、
-        兴趣爱好等维度。
+        V2 分层角色卡系统，包含基础层、性格层、背景层等。
+        自动组装生成个性化 AI 角色描述，支持多维度角色定制。
       </>
     ),
   },
   {
-    title: 'RAG 检索',
-    icon: '🔍',
+    title: 'Admin Panel',
+    icon: '🔧',
+    link: '/docs/admin/overview',
     description: (
       <>
-        使用 ChromaDB 向量数据库进行语义检索，实现基于个人记忆的
-        智能问答和上下文构建。
-      </>
-    ),
-  },
-  {
-    title: '权限管理',
-    icon: '🔐',
-    description: (
-      <>
-        完善的 RBAC 权限控制系统，保护用户隐私，确保只有授权人员
-        才能访问敏感记忆数据。
+        功能完善的管理后台，支持用户管理、问卷管理、记忆管理和角色权限管理。
+        现代化 UI 设计，响应式布局，高效的数据管理工具。
       </>
     ),
   },
 ];
 
-function Feature({title, description, icon}: FeatureItem) {
-  return (
-    <div className={clsx('col col--4')}>
-      <div className="text--center">
-        <div className={styles.featureIcon}>{icon}</div>
-      </div>
-      <div className="text--center padding-horiz--md">
-        <Heading as="h3">{title}</Heading>
-        <p>{description}</p>
-      </div>
-    </div>
+function Feature({title, description, icon, link}: FeatureItem) {
+  const content = (
+    <>
+      <div className={styles.featureIcon}>{icon}</div>
+      <Heading as="h3" className={styles.featureTitle}>
+        {title}
+      </Heading>
+      <p className={styles.featureDescription}>{description}</p>
+    </>
   );
+
+  if (link) {
+    return (
+      <Link to={link} className={styles.featureLink}>
+        <div className={styles.featureCard}>{content}</div>
+      </Link>
+    );
+  }
+
+  return <div className={styles.featureCard}>{content}</div>;
 }
 
 export default function HomepageFeatures(): ReactNode {
   return (
     <section className={styles.features}>
       <div className="container">
-        <div className="row">
+        <div className={styles.featuresGrid}>
           {FeatureList.map((props, idx) => (
             <Feature key={idx} {...props} />
           ))}

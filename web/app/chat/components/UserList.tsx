@@ -8,7 +8,10 @@ interface Contact {
   targetUserId: string
   targetUserName: string
   targetUniqueCode: string
-  relationType: string
+  relationType: 'family' | 'friend' | 'stranger'
+  specificRelation: string
+  sessionId: string | null
+  sentimentScore: number
   lastMessage: string | null
   lastMessageAt: string | null
 }

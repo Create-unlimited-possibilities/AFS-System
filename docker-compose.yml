@@ -55,17 +55,13 @@ services:
       - ./server:/app
       - /app/node_modules
       - ./server/storage:/app/storage
+      - ./.env:/app/.env:ro
     depends_on:
       - mongoserver
       - modelserver
       - chromaserver
     env_file:
       - .env
-    environment:
-      - PORT=3000
-      - MODEL_SERVER_URL=http://modelserver:8000
-      - WEATHER_API_KEY=your_api_key_here
-      - CHROMA_URL=http://chromaserver:8000
     networks:
       - afs-network
     restart: unless-stopped

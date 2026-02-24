@@ -362,6 +362,150 @@ class ChatController {
       res.status(500).json({ success: false, error: error.message });
     }
   }
+
+  /**
+   * 预加载会话
+   * 用户点击联系人时调用，提前加载角色卡和复杂关系层
+   */
+  async preloadSession(req, res) {
+    try {
+      const { targetUserId } = req.params;
+      const interlocutorUserId = req.user.id;
+
+      logger.info(`[ChatController] 预加载会话 - Target: ${targetUserId}, Interlocutor: ${interlocutorUserId}`);
+
+      const result = await orchestrator.preloadSession({
+        targetUserId,
+        interlocutorUserId
+      });
+
+      res.json({
+        success: true,
+        session: result
+      });
+    } catch (error) {
+      logger.error('[ChatController] 预加载会话失败:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * 结束会话
+   */
+  async endChatSession(req, res) {
+    try {
+      const { sessionId } = req.params;
+
+      logger.info(`[ChatController] 结束会话 - Session: ${sessionId}`);
+
+      const result = await orchestrator.endSession(sessionId);
+
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (error) {
+      logger.error('[ChatController] 结束会话失败:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  // ==================== Indexing Wait Mechanism Endpoints ====================
+
+  /**
+   * Get session status (for checking if indexing)
+   */
+  async getSessionStatus(req, res) {
+    try {
+      const { sessionId } = req.params;
+
+      const status = await orchestrator.getSessionStatus(sessionId);
+
+      res.json({
+        success: true,
+        ...status
+      });
+    } catch (error) {
+      logger.error('[ChatController] 获取会话状态失败:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Process pending messages after indexing completes
+   * Called by frontend when indexing is done
+   */
+  async processPendingMessages(req, res) {
+    try {
+      const { sessionId } = req.params;
+
+      logger.info(`[ChatController] 处理待处理消息 - Session: ${sessionId}`);
+
+      const result = await orchestrator.processPendingMessages(sessionId);
+
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (error) {
+      logger.error('[ChatController] 处理待处理消息失败:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Set session to indexing mode (internal use, triggered by token threshold)
+   */
+  async setSessionIndexing(req, res) {
+    try {
+      const { sessionId } = req.params;
+
+      logger.info(`[ChatController] 设置会话为索引模式 - Session: ${sessionId}`);
+
+      const result = await orchestrator.setSessionIndexing(sessionId);
+
+      res.json(result);
+    } catch (error) {
+      logger.error('[ChatController] 设置索引模式失败:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Set session back to active mode
+   */
+  async setSessionActive(req, res) {
+    try {
+      const { sessionId } = req.params;
+
+      logger.info(`[ChatController] 设置会话为活跃模式 - Session: ${sessionId}`);
+
+      const result = await orchestrator.setSessionActive(sessionId);
+
+      res.json(result);
+    } catch (error) {
+      logger.error('[ChatController] 设置活跃模式失败:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
 }
 
 export default new ChatController();

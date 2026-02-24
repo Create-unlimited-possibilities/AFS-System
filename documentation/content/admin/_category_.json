@@ -1,0 +1,10 @@
+{
+  "label": "Admin Panel",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "title": "Admin Panel",
+    "description": "Administrative interface and management tools",
+    "slug": "/category/admin-panel"
+  }
+}

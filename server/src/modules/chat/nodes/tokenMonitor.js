@@ -3,7 +3,9 @@
  * Monitors token usage and triggers warnings/termination when approaching context limits
  *
  * @author AFS Team
- * @version 1.0.0
+ * @version 2.0.0
+ *
+ * 注意：结束意图检测已移至 inputProcessor.js，使用 LLM 语义判断
  */
 
 import logger from '../../../core/utils/logger.js';
@@ -19,32 +21,21 @@ const tokenLogger = {
 const MODEL_LIMITS = {
   'deepseek-r1:14b': 65536,
   'deepseek-r1': 65536,
+  'deepseek-chat': 65536,
+  'deepseek-reasoner': 65536,
   'qwen2.5': 32768,
+  'qwen2.5:7b': 32768,
   'default': 65536
 };
 
-// Thresholds
+// Thresholds for token-based prompts
 const THRESHOLDS = {
-  gentleReminder: 0.6,  // 60% - hint at ending
-  forceTerminate: 0.7   // 70% - force end
+  fatiguePrompt: 0.6,    // 60% - show fatigue dialog with user choice
+  forceOffline: 0.7      // 70% - force offline and trigger indexing
 };
 
 // Response buffer for LLM generation
 const RESPONSE_BUFFER = 1000;
-
-// End intent phrases (Chinese)
-const END_INTENT_PHRASES = [
-  // Common goodbyes
-  '结束对话', '不聊了', '再见', '拜拜', '下次聊',
-  // Casual endings
-  '先这样', '挂了', '走了', 'bye', 'goodbye',
-  // Polite endings
-  '今天就到这里', '不说了', '改天聊', '先忙',
-  // Additional variations
-  '下线了', '去忙了', '先走了', '回头聊',
-  '没空了', '有事', '得走了', '要走了',
-  'byebye', '晚安', '回见', '再会'
-];
 
 /**
  * Token Monitor Node
@@ -78,20 +69,28 @@ export async function tokenMonitorNode(state) {
 
     // Determine action based on thresholds
     let action = 'continue';
-    let message = null;
 
-    if (usageRatio >= THRESHOLDS.forceTerminate) {
-      action = 'terminate';
-      message = await generateTerminationMessage(state, usageRatio);
-      tokenLogger.warn('[TokenMonitor] Conversation approaching limit - terminating', {
+    if (usageRatio >= THRESHOLDS.forceOffline) {
+      // 70% - Force offline: trigger memory save and indexing
+      action = 'force_offline';
+      tokenLogger.warn('[TokenMonitor] Token usage at 70% - forcing offline for indexing', {
         usageRatio: (usageRatio * 100).toFixed(1) + '%'
       });
-    } else if (usageRatio >= THRESHOLDS.gentleReminder) {
-      action = 'remind';
-      message = await generateReminderMessage(state, usageRatio);
-      tokenLogger.info('[TokenMonitor] Conversation usage high - sending reminder', {
-        usageRatio: (usageRatio * 100).toFixed(1) + '%'
-      });
+    } else if (usageRatio >= THRESHOLDS.fatiguePrompt) {
+      // 60% - Show fatigue dialog with user choice
+      // Only show if user hasn't already chosen to continue
+      if (!state.metadata?.userChoseToContinue) {
+        action = 'fatigue_prompt';
+        tokenLogger.info('[TokenMonitor] Token usage at 60% - triggering fatigue dialog', {
+          usageRatio: (usageRatio * 100).toFixed(1) + '%'
+        });
+      } else {
+        // User chose to continue, keep conversation going until 70%
+        action = 'continue_after_fatigue';
+        tokenLogger.info('[TokenMonitor] User chose to continue after fatigue prompt', {
+          usageRatio: (usageRatio * 100).toFixed(1) + '%'
+        });
+      }
     }
 
     // Store token info in state
@@ -108,17 +107,34 @@ export async function tokenMonitorNode(state) {
       },
       usageRatio,
       action,
-      message,
       checkedAt: new Date().toISOString()
     };
 
     state.tokenInfo = tokenInfo;
-    state.metadata = {
-      ...state.metadata,
+
+    // Update metadata with token info and action-specific flags
+    const metadataUpdates = {
       tokenInfo: {
         usageRatio: Math.round(usageRatio * 100),
         action
       }
+    };
+
+    // Set action-specific metadata flags
+    if (action === 'fatigue_prompt') {
+      metadataUpdates.showFatiguePrompt = true;
+      metadataUpdates.fatiguePromptType = 'soft';
+      metadataUpdates.usagePercent = Math.round(usageRatio * 100);
+    } else if (action === 'force_offline') {
+      metadataUpdates.forceOffline = true;
+      metadataUpdates.needMemoryUpdate = true;
+      metadataUpdates.sessionStatus = 'indexing';
+      metadataUpdates.usagePercent = Math.round(usageRatio * 100);
+    }
+
+    state.metadata = {
+      ...state.metadata,
+      ...metadataUpdates
     };
 
     return state;
@@ -228,122 +244,6 @@ export function estimateTokens(text) {
   }
 
   return Math.ceil(tokenCount);
-}
-
-/**
- * Generate a reminder message about conversation length
- * TODO: Use LLM for personality-matched generation
- *
- * @param {Object} state - Conversation state
- * @param {number} usageRatio - Current token usage ratio
- * @returns {Promise<string>} Reminder message
- */
-async function generateReminderMessage(state, usageRatio) {
-  const percentage = Math.round(usageRatio * 100);
-  const userName = state.userName || '';
-
-  // Personality-based templates
-  // TODO: Use roleCard personality for matching
-  const templates = [
-    `${userName ? userName + '，' : ''}我们的对话很愉快呢。不过提醒一下，对话内容已经比较长了（${percentage}%），如果你还有想说的话，可以继续聊，但可能快要到结束的时候了。`,
-    `${userName ? userName + '，' : ''}聊得很开心！不过对话已经比较长了（${percentage}%），如果你还有什么想说的，我们可以继续，或者也可以找个别的时间再聊。`,
-    `对了${userName ? '，' + userName : ''}，稍微提醒一下，我们的对话已经进行挺久了（${percentage}%）。如果还有什么重要的话想说，现在说挺好的，不然可能快要结束了。`
-  ];
-
-  // Select template based on sentiment score (if available)
-  const sentimentScore = state.interlocutor?.sentimentScore || 50;
-  const templateIndex = sentimentScore > 60 ? 0 : (sentimentScore > 40 ? 1 : 2);
-
-  return templates[templateIndex];
-}
-
-/**
- * Generate a termination message for forced conversation end
- * TODO: Use LLM for personality-matched generation
- *
- * @param {Object} state - Conversation state
- * @param {number} usageRatio - Current token usage ratio
- * @returns {Promise<string>} Termination message
- */
-async function generateTerminationMessage(state, usageRatio) {
-  const userName = state.userName || '';
-  const percentage = Math.round(usageRatio * 100);
-
-  // Personality-based templates
-  const templates = [
-    `${userName ? userName + '，' : ''}今天聊得真开心！不过我们的对话已经很长了（${percentage}%），系统快要处理不过来了。我们改天再继续聊吧，我会记得我们今天说过的内容的。再见！`,
-    `${userName ? userName + '，' : ''}非常抱歉，我们的对话已经非常长了（${percentage}%），系统需要休息一下。我很珍惜和你的每次对话，下次再聊吧！拜拜！`,
-    `亲爱的${userName || '朋友'}，对话内容已经很长了（${percentage}%），为了避免系统出错，我们今天先聊到这里吧。我会把我们的对话好好保存起来的。下次见！`
-  ];
-
-  // Select template based on sentiment score
-  const sentimentScore = state.interlocutor?.sentimentScore || 50;
-  const templateIndex = sentimentScore > 60 ? 0 : (sentimentScore > 40 ? 1 : 2);
-
-  return templates[templateIndex];
-}
-
-/**
- * Detect if user message indicates intent to end conversation
- *
- * @param {string} message - User message to analyze
- * @returns {Object} Detection result with isEndIntent and confidence
- */
-export function detectEndIntent(message) {
-  if (!message || typeof message !== 'string') {
-    return { isEndIntent: false, confidence: 0, matchedPhrase: null };
-  }
-
-  const normalizedMessage = message.toLowerCase().trim();
-
-  // Check for exact matches first (high confidence)
-  for (const phrase of END_INTENT_PHRASES) {
-    if (normalizedMessage === phrase.toLowerCase()) {
-      return {
-        isEndIntent: true,
-        confidence: 1.0,
-        matchedPhrase: phrase,
-        matchType: 'exact'
-      };
-    }
-  }
-
-  // Check for phrase inclusion (medium confidence)
-  for (const phrase of END_INTENT_PHRASES) {
-    if (normalizedMessage.includes(phrase.toLowerCase())) {
-      // Higher confidence if phrase is at end of message
-      const isAtEnd = normalizedMessage.endsWith(phrase.toLowerCase());
-      return {
-        isEndIntent: true,
-        confidence: isAtEnd ? 0.9 : 0.7,
-        matchedPhrase: phrase,
-        matchType: 'include'
-      };
-    }
-  }
-
-  // Check for partial matches with key words
-  const endKeywords = ['结束', '再见', '拜拜', 'bye', 'goodbye', '不聊'];
-  let matchCount = 0;
-  let matchedKeywords = [];
-
-  for (const keyword of endKeywords) {
-    if (normalizedMessage.includes(keyword.toLowerCase())) {
-      matchCount++;
-      matchedKeywords.push(keyword);
-    }
-  }
-
-  if (matchCount > 0) {
-    return {
-      isEndIntent: true,
-      confidence: Math.min(0.5 + (matchCount * 0.15), 0.85),
-      matchedPhrase: matchedKeywords.join(', '),
-      matchType: 'keyword'
-    };
-  }
-
-  return { isEndIntent: false, confidence: 0, matchedPhrase: null };
 }
 
 /**

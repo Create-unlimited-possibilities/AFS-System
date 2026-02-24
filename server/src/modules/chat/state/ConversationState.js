@@ -1,9 +1,9 @@
 /**
- * 对话状态类
- * 用于LangGraph的对话流程管理
+ * Conversation State Class
+ * Used for LangGraph conversation flow management
  *
  * @author AFS Team
- * @version 2.0.0
+ * @version 2.1.0
  */
 
 class ConversationState {
@@ -35,8 +35,31 @@ class ConversationState {
     this.currentInput = initialData.currentInput || '';
     this.generatedResponse = initialData.generatedResponse || '';
 
-    this.metadata = initialData.metadata || {};
+    // Initialize metadata with token-based prompt fields
+    this.metadata = {
+      // Session status: 'active', 'fatigue_prompt', 'indexing'
+      sessionStatus: 'active',
+      // Fatigue prompt flags (60% threshold)
+      showFatiguePrompt: false,
+      fatiguePromptType: null,  // 'soft'
+      userChoseToContinue: false,
+      usagePercent: 0,
+      // Force offline flags (70% threshold)
+      forceOffline: false,
+      forceEnd: false,
+      shouldEndSession: false,
+      needMemoryUpdate: false,
+      terminationReason: null,
+      // Token info
+      tokenInfo: null,
+      // Other metadata
+      ...initialData.metadata
+    };
+
     this.errors = initialData.errors || [];
+
+    // Pending messages for indexing period (stored as unread)
+    this.pendingMessages = initialData.pendingMessages || [];
   }
 
   setState(updates) {
@@ -56,7 +79,8 @@ class ConversationState {
       currentInput: this.currentInput,
       generatedResponse: this.generatedResponse,
       metadata: this.metadata,
-      errors: this.errors
+      errors: this.errors,
+      pendingMessages: this.pendingMessages
     };
   }
 
@@ -77,6 +101,39 @@ class ConversationState {
       metadata
     });
     return this;
+  }
+
+  /**
+   * Add a pending message (stored as unread during indexing)
+   * @param {string} role - Message role
+   * @param {string} content - Message content
+   * @param {Object} metadata - Additional metadata
+   * @returns {ConversationState}
+   */
+  addPendingMessage(role, content, metadata = {}) {
+    this.pendingMessages.push({
+      role,
+      content,
+      timestamp: new Date(),
+      metadata
+    });
+    return this;
+  }
+
+  /**
+   * Check if session is in indexing state
+   * @returns {boolean}
+   */
+  isIndexing() {
+    return this.metadata.sessionStatus === 'indexing';
+  }
+
+  /**
+   * Check if fatigue prompt should be shown
+   * @returns {boolean}
+   */
+  shouldShowFatiguePrompt() {
+    return this.metadata.showFatiguePrompt === true && !this.metadata.userChoseToContinue;
   }
 }
 

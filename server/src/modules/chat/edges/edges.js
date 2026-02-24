@@ -1,64 +1,75 @@
 /**
- * LangGraph边定义
- * 定义节点之间的连接关系
+ * LangGraph Edge Definitions V2
+ * Defines connections between nodes in the conversation flow
  *
  * @author AFS Team
- * @version 1.0.0
+ * @version 2.1.0
  */
 
 export const edges = {
-  'input_processor': 'relation_confirm',
-  'relation_confirm': 'rolecard_assemble',
-  'rolecard_assemble': 'token_monitor',
-  'token_monitor': 'route_by_relation',
+  // 1. Input processor -> Token monitor
+  'input_processor': 'token_monitor',
+
+  // 2. Token monitor -> Memory check (check if RAG retrieval needed)
+  'token_monitor': 'memory_check',
+
+  // 3. RAG retriever -> Context builder
   'rag_retriever': 'context_builder',
-  'sentiment_analyzer': 'context_builder',
+
+  // 4. Context builder -> Response generator
   'context_builder': 'response_generator',
+
+  // 5. Response generator -> Token response
   'response_generator': 'token_response',
-  'token_response': 'memory_updater',
-  'memory_updater': 'output_formatter'
+
+  // 6. Token response -> Output formatter (default path)
+  'token_response': 'output_formatter'
 };
 
 export const conditionalEdges = {
-  'route_by_relation': routeByRelation,
-  'token_response': routeAfterTokenResponse
+  // Route based on whether memory retrieval is needed
+  'memory_check': routeByMemoryCheck,
+
+  // Route based on token threshold state (fatigue prompt, force offline)
+  'token_response': routeByTokenState
 };
 
 /**
- * 根据关系类型路由到下一个节点
- * @param {Object} state - 当前对话状态
- * @returns {string} 下一个节点名称
- */
-export function routeByRelation(state) {
-  const relationType = state.interlocutor?.relationType || 'stranger';
-
-  switch (relationType) {
-    case 'family':
-      return 'rag_retriever';
-    case 'friend':
-      return 'rag_retriever';
-    case 'stranger':
-      return 'sentiment_analyzer';
-    default:
-      return 'sentiment_analyzer';
-  }
-}
-
-/**
- * Route after token response check
- * If token monitoring triggered termination, skip memory_updater and go to output
- * Otherwise continue to memory_updater
- *
+ * Route based on message content to determine if RAG retrieval is needed
  * @param {Object} state - Current conversation state
  * @returns {string} Next node name
  */
-export function routeAfterTokenResponse(state) {
-  // Check if token monitoring triggered termination
-  if (state.metadata?.tokenTerminated || state.metadata?.shouldEndSession) {
-    // Skip memory_updater for terminated sessions
+export function routeByMemoryCheck(state) {
+  // If message involves memory, retrieve from RAG
+  if (state.metadata?.involvesMemory) {
+    return 'rag_retriever';
+  }
+
+  // Otherwise, build context directly
+  return 'context_builder';
+}
+
+/**
+ * Route based on token threshold state after token response
+ * @param {Object} state - Current conversation state
+ * @returns {string} Next node name
+ */
+export function routeByTokenState(state) {
+  const { metadata } = state;
+
+  // Force offline (70% threshold) - end conversation, trigger memory save
+  if (metadata?.forceOffline) {
+    // The orchestrator handles memory save and indexing
+    // Route to output_formatter to return the closing message
     return 'output_formatter';
   }
 
-  // Normal flow - continue to memory updater
-  return 'memory_updater';
+  // Fatigue prompt (60% threshold) - continue but show dialog
+  if (metadata?.showFatiguePrompt) {
+    // Frontend handles dialog, continue to output
+    return 'output_formatter';
+  }
+
+  // Normal flow - continue to output formatter
+  return 'output_formatter';
 }

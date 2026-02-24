@@ -6,6 +6,9 @@ import mongoose from 'mongoose';
 // Memory scheduler
 import { getScheduler } from './modules/memory/Scheduler.js';
 
+// Admin system initialization
+import { initializeAdminSystem } from './modules/admin/scripts/initAdmin.js';
+
 // Module routes
 import authRouter from './modules/auth/route.js';
 import usersRouter from './modules/user/route.js';
@@ -18,6 +21,8 @@ import rolecardRouter from './modules/rolecard/route.js';
 import sentimentRouter from './modules/sentiment/route.js';
 import { regionsRouter } from './modules/common/china-regions/index.js';
 import memoryRouter from './modules/memory/route.js';
+import adminRouter from './modules/admin/route.js';
+import adminAuthRouter from './modules/admin/authRoute.js';
 
 // Auth middleware
 import { protect } from './modules/auth/middleware.js';
@@ -46,6 +51,14 @@ mongoose.connect(process.env.MONGO_URI)
 
 mongoose.connection.once('open', async () => {
   logger.info('MongoDB 已连接');
+
+  // Initialize admin system (permissions, roles, default admin)
+  try {
+    await initializeAdminSystem();
+    logger.info('Admin system initialized');
+  } catch (error) {
+    logger.warn('Admin system initialization skipped:', error.message);
+  }
 
   const syncQueue = new SimpleSyncQueue(dualStorage);
   SimpleSyncQueue.instance = syncQueue;
@@ -79,6 +92,8 @@ app.use('/api/chat', protect, chatRouter);
 app.use('/api/rolecard', protect, rolecardRouter);
 app.use('/api/sentiment', protect, sentimentRouter);
 app.use('/api/memory', memoryRouter);
+app.use('/admin-auth', adminAuthRouter);  // Public admin auth routes - completely separate path
+app.use('/api/admin', adminRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {

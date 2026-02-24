@@ -6,8 +6,9 @@
  * @version 1.0.0
  */
 
-import LLMClient from '../../core/llm/client.js';
+import LLMClient, { createDefaultLLMClient } from '../../core/llm/client.js';
 import { buildMemoryExtractionPrompt, formatConversationForPrompt } from './prompts/memoryExtraction.js';
+import TopicChunker from './TopicChunker.js';
 import logger from '../../core/utils/logger.js';
 
 const memoryLogger = {
@@ -19,13 +20,14 @@ const memoryLogger = {
 
 class MemoryExtractor {
   constructor() {
-    this.llmClient = new LLMClient(process.env.OLLAMA_MODEL || 'deepseek-r1:14b', {
-      temperature: 0.3,
-      timeout: 60000
-    });
+    // 使用统一的LLM配置
+    this.llmClient = createDefaultLLMClient();
+    this.extractionTemperature = 0.3;
+    this.topicChunker = new TopicChunker();
     memoryLogger.info('MemoryExtractor initialized', {
-      model: this.llmClient.model,
-      temperature: 0.3
+      model: this.llmClient.getModelInfo().model,
+      backend: this.llmClient.getModelInfo().backend,
+      temperature: this.extractionTemperature
     });
   }
 
@@ -112,6 +114,151 @@ class MemoryExtractor {
       // Fallback to raw memory on error
       memoryLogger.warn('Falling back to raw memory');
       return this.createRawMemory(messages, { roleCardOwnerName, interlocutorName });
+    }
+  }
+
+  /**
+   * Extract structured memories from conversation with topic-based chunking
+   * Uses TopicChunker to split conversation before extraction
+   * @param {Object} options - Extraction options
+   * @param {Object} options.roleCard - The role card object (with coreLayer)
+   * @param {string} options.roleCardOwnerName - Name of role card owner
+   * @param {string} options.interlocutorName - Name of conversation partner
+   * @param {string} options.relationType - Relationship type (family, friend, etc.)
+   * @param {Array} options.messages - Array of message objects
+   * @param {boolean} options.wasInterrupted - Whether conversation was interrupted
+   * @returns {Promise<Object>} Extraction result with array of chunk memories
+   */
+  async extractWithChunking(options) {
+    const {
+      roleCard,
+      roleCardOwnerName,
+      interlocutorName,
+      relationType,
+      messages,
+      wasInterrupted = false
+    } = options;
+
+    memoryLogger.info('Starting memory extraction with chunking', {
+      hasRoleCard: !!roleCard,
+      ownerName: roleCardOwnerName,
+      interlocutorName,
+      relationType,
+      messageCount: messages?.length || 0,
+      wasInterrupted
+    });
+
+    // If no role card, return simplified raw memory without chunking
+    if (!roleCard || !roleCard.coreLayer) {
+      memoryLogger.info('No role card provided, creating raw memory without chunking');
+      return {
+        chunks: [{
+          ...this.createRawMemory(messages, { roleCardOwnerName, interlocutorName }),
+          chunkId: 'single',
+          isChunked: false
+        }],
+        totalChunks: 1,
+        hasIncompleteTopics: false,
+        chunkingSkipped: true,
+        skipReason: 'No role card provided'
+      };
+    }
+
+    try {
+      // Step 1: Chunk the conversation using TopicChunker
+      const chunkingResult = await this.topicChunker.chunk({
+        messages,
+        roleCardOwnerName,
+        interlocutorName,
+        relationType,
+        wasInterrupted
+      });
+
+      memoryLogger.info('Topic chunking completed', {
+        totalChunks: chunkingResult.totalChunks,
+        hasIncompleteTopics: chunkingResult.hasIncompleteTopics
+      });
+
+      // Step 2: Extract memory for each chunk
+      const extractedChunks = [];
+      for (let i = 0; i < chunkingResult.chunks.length; i++) {
+        const chunk = chunkingResult.chunks[i];
+
+        memoryLogger.debug(`Extracting memory for chunk ${i + 1}/${chunkingResult.chunks.length}`, {
+          chunkId: chunk.id,
+          messageCount: chunk.messageCount,
+          isIncomplete: chunk.isIncomplete
+        });
+
+        // Extract memory for this chunk
+        const extractedData = await this.extract({
+          roleCard,
+          roleCardOwnerName,
+          interlocutorName,
+          relationType,
+          messages: chunk.messages
+        });
+
+        // Add chunk-specific metadata
+        extractedChunks.push({
+          ...extractedData,
+          chunkId: chunk.id,
+          chunkIndex: i,
+          topicSummary: chunk.topicSummary || extractedData.topicSummary,
+          messageIndices: chunk.messageIndices,
+          isIncomplete: chunk.isIncomplete,
+          completenessScore: chunk.completenessScore,
+          suggestedFollowUp: chunk.suggestedFollowUp,
+          isChunked: true
+        });
+      }
+
+      const result = {
+        chunks: extractedChunks,
+        totalChunks: extractedChunks.length,
+        hasIncompleteTopics: chunkingResult.hasIncompleteTopics,
+        incompleteTopicChunks: chunkingResult.incompleteTopicChunks,
+        analysisMetadata: {
+          ...chunkingResult.analysisMetadata,
+          extractedAt: new Date().toISOString()
+        }
+      };
+
+      memoryLogger.info('Memory extraction with chunking completed', {
+        totalChunks: result.totalChunks,
+        hasIncompleteTopics: result.hasIncompleteTopics,
+        incompleteCount: result.incompleteTopicChunks.length
+      });
+
+      return result;
+
+    } catch (error) {
+      memoryLogger.error('Memory extraction with chunking failed', {
+        error: error.message,
+        stack: error.stack
+      });
+
+      // Fallback to single extraction without chunking
+      memoryLogger.warn('Falling back to single extraction without chunking');
+      const singleExtraction = await this.extract({
+        roleCard,
+        roleCardOwnerName,
+        interlocutorName,
+        relationType,
+        messages
+      });
+
+      return {
+        chunks: [{
+          ...singleExtraction,
+          chunkId: 'fallback',
+          isChunked: false
+        }],
+        totalChunks: 1,
+        hasIncompleteTopics: wasInterrupted,
+        chunkingFailed: true,
+        error: error.message
+      };
     }
   }
 

@@ -262,7 +262,7 @@ class VectorIndexService {
         participants: JSON.stringify(memory.meta.participants),
         compressionStage: memory.meta.compressionStage || 'raw',
         createdAt: memory.meta.createdAt,
-        category: this.inferCategory(memory),
+        category: 'conversation',  // Conversation memories always have 'conversation' category
         tags: JSON.stringify(memory.tags || [])
       };
 
@@ -418,18 +418,28 @@ class VectorIndexService {
 
       const queryEmbedding = await this.embeddingService.embedQuery(query);
 
-      let where = {};
-      if (relationType) {
-        where.category = relationType;
-        if (relationSpecificId) {
-          where.helperId = relationSpecificId;
-        }
+      // Build where clause for ChromaDB
+      // ChromaDB requires $and operator for multiple conditions
+      let where = undefined;
+      if (relationType && relationSpecificId) {
+        where = {
+          $and: [
+            { category: relationType },
+            { helperId: relationSpecificId }
+          ]
+        };
+      } else if (relationType) {
+        where = { category: relationType };
+      } else if (relationSpecificId) {
+        where = { helperId: relationSpecificId };
       }
+
+      logger.info(`[VectorIndexService] 搜索参数 - userId: ${userId}, query: "${query}", where: ${JSON.stringify(where)}`);
 
       const results = await collection.query({
         queryEmbeddings: [queryEmbedding],
         nResults: topK,
-        where: Object.keys(where).length > 0 ? where : undefined
+        where: where
       });
 
       const memories = [];

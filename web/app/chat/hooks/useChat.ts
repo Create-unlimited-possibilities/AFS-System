@@ -19,6 +19,8 @@ interface Message {
   timestamp: Date
   pending?: boolean
   streaming?: boolean
+  failed?: boolean  // 消息发送失败
+  error?: string    // 错误信息
 }
 
 export function useChat() {
@@ -42,20 +44,7 @@ export function useChat() {
     }
   }, [])
 
-  // 选择联系人
-  const selectContact = useCallback(async (contact: Contact) => {
-    setSelectedContact(contact)
-    setMessages([])
-
-    if (contact.sessionId) {
-      setSessionId(contact.sessionId)
-      await loadMessages(contact.sessionId)
-    } else {
-      setSessionId(null)
-    }
-  }, [])
-
-  // 加载消息历史
+  // 加载消息历史 - 必须在 selectContact 之前定义
   const loadMessages = useCallback(async (sid: string) => {
     const token = localStorage.getItem('token')
     const res = await fetch(
@@ -72,6 +61,47 @@ export function useChat() {
       })))
     }
   }, [])
+
+  // 预加载会话 - 点击联系人时调用，提前加载角色卡和复杂关系层
+  const preloadSession = useCallback(async (targetUserId: string) => {
+    const token = localStorage.getItem('token')
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/chat/sessions/preload/${targetUserId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    const data = await res.json()
+    if (data.success) {
+      return data.session
+    }
+    return null
+  }, [])
+
+  // 选择联系人
+  const selectContact = useCallback(async (contact: Contact) => {
+    setSelectedContact(contact)
+    setMessages([])
+    setIsLoading(true)
+
+    try {
+      // 调用预加载API，提前加载角色卡和复杂关系层
+      const session = await preloadSession(contact.targetUserId)
+
+      if (session) {
+        setSessionId(session.sessionId)
+        // 如果有历史消息，加载它们
+        if (session.hasHistory) {
+          await loadMessages(session.sessionId)
+        }
+      } else {
+        setSessionId(null)
+      }
+    } catch (err) {
+      console.error('预加载会话失败:', err)
+      setSessionId(null)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [preloadSession, loadMessages])
 
   // 发送消息
   const sendMessage = useCallback(async (content: string) => {
@@ -128,7 +158,7 @@ export function useChat() {
       const data = await res.json()
 
       if (data.success) {
-        // 移除临时消息，添加真实消息
+        // 移除临时消息，添加真实用户消息
         setMessages(prev => {
           const filtered = prev.filter(m => m.id !== tempId)
           return [...filtered, {
@@ -136,22 +166,83 @@ export function useChat() {
             role: 'user' as const,
             content,
             timestamp: new Date()
-          }, {
-            id: `ai_${Date.now()}`,
-            role: 'assistant' as const,
-            content: data.message || data.response,
-            timestamp: new Date()
           }]
         })
+
+        // 使用后端返回的分割后的句子（如果有）
+        const sentences = data.sentences || [data.message || data.response]
+
+        // 逐句添加AI消息，每句间隔1-2秒
+        let currentIndex = 0
+
+        const addNextSentence = () => {
+          if (currentIndex >= sentences.length) {
+            return
+          }
+
+          setMessages(prev => [...prev, {
+            id: `ai_${Date.now()}_${currentIndex}`,
+            role: 'assistant' as const,
+            content: sentences[currentIndex],
+            timestamp: new Date()
+          }])
+
+          currentIndex++
+
+          if (currentIndex < sentences.length) {
+            const delay = 1000 + Math.random() * 1000
+            setTimeout(addNextSentence, delay)
+          }
+        }
+
+        // 第一句延迟1-2秒后显示
+        const initialDelay = 1000 + Math.random() * 1000
+        setTimeout(addNextSentence, initialDelay)
+
         await loadContacts()
+      } else {
+        // 消息发送失败 - 标记用户消息为失败，不保存到历史
+        console.error('消息发送失败:', data.error)
+        setMessages(prev => prev.map(m =>
+          m.id === tempId
+            ? { ...m, pending: false, failed: true, error: data.error || '发送失败' }
+            : m
+        ))
       }
     } catch (err) {
       console.error('发送失败:', err)
-      setMessages(prev => prev.filter(m => m.id !== tempId))
+      // 标记消息为失败
+      setMessages(prev => prev.map(m =>
+        m.id === tempId
+          ? { ...m, pending: false, failed: true, error: '网络错误' }
+          : m
+      ))
     } finally {
       setIsLoading(false)
     }
   }, [selectedContact, sessionId, loadContacts])
+
+  // 结束会话
+  const endSession = useCallback(async () => {
+    if (!sessionId) return
+
+    const token = localStorage.getItem('token')
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/chat/sessions/${sessionId}/end-chat`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    )
+    const data = await res.json()
+    if (data.success) {
+      setSessionId(null)
+      setMessages([])
+      setSelectedContact(null)
+      await loadContacts()
+    }
+    return data
+  }, [sessionId, loadContacts])
 
   // 过滤联系人
   const filteredContacts = contacts.filter(c =>
@@ -169,6 +260,7 @@ export function useChat() {
     loadContacts,
     selectContact,
     sendMessage,
+    endSession,
     setSelectedContact
   }
 }

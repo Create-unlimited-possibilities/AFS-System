@@ -11,6 +11,7 @@ import Compressor from './Compressor.js';
 import Scheduler from './Scheduler.js';
 import PendingTopicsManager from './PendingTopicsManager.js';
 import ProactiveMessagingManager from './ProactiveMessagingManager.js';
+import TopicChunker from './TopicChunker.js';
 
 export {
   MemoryStore,
@@ -18,7 +19,8 @@ export {
   Compressor,
   Scheduler,
   PendingTopicsManager,
-  ProactiveMessagingManager
+  ProactiveMessagingManager,
+  TopicChunker
 };
 
 export default {
@@ -27,5 +29,6 @@ export default {
   Compressor,
   Scheduler,
   PendingTopicsManager,
-  ProactiveMessagingManager
+  ProactiveMessagingManager,
+  TopicChunker
 };

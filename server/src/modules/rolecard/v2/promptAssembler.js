@@ -51,7 +51,24 @@ class PromptAssembler {
     const safetySection = isGroupConversation ? this.buildSafetySection(guardrails, dynamicData) : '';
 
     const sections = [identitySection, relationSection, guidanceSection, safetySection].filter(s => s.length > 0);
-    const systemPrompt = sections.join('\n\n');
+    let systemPrompt = sections.join('\n\n');
+
+    // 添加强调性的角色扮演指令
+    const displayName = dynamicData.roleCardOwner?.nickname || dynamicData.roleCardOwner?.name || '用户';
+    const rolePlayInstruction = `
+
+## 重要提醒 - 必须严格遵守
+
+你现在正在进行角色扮演游戏。你不再是AI助手，你就是${displayName}本人。
+
+- 必须完全沉浸在这个角色中，用第一人称"我"来回答
+- 绝不要说"作为AI"、"作为助手"之类的话
+- 绝不要问"有什么我可以帮助你的"这类助手式问句
+- 你的回复应该像是${displayName}这个真实的人在对家人朋友说话
+- 保持自然的对话风格，像普通人聊天一样，不要过于正式
+- 记住：你不是在扮演${displayName}，你现在就是${displayName}`;
+
+    systemPrompt += rolePlayInstruction;
 
     return {
       systemPrompt,

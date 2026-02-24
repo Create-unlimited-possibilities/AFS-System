@@ -10,6 +10,7 @@ export interface User {
     description?: string;
     permissions?: Permission[];
     isSystem?: boolean;
+    isAdmin?: boolean;  // Admin flag for backend middleware
     createdAt?: string;
     updatedAt?: string;
   } | null;  // 明确role可以是完整对象或null
@@ -174,6 +175,7 @@ export interface Role {
   description: string;
   permissions: Permission[];
   isSystem: boolean;
+  isAdmin?: boolean;  // Admin flag for backend middleware
   createdAt: string;
   updatedAt: string;
 }
@@ -366,4 +368,77 @@ export interface VectorIndexBuildResult {
     friend: number
   }
   duration: number
+}
+
+// ============================================
+// Chat Session Types for Fatigue/Offline Flow
+// ============================================
+
+/**
+ * Role card information for fatigue dialog display
+ */
+export interface RoleCardInfo {
+  name: string
+  avatar?: string
+}
+
+/**
+ * Token threshold event data from backend
+ */
+export interface TokenThresholdEvent {
+  sessionId: string
+  threshold: 60 | 70           // 60 = fatigue dialog, 70 = forced offline
+  message?: string              // Role card's tired message (for 60%)
+  roleCardInfo: RoleCardInfo
+}
+
+/**
+ * Indexing status event data from backend
+ */
+export interface IndexingStatusEvent {
+  sessionId: string
+  status: 'started' | 'completed'
+  pendingMessageCount?: number  // Messages queued during offline
+}
+
+/**
+ * Role card online event data from backend
+ */
+export interface RoleCardOnlineEvent {
+  sessionId: string
+  readyToChat: boolean
+}
+
+/**
+ * WebSocket event types for chat session
+ */
+export type ChatSessionEventType =
+  | 'token_threshold'
+  | 'indexing_status'
+  | 'role_card_online'
+
+/**
+ * WebSocket message structure for chat session events
+ */
+export interface ChatSessionWebSocketMessage {
+  event: ChatSessionEventType
+  data: TokenThresholdEvent | IndexingStatusEvent | RoleCardOnlineEvent
+}
+
+/**
+ * Chat session state for Zustand store
+ */
+export interface ChatSessionState {
+  // Fatigue Dialog State (60% threshold)
+  showFatigueDialog: boolean
+  fatigueMessage: string
+  roleCardInfo: RoleCardInfo | null
+
+  // Offline State (70% threshold)
+  isOffline: boolean
+  isIndexing: boolean
+  pendingMessageCount: number
+
+  // Session tracking
+  sessionId: string | null
 }

@@ -1,0 +1,10 @@
+{
+  "label": "AI Chat System",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "title": "AI Chat System",
+    "description": "LangGraph orchestration and chat nodes",
+    "slug": "/category/ai-chat-system"
+  }
+}

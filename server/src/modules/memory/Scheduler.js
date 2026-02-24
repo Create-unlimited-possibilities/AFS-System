@@ -2,6 +2,7 @@
  * Scheduler - Memory Processing Scheduler
  * Handles scheduled tasks for memory compression and cleanup
  * Runs daily at 3:00 AM to compress old memories
+ * Runs every 5 minutes to check for timed-out sessions
  *
  * @author AFS Team
  * @version 2.0.0
@@ -14,6 +15,10 @@ import MemoryStore from './MemoryStore.js';
 import Compressor from './Compressor.js';
 import VectorIndexService from '../../core/storage/vector.js';
 import DualStorage from '../../core/storage/dual.js';
+import ChatSession from '../chat/model.js';
+import User from '../user/model.js';
+import ConversationState from '../chat/state/ConversationState.js';
+import MemoryExtractor from './MemoryExtractor.js';
 import logger from '../../core/utils/logger.js';
 
 const memoryLogger = {
@@ -29,19 +34,31 @@ class Scheduler {
     this.compressor = new Compressor();
     this.vectorService = new VectorIndexService();
     this.dualStorage = new DualStorage();
+    this.memoryExtractor = new MemoryExtractor();
 
+    // Daily compression task settings
     this.isRunning = false;
     this.lastRunTime = null;
     this.nextRunTime = null;
     this.timerId = null;
     this.dailyRunHour = 3; // Run at 3:00 AM
 
-    memoryLogger.info('Scheduler initialized');
+    // Timeout detection settings
+    this.timeoutCheckIntervalMs = 5 * 60 * 1000; // 5 minutes
+    this.timeoutThresholdMs = (parseInt(process.env.SESSION_TIMEOUT_MINUTES) || 30) * 60 * 1000; // Default 30 minutes
+    this.timeoutTimerId = null;
+    this.isTimeoutCheckerRunning = false;
+    this.lastTimeoutCheckTime = null;
+
+    memoryLogger.info('Scheduler initialized', {
+      timeoutThresholdMinutes: this.timeoutThresholdMs / 60000
+    });
   }
 
   /**
    * Start the scheduler
    * Schedules daily run at 3:00 AM
+   * Also starts the timeout detection checker
    */
   start() {
     if (this.isRunning) {
@@ -85,6 +102,9 @@ class Scheduler {
         this.runDailyTask();
       }, 24 * 60 * 60 * 1000);
     }, delayMs);
+
+    // Start timeout detection checker
+    this.startTimeoutChecker();
   }
 
   /**
@@ -96,10 +116,397 @@ class Scheduler {
       clearInterval(this.timerId);
       this.timerId = null;
     }
+
+    // Stop timeout checker
+    this.stopTimeoutChecker();
+
     this.isRunning = false;
     this.nextRunTime = null;
 
     memoryLogger.info('Scheduler stopped');
+  }
+
+  // ==================== TIMEOUT DETECTION SYSTEM ====================
+
+  /**
+   * Start the session timeout checker
+   * Runs every 5 minutes to detect inactive sessions
+   */
+  startTimeoutChecker() {
+    if (this.isTimeoutCheckerRunning) {
+      memoryLogger.warn('Timeout checker is already running');
+      return;
+    }
+
+    this.isTimeoutCheckerRunning = true;
+
+    memoryLogger.info('Session timeout checker started', {
+      checkIntervalMinutes: this.timeoutCheckIntervalMs / 60000,
+      timeoutThresholdMinutes: this.timeoutThresholdMs / 60000
+    });
+
+    // Run first check immediately
+    this.checkSessionTimeouts();
+
+    // Then schedule periodic checks
+    this.timeoutTimerId = setInterval(() => {
+      this.checkSessionTimeouts();
+    }, this.timeoutCheckIntervalMs);
+  }
+
+  /**
+   * Stop the session timeout checker
+   */
+  stopTimeoutChecker() {
+    if (this.timeoutTimerId) {
+      clearInterval(this.timeoutTimerId);
+      this.timeoutTimerId = null;
+    }
+    this.isTimeoutCheckerRunning = false;
+
+    memoryLogger.info('Session timeout checker stopped');
+  }
+
+  /**
+   * Check for timed-out sessions and process them
+   * @returns {Promise<Object>} Check results
+   */
+  async checkSessionTimeouts() {
+    const checkStartTime = Date.now();
+    this.lastTimeoutCheckTime = new Date().toISOString();
+
+    memoryLogger.debug('Checking for timed-out sessions', {
+      time: this.lastTimeoutCheckTime
+    });
+
+    const results = {
+      checked: 0,
+      timedOut: 0,
+      processed: 0,
+      errors: []
+    };
+
+    try {
+      // Calculate timeout threshold
+      const timeoutThreshold = new Date(Date.now() - this.timeoutThresholdMs);
+
+      // Find active sessions that have timed out
+      const timedOutSessions = await ChatSession.find({
+        isActive: true,
+        lastMessageAt: { $lt: timeoutThreshold }
+      });
+
+      results.checked = timedOutSessions.length;
+
+      if (timedOutSessions.length === 0) {
+        memoryLogger.debug('No timed-out sessions found');
+        return results;
+      }
+
+      memoryLogger.info(`Found ${timedOutSessions.length} timed-out session(s)`, {
+        threshold: timeoutThreshold.toISOString()
+      });
+
+      // Process each timed-out session
+      for (const session of timedOutSessions) {
+        results.timedOut++;
+
+        try {
+          const processed = await this.processTimedOutSession(session);
+          if (processed) {
+            results.processed++;
+          }
+        } catch (error) {
+          results.errors.push({
+            sessionId: session.sessionId,
+            error: error.message
+          });
+          memoryLogger.error('Failed to process timed-out session', {
+            sessionId: session.sessionId,
+            error: error.message
+          });
+          // Continue processing other sessions - don't crash the checker
+        }
+      }
+
+      const duration = Date.now() - checkStartTime;
+
+      memoryLogger.info('Timeout check completed', {
+        ...results,
+        durationMs: duration
+      });
+
+      return results;
+
+    } catch (error) {
+      memoryLogger.error('Timeout check failed', {
+        error: error.message,
+        stack: error.stack
+      });
+
+      results.errors.push({
+        type: 'global',
+        error: error.message
+      });
+
+      return results;
+    }
+  }
+
+  /**
+   * Process a single timed-out session
+   * Saves memory and starts a new cycle
+   * @param {Object} session - ChatSession document
+   * @returns {Promise<boolean>} Success status
+   */
+  async processTimedOutSession(session) {
+    const sessionId = session.sessionId;
+
+    memoryLogger.info('Processing timed-out session', {
+      sessionId,
+      targetUserId: session.targetUserId?.toString(),
+      interlocutorUserId: session.interlocutorUserId?.toString(),
+      lastMessageAt: session.lastMessageAt?.toISOString()
+    });
+
+    try {
+      // Get current cycle messages
+      const currentCycle = session.cycles?.find(
+        c => c.cycleId === session.currentCycleId
+      );
+      const messages = currentCycle?.messages || [];
+
+      // Skip if no messages to save
+      if (messages.length < 2) {
+        memoryLogger.debug('Session has insufficient messages, skipping memory save', {
+          sessionId,
+          messageCount: messages.length
+        });
+
+        // Still start a new cycle to reset context
+        await this.startNewCycleForSession(session);
+        return true;
+      }
+
+      // Load user data
+      const targetUser = await User.findById(session.targetUserId);
+      const interlocutorUser = await User.findById(session.interlocutorUserId);
+
+      if (!targetUser || !interlocutorUser) {
+        memoryLogger.warn('Users not found for session, skipping', {
+          sessionId,
+          targetUserId: session.targetUserId?.toString(),
+          interlocutorUserId: session.interlocutorUserId?.toString()
+        });
+        return false;
+      }
+
+      // Load role card
+      const roleCardV2 = await this.dualStorage.loadRoleCardV2(
+        session.targetUserId.toString()
+      );
+
+      // Build minimal conversation state for memory extraction
+      const state = new ConversationState({
+        userId: session.targetUserId.toString(),
+        userName: targetUser.name,
+        systemPrompt: '', // Not needed for memory extraction
+        interlocutor: {
+          id: session.interlocutorUserId.toString(),
+          name: interlocutorUser.name,
+          relationType: session.relation || 'stranger',
+          specificId: session.interlocutorUserId.toString()
+        },
+        messages: messages,
+        metadata: {
+          sessionId,
+          currentCycleId: session.currentCycleId,
+          timeoutDetected: true
+        }
+      });
+
+      // Save conversation memory
+      await this.saveConversationMemoryForSession(session, state, roleCardV2);
+
+      // Start new cycle
+      await this.startNewCycleForSession(session);
+
+      memoryLogger.info('Timed-out session processed successfully', {
+        sessionId,
+        messageCount: messages.length
+      });
+
+      return true;
+
+    } catch (error) {
+      memoryLogger.error('Error processing timed-out session', {
+        sessionId,
+        error: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Save conversation memory for a session
+   * @param {Object} session - ChatSession document
+   * @param {Object} state - ConversationState object
+   * @param {Object} roleCardV2 - Role card data
+   */
+  async saveConversationMemoryForSession(session, state, roleCardV2) {
+    try {
+      const messages = state.messages || [];
+      const targetUserId = state.userId;
+      const interlocutorId = state.interlocutor?.id;
+
+      if (!targetUserId || !interlocutorId) {
+        memoryLogger.warn('Missing user IDs, skipping memory save', {
+          sessionId: session.sessionId
+        });
+        return;
+      }
+
+      memoryLogger.debug('Saving conversation memory', {
+        sessionId: session.sessionId,
+        targetUserId,
+        interlocutorId,
+        messageCount: messages.length
+      });
+
+      // Format messages
+      const formattedMessages = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        isOwner: msg.role === 'assistant'
+      }));
+
+      // Extract memory
+      let extractedMemory = null;
+      if (roleCardV2) {
+        try {
+          extractedMemory = await this.memoryExtractor.extract({
+            roleCard: roleCardV2,
+            roleCardOwnerName: state.userName || 'User',
+            interlocutorName: state.interlocutor?.name || 'Interlocutor',
+            relationType: state.interlocutor?.relationType || 'stranger',
+            messages: formattedMessages
+          });
+          memoryLogger.debug('Memory extracted for timed-out session', {
+            sessionId: session.sessionId,
+            summaryLength: extractedMemory.summary?.length || 0
+          });
+        } catch (extractError) {
+          memoryLogger.warn('Memory extraction failed for timed-out session', {
+            sessionId: session.sessionId,
+            error: extractError.message
+          });
+        }
+      }
+
+      // Save memory
+      await this.memoryStore.saveBidirectional({
+        userAId: targetUserId,
+        userBId: interlocutorId,
+        conversationData: {
+          raw: JSON.stringify(formattedMessages),
+          messageCount: messages.length
+        },
+        userAMemory: extractedMemory ? {
+          processed: {
+            summary: extractedMemory.summary,
+            keyTopics: extractedMemory.keyTopics,
+            facts: extractedMemory.facts
+          },
+          tags: extractedMemory.tags
+        } : null
+      });
+
+      memoryLogger.info('Conversation memory saved for timed-out session', {
+        sessionId: session.sessionId
+      });
+
+    } catch (error) {
+      memoryLogger.error('Failed to save conversation memory', {
+        sessionId: session.sessionId,
+        error: error.message
+      });
+      // Don't throw - memory save failure shouldn't stop new cycle creation
+    }
+  }
+
+  /**
+   * Start a new cycle for a session
+   * Handles both legacy sessions (no cycles) and modern sessions
+   * @param {Object} session - ChatSession document
+   * @returns {Promise<boolean>} Success status
+   */
+  async startNewCycleForSession(session) {
+    try {
+      const sessionId = session.sessionId;
+      const oldCycleId = session.currentCycleId;
+      const hasCycles = session.cycles && Array.isArray(session.cycles) && session.cycles.length > 0;
+
+      // Generate new cycle ID
+      const newCycleId = `cycle_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+      // End current cycle if it exists (handle legacy sessions without cycles)
+      if (oldCycleId && hasCycles) {
+        // Find and end the current cycle using positional operator
+        const endResult = await ChatSession.findOneAndUpdate(
+          { sessionId, 'cycles.cycleId': oldCycleId },
+          { $set: { 'cycles.$.endedAt': new Date() } }
+        );
+
+        if (!endResult) {
+          memoryLogger.warn('Could not find cycle to end, continuing with new cycle creation', {
+            sessionId,
+            oldCycleId
+          });
+        }
+      } else {
+        memoryLogger.debug('Session has no current cycle to end (legacy or new session)', {
+          sessionId,
+          hasCycles,
+          oldCycleId
+        });
+      }
+
+      // Create new cycle
+      const newCycle = {
+        cycleId: newCycleId,
+        startedAt: new Date(),
+        messages: []
+      };
+
+      // Update session with new cycle
+      // Use $push with $each to handle both cases (existing cycles array or not)
+      await ChatSession.findOneAndUpdate(
+        { sessionId },
+        {
+          $push: { cycles: newCycle },
+          $set: { currentCycleId: newCycleId }
+        },
+        { upsert: false }
+      );
+
+      memoryLogger.info('New cycle started for timed-out session', {
+        sessionId,
+        oldCycleId: oldCycleId || 'none',
+        newCycleId,
+        wasLegacySession: !hasCycles
+      });
+
+      return true;
+
+    } catch (error) {
+      memoryLogger.error('Failed to start new cycle for session', {
+        sessionId: session.sessionId,
+        error: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
   }
 
   /**
@@ -465,7 +872,14 @@ class Scheduler {
       isRunning: this.isRunning,
       lastRunTime: this.lastRunTime,
       nextRunTime: this.nextRunTime,
-      dailyRunHour: this.dailyRunHour
+      dailyRunHour: this.dailyRunHour,
+      // Timeout checker status
+      timeoutChecker: {
+        isRunning: this.isTimeoutCheckerRunning,
+        lastCheckTime: this.lastTimeoutCheckTime,
+        checkIntervalMinutes: this.timeoutCheckIntervalMs / 60000,
+        timeoutThresholdMinutes: this.timeoutThresholdMs / 60000
+      }
     };
   }
 
@@ -482,7 +896,12 @@ class Scheduler {
         isRunning: this.isRunning,
         compressorHealthy: compressorHealth,
         lastRunTime: this.lastRunTime,
-        nextRunTime: this.nextRunTime
+        nextRunTime: this.nextRunTime,
+        // Timeout checker health
+        timeoutChecker: {
+          isRunning: this.isTimeoutCheckerRunning,
+          lastCheckTime: this.lastTimeoutCheckTime
+        }
       };
     } catch (error) {
       return {
@@ -490,6 +909,15 @@ class Scheduler {
         error: error.message
       };
     }
+  }
+
+  /**
+   * Manually trigger timeout check (for testing)
+   * @returns {Promise<Object>} Check results
+   */
+  async triggerTimeoutCheck() {
+    memoryLogger.info('Manual timeout check triggered');
+    return this.checkSessionTimeouts();
   }
 }
 

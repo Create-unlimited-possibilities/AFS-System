@@ -6,7 +6,7 @@
  * @version 1.0.0
  */
 
-import LLMClient from '../../core/llm/client.js';
+import LLMClient, { createDefaultLLMClient } from '../../core/llm/client.js';
 import PendingTopicsManager from './PendingTopicsManager.js';
 import DualStorage from '../../core/storage/dual.js';
 import ChatSession from '../chat/model.js';
@@ -26,12 +26,14 @@ const proactiveLogger = {
 
 class ProactiveMessagingManager {
   constructor() {
-    this.llmClient = new LLMClient(process.env.OLLAMA_MODEL || 'deepseek-r1:14b', {
-      temperature: 0.7, // Higher temperature for natural variation
-      timeout: 30000
-    });
+    // 使用统一的LLM配置
+    this.llmClient = createDefaultLLMClient();
     this.pendingTopicsManager = new PendingTopicsManager();
     this.dualStorage = new DualStorage();
+    proactiveLogger.info('ProactiveMessagingManager initialized', {
+      model: this.llmClient.getModelInfo().model,
+      backend: this.llmClient.getModelInfo().backend
+    });
   }
 
   /**

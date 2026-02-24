@@ -1,13 +1,38 @@
 import type { User, Role } from '@/types';
 
-export const hasPermission = (user: User | null, permissionName: string): boolean => {
+// Interface for admin user from admin-auth store
+interface AdminUserRole {
+  _id: string;
+  name: string;
+  isAdmin?: boolean;
+  permissions: Array<{ _id: string; name: string }>;
+}
+
+interface AdminUser {
+  _id: string;
+  email: string;
+  name: string;
+  role?: AdminUserRole;
+  lastLogin?: string;
+}
+
+// Union type for user-like objects (User from main site, or AdminUser from admin panel)
+type UserLike = User | AdminUser | null;
+
+// Helper to get user ID from either User or AdminUser
+const getUserId = (user: UserLike): string | undefined => {
+  if (!user) return undefined;
+  return (user as any)._id || (user as any).id;
+};
+
+export const hasPermission = (user: UserLike, permissionName: string): boolean => {
   if (!user || !user.role) {
     return false;
   }
 
   if (!user.role.permissions || !Array.isArray(user.role.permissions)) {
     console.warn('[hasPermission] Invalid permissions:', {
-      userId: user._id || user.id,
+      userId: getUserId(user),
       roleName: user.role.name,
       permissions: user.role.permissions
     });
@@ -19,7 +44,7 @@ export const hasPermission = (user: User | null, permissionName: string): boolea
   );
 };
 
-export const hasAnyPermission = (user: User | null, permissionNames: string[]): boolean => {
+export const hasAnyPermission = (user: UserLike, permissionNames: string[]): boolean => {
   if (!user || !user.role) {
     return false;
   }
@@ -34,7 +59,7 @@ export const hasAnyPermission = (user: User | null, permissionNames: string[]): 
   );
 };
 
-export const hasAllPermissions = (user: User | null, permissionNames: string[]): boolean => {
+export const hasAllPermissions = (user: UserLike, permissionNames: string[]): boolean => {
   if (!user || !user.role) {
     return false;
   }
@@ -49,7 +74,7 @@ export const hasAllPermissions = (user: User | null, permissionNames: string[]):
   );
 };
 
-export const hasRole = (user: User | null, roleName: string): boolean => {
+export const hasRole = (user: UserLike, roleName: string): boolean => {
   if (!user || !user.role) {
     return false;
   }
@@ -57,19 +82,30 @@ export const hasRole = (user: User | null, roleName: string): boolean => {
   return user.role.name === roleName;
 };
 
-export const isAdmin = (user: User | null): boolean => {
-  return hasRole(user, '管理员');
+export const isAdmin = (user: UserLike): boolean => {
+  // Check by isAdmin flag (set by backend) or by role name for backward compatibility
+  if (!user || !user.role) {
+    return false;
+  }
+
+  // Check if role has isAdmin flag (primary method)
+  if (user.role.isAdmin) {
+    return true;
+  }
+
+  // Fallback: check by role name (backward compatibility)
+  return hasRole(user, '管理员') || hasRole(user, 'admin');
 };
 
-export const canManageUsers = (user: User | null): boolean => {
+export const canManageUsers = (user: UserLike): boolean => {
   return hasAnyPermission(user, ['user:view', 'user:create', 'user:update', 'user:delete']);
 };
 
-export const canManageRoles = (user: User | null): boolean => {
+export const canManageRoles = (user: UserLike): boolean => {
   return hasAnyPermission(user, ['role:view', 'role:create', 'role:update', 'role:delete']);
 };
 
-export const canManageSystem = (user: User | null): boolean => {
+export const canManageSystem = (user: UserLike): boolean => {
   return hasAnyPermission(user, ['system:view', 'system:update']);
 };
 

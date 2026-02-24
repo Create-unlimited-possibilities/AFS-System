@@ -1,0 +1,10 @@
+{
+  "label": "User System",
+  "position": 1,
+  "link": {
+    "type": "generated-index",
+    "title": "User System",
+    "description": "User authentication, profiles, and assist relationships",
+    "slug": "/category/user-system"
+  }
+}

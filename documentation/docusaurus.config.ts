@@ -98,9 +98,9 @@ const config: Config = {
         },
         {
           type: 'docSidebar',
-          sidebarId: 'modulesSidebar',
+          sidebarId: 'deploymentSidebar',
           position: 'left',
-          label: '模块',
+          label: '部署',
         },
         {
           href: 'https://github.com/Create-unlimited-possibilities/AFS-System',

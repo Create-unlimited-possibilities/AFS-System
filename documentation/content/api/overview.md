@@ -2,34 +2,62 @@
 sidebar_position: 1
 ---
 
-# API 概述
+# API Overview
 
-## 基础信息
+The AFS System provides a comprehensive REST API for managing users, AI conversations, memories, questionnaires, and administration. The API is built on Express.js with MongoDB for data persistence.
 
-| 项目 | 值 |
-|------|-----|
-| 基础 URL | `http://localhost:3001/api` |
-| 认证方式 | JWT Token (Cookie) |
-| 数据格式 | JSON |
-| 字符编码 | UTF-8 |
+## Base URL
 
-## 认证
+| Environment | URL |
+|-------------|-----|
+| Development | `http://localhost:3000` |
+| Production | `https://your-domain.com` |
 
-所有需要认证的接口都需要在请求中携带 JWT Token：
+## Authentication
 
-```http
-Cookie: token=<your-jwt-token>
+Most endpoints require authentication using JWT (JSON Web Token) tokens.
+
+### Getting a Token
+
+After login or registration, you'll receive a token in the response:
+
+```json
+{
+  "success": true,
+  "user": {
+    "id": "507f1f77bcf86cd799439011",
+    "email": "user@example.com",
+    "name": "John Doe",
+    "uniqueCode": "ABC123",
+    "role": {
+      "name": "user",
+      "permissions": []
+    }
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
 ```
 
-或在 Header 中：
+### Using the Token
 
-```http
-Authorization: Bearer <your-jwt-token>
+Include the token in the Authorization header for protected requests:
+
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+     http://localhost:3000/api/users/profile
 ```
 
-## 通用响应格式
+```javascript
+fetch('/api/users/profile', {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+})
+```
 
-### 成功响应
+## Response Format
+
+### Success Response
 
 ```json
 {
@@ -38,44 +66,122 @@ Authorization: Bearer <your-jwt-token>
 }
 ```
 
-### 错误响应
+### Error Response
 
 ```json
 {
   "success": false,
-  "message": "错误描述",
-  "error": "ERROR_CODE"
+  "error": "Error message description"
 }
 ```
 
-## API 模块
+## HTTP Status Codes
 
-| 模块 | 路由前缀 | 描述 |
-|------|---------|------|
-| 认证 | `/api/auth` | 登录、注册、Token 验证 |
-| 用户 | `/api/users` | 用户 CRUD、统计 |
-| 角色 | `/api/roles` | 角色权限管理 |
-| 问题 | `/api/questions` | 问题列表、进度 |
-| 回答 | `/api/answers` | 回答保存、查询 |
-| 协助 | `/api/auth/assist` | 协助关系管理 |
-| 对话 | `/api/chat` | AI 对话会话 |
-| 角色卡 | `/api/rolecard` | 角色卡生成、管理 |
-| 好感度 | `/api/sentiment` | 好感度追踪 |
-| 设置 | `/api/settings` | 系统设置 |
+| Code | Description |
+|------|-------------|
+| 200 | Success |
+| 201 | Created |
+| 400 | Bad Request - Invalid input |
+| 401 | Unauthorized - Missing or invalid token |
+| 403 | Forbidden - Insufficient permissions |
+| 404 | Not Found |
+| 500 | Internal Server Error |
 
-## HTTP 状态码
+## API Modules
 
-| 状态码 | 含义 |
-|--------|------|
-| 200 | 成功 |
-| 201 | 创建成功 |
-| 400 | 请求参数错误 |
-| 401 | 未认证 |
-| 403 | 权限不足 |
-| 404 | 资源不存在 |
-| 500 | 服务器错误 |
+The AFS System API is organized into the following modules:
 
-## 速率限制
+| Module | Path | Description | Auth Required |
+|--------|------|-------------|---------------|
+| Authentication | `/api/auth` | User registration, login, session management | Partial |
+| Users | `/api/users` | User profile and management | Yes |
+| Chat | `/api/chat` | AI conversation sessions and messaging | Yes |
+| Questions | `/api/questions` | Questionnaire questions | Yes |
+| Answers | `/api/answers` | Questionnaire answers | Yes |
+| RoleCard | `/api/rolecard` | AI role card generation and management | Yes |
+| Memory | `/api/memory` | Memory indexing, compression, retrieval | No* |
+| Sentiment | `/api/sentiment` | Relationship sentiment tracking | Yes |
+| Roles | `/api/roles` | Role and permission management | Yes |
+| Settings | `/api/settings` | System settings configuration | Yes |
+| Regions | `/api/regions` | China administrative regions data | No |
+| Admin | `/api/admin` | Administrative operations | Yes |
+| Admin Auth | `/admin-auth` | Admin login/register | No |
 
-- 每个 IP 每分钟最多 100 次请求
-- 超出限制返回 429 状态码
+*Memory routes have their own authentication middleware
+
+## Pagination
+
+List endpoints support pagination using query parameters:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | number | 1 | Page number |
+| `limit` | number | 20 | Items per page |
+
+Example request:
+
+```bash
+GET /api/admin/users?page=2&limit=50
+```
+
+Response format:
+
+```json
+{
+  "success": true,
+  "data": [...],
+  "pagination": {
+    "page": 2,
+    "limit": 50,
+    "total": 150,
+    "pages": 3
+  }
+}
+```
+
+## Filtering and Search
+
+Many endpoints support filtering and search:
+
+```bash
+# Search users
+GET /api/admin/users?search=john
+
+# Filter by role
+GET /api/questions?role=elder&layer=basic
+
+# Filter by status
+GET /api/admin/users?isActive=true
+```
+
+## SSE (Server-Sent Events)
+
+Some endpoints support Server-Sent Events for streaming responses:
+
+- RoleCard generation with progress
+- Real-time AI responses
+
+Example:
+
+```javascript
+const eventSource = new EventSource('/api/rolecard/generate/stream', {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+
+eventSource.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Progress:', data.progress);
+};
+```
+
+## Admin API
+
+The Admin API has dedicated authentication routes and requires admin role:
+
+- Admin Login: `POST /admin-auth/login`
+- Admin Register: `POST /admin-auth/register`
+- Admin endpoints: `GET /api/admin/*` (requires admin role)
+
+See [Admin API Documentation](/docs/api/admin) for details.
