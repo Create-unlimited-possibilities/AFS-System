@@ -23,6 +23,9 @@ import { regionsRouter } from './modules/common/china-regions/index.js';
 import memoryRouter from './modules/memory/route.js';
 import adminRouter from './modules/admin/route.js';
 import adminAuthRouter from './modules/admin/authRoute.js';
+import xiaoshudongRouter from './modules/xiaoshudong/route.js';
+import ziweiRouter from './modules/ziwei/route.js';
+import { langGraphRouter, configLoader, ensureLangGraphPermission } from './modules/langgraph/index.js';
 
 // Auth middleware
 import { protect } from './modules/auth/middleware.js';
@@ -69,6 +72,15 @@ mongoose.connection.once('open', async () => {
   await hookRegistry.registerAll();
 
   logger.info('自动挂钩已注册');
+
+  // Initialize LangGraph config and permission
+  try {
+    await ensureLangGraphPermission();
+    await configLoader.initialize();
+    logger.info('LangGraph module initialized');
+  } catch (error) {
+    logger.warn('LangGraph initialization skipped:', error.message);
+  }
 });
 
 app.use('/api/auth', authRouter);
@@ -92,8 +104,11 @@ app.use('/api/chat', protect, chatRouter);
 app.use('/api/rolecard', protect, rolecardRouter);
 app.use('/api/sentiment', protect, sentimentRouter);
 app.use('/api/memory', memoryRouter);
+app.use('/api/xiaoshudong', xiaoshudongRouter);
+app.use('/api/ziwei', ziweiRouter);
 app.use('/admin-auth', adminAuthRouter);  // Public admin auth routes - completely separate path
 app.use('/api/admin', adminRouter);
+app.use('/api/admin/langgraph', langGraphRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
