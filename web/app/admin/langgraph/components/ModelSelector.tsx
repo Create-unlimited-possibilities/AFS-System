@@ -1,9 +1,9 @@
 // web/app/admin/langgraph/components/ModelSelector.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Cpu, Cloud } from 'lucide-react';
+import { Cpu, Cloud, Info } from 'lucide-react';
 import type { AvailableModels, LLMConfig } from '../hooks/useLangGraph';
 
 interface ModelSelectorProps {
@@ -14,6 +14,11 @@ interface ModelSelectorProps {
 
 export function ModelSelector({ config, models, onChange }: ModelSelectorProps) {
   const [source, setSource] = useState<'ollama' | 'api'>(config.source);
+
+  // Sync source with config changes (when switching nodes)
+  useEffect(() => {
+    setSource(config.source);
+  }, [config.source]);
 
   const handleSourceChange = (newSource: 'ollama' | 'api') => {
     setSource(newSource);
@@ -30,6 +35,12 @@ export function ModelSelector({ config, models, onChange }: ModelSelectorProps) 
 
   return (
     <div className="space-y-4">
+      {/* Hint about default config */}
+      <div className="flex items-start gap-2 p-2 bg-blue-50 rounded-lg text-xs text-blue-700">
+        <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+        <span>此配置会覆盖「模型管理 → 默认配置」中的全局设置</span>
+      </div>
+
       {/* Model Source Selection */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
