@@ -8,6 +8,7 @@
 
 import LLMClient, { createDefaultLLMClient } from '../../../core/llm/client.js';
 import logger from '../../../core/utils/logger.js';
+import { configLoader } from '../../langgraph/configLoader.js';
 
 // 历史记录配置
 const MAX_HISTORY_TURNS = 20;  // 最多保留20轮对话（40条消息）
@@ -24,6 +25,13 @@ export async function responseGeneratorNode(state) {
 
     const { contextMessages, userName } = state;
     const llmClient = createDefaultLLMClient();
+
+    // Get LLM config from configLoader for rolecard flow
+    const nodeConfig = configLoader.getNodeConfig('rolecard', 'response_generator');
+    const llmOptions = {
+      temperature: nodeConfig?.llmConfig?.temperature || 0.7,
+      maxTokens: nodeConfig?.llmConfig?.maxTokens || 500
+    };
 
     // 提取系统提示词和对话历史
     const systemMessage = contextMessages.find(m => m.role === 'system');
@@ -78,10 +86,7 @@ export async function responseGeneratorNode(state) {
     const promptPreview = prompt.length > 1000 ? prompt.substring(0, 500) + '\n...[省略]...\n' + prompt.substring(prompt.length - 300) : prompt;
     logger.info(`[ResponseGenerator] 完整PROMPT (${prompt.length}字符):\n${promptPreview}`);
 
-    const response = await llmClient.generate(prompt, {
-      temperature: 0.7,
-      maxTokens: 500
-    });
+    const response = await llmClient.generate(prompt, llmOptions);
 
     // 调试：输出原始响应
     logger.info(`[ResponseGenerator] LLM原始响应 (${response?.length || 0}字符): ${response?.substring(0, 300)}...`);
