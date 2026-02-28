@@ -57,6 +57,9 @@ const SYSTEM_PERMISSIONS = [
 
   // Conversation management
   { name: 'conversation:view', description: '查看对话', category: 'content' },
+
+  // LangGraph management
+  { name: 'langgraph:edit', description: '编辑 LangGraph 流程配置', category: 'system' },
 ];
 
 /**
@@ -170,6 +173,7 @@ export async function createAdminUser(email, password, name = 'Administrator') {
 
 /**
  * Full initialization - call this on server startup
+ * Ensures a super admin always exists with all permissions
  */
 export async function initializeAdminSystem() {
   try {
@@ -177,15 +181,16 @@ export async function initializeAdminSystem() {
 
     const adminRole = await initializeAdminRole();
 
-    // Create default admin user from env variables if provided
-    const defaultEmail = process.env.ADMIN_EMAIL;
-    const defaultPassword = process.env.ADMIN_PASSWORD;
+    // Default admin credentials (use env vars if available, otherwise use defaults)
+    const defaultEmail = process.env.ADMIN_EMAIL || 'admin@afs-system.com';
+    const defaultPassword = process.env.ADMIN_PASSWORD || 'Admin@123456';
+    const defaultName = process.env.ADMIN_NAME || 'Super Administrator';
 
-    if (defaultEmail && defaultPassword) {
-      await createAdminUser(defaultEmail, defaultPassword, 'System Administrator');
-    }
+    // Always ensure super admin exists
+    await createAdminUser(defaultEmail, defaultPassword, defaultName);
 
     logger.info('[InitAdmin] Admin system initialization completed');
+    logger.info(`[InitAdmin] Super admin ready: ${defaultEmail}`);
     return adminRole;
   } catch (error) {
     logger.error('[InitAdmin] Admin system initialization failed:', error);
@@ -197,8 +202,8 @@ export async function initializeAdminSystem() {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2);
   const email = args[0] || process.env.ADMIN_EMAIL || 'admin@afs-system.com';
-  const password = args[1] || process.env.ADMIN_PASSWORD || 'admin123456';
-  const name = args[2] || 'System Administrator';
+  const password = args[1] || process.env.ADMIN_PASSWORD || 'Admin@123456';
+  const name = args[2] || process.env.ADMIN_NAME || 'Super Administrator';
 
   // Connect to MongoDB first
   const MONGO_URI = process.env.MONGO_URI || 'mongodb://mongoserver:27017/afs_db';
