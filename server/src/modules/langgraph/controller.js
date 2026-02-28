@@ -20,9 +20,12 @@ class LangGraphController {
   async getFlowById(req, res) {
     try {
       const { flowId } = req.params;
+      console.log(`[LangGraphController] Getting flow: ${flowId}`);
       const flow = await langGraphService.getFlowById(flowId);
+      console.log(`[LangGraphController] Flow nodes count: ${flow?.nodes?.length}`);
       res.json({ success: true, data: flow });
     } catch (error) {
+      console.error(`[LangGraphController] Error getting flow:`, error);
       res.status(404).json({ success: false, error: error.message });
     }
   }
@@ -57,13 +60,16 @@ class LangGraphController {
   async resetFlowConfig(req, res) {
     try {
       const { flowId } = req.params;
+      console.log(`[LangGraphController] Resetting flow: ${flowId}`);
       const config = await langGraphService.resetFlowConfig(flowId);
+      console.log(`[LangGraphController] Reset complete, nodes: ${config?.nodes?.length}`);
       res.json({
         success: true,
         message: `流程 ${flowId} 已重置为默认配置`,
         data: config
       });
     } catch (error) {
+      console.error(`[LangGraphController] Reset error:`, error);
       res.status(400).json({ success: false, error: error.message });
     }
   }
