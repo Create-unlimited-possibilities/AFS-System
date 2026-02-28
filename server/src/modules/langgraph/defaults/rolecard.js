@@ -7,15 +7,13 @@ export const rolecardDefault = {
     {
       nodeId: 'input_processor',
       nodeName: '输入处理',
-      nodeType: 'process',
+      nodeType: 'start',
       promptType: 'none',
       staticPrompt: '',
-      dynamicSources: [
-        { name: '用户消息', description: '用户输入的原始消息' }
-      ],
+      dynamicSources: [{ name: '用户消息', description: '用户输入的原始消息' }],
       llmEnabled: false,
       llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.7, maxTokens: 500 },
-      position: { x: 100, y: 200 }
+      position: { x: 300, y: 50 }
     },
     {
       nodeId: 'token_monitor',
@@ -29,7 +27,7 @@ export const rolecardDefault = {
       ],
       llmEnabled: false,
       llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.7, maxTokens: 500 },
-      position: { x: 250, y: 200 }
+      position: { x: 300, y: 130 }
     },
     {
       nodeId: 'memory_check',
@@ -37,12 +35,10 @@ export const rolecardDefault = {
       nodeType: 'condition',
       promptType: 'none',
       staticPrompt: '',
-      dynamicSources: [
-        { name: '消息内容', description: '分析消息是否涉及记忆' }
-      ],
+      dynamicSources: [{ name: '消息内容', description: '分析消息是否涉及记忆' }],
       llmEnabled: false,
       llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.3, maxTokens: 100 },
-      position: { x: 400, y: 100 }
+      position: { x: 300, y: 210 }
     },
     {
       nodeId: 'rag_retriever',
@@ -56,7 +52,7 @@ export const rolecardDefault = {
       ],
       llmEnabled: false,
       llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.5, maxTokens: 200 },
-      position: { x: 550, y: 50 }
+      position: { x: 150, y: 290 }
     },
     {
       nodeId: 'context_builder',
@@ -72,7 +68,7 @@ export const rolecardDefault = {
       ],
       llmEnabled: false,
       llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.7, maxTokens: 500 },
-      position: { x: 700, y: 100 }
+      position: { x: 300, y: 370 }
     },
     {
       nodeId: 'response_generator',
@@ -87,7 +83,7 @@ export const rolecardDefault = {
       ],
       llmEnabled: true,
       llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.7, maxTokens: 500 },
-      position: { x: 850, y: 200 }
+      position: { x: 300, y: 450 }
     },
     {
       nodeId: 'token_response',
@@ -101,7 +97,7 @@ export const rolecardDefault = {
       ],
       llmEnabled: false,
       llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.7, maxTokens: 500 },
-      position: { x: 1000, y: 200 }
+      position: { x: 300, y: 530 }
     },
     {
       nodeId: 'output_formatter',
@@ -115,17 +111,17 @@ export const rolecardDefault = {
       ],
       llmEnabled: false,
       llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.7, maxTokens: 500 },
-      position: { x: 1150, y: 200 }
+      position: { x: 300, y: 610 }
     }
   ],
   edges: [
-    { source: 'input_processor', target: 'token_monitor', conditionType: 'always' },
-    { source: 'token_monitor', target: 'memory_check', conditionType: 'always' },
-    { source: 'memory_check', target: 'rag_retriever', conditionType: 'conditional' },
-    { source: 'memory_check', target: 'context_builder', conditionType: 'conditional' },
-    { source: 'rag_retriever', target: 'context_builder', conditionType: 'always' },
-    { source: 'context_builder', target: 'response_generator', conditionType: 'always' },
-    { source: 'response_generator', target: 'token_response', conditionType: 'always' },
-    { source: 'token_response', target: 'output_formatter', conditionType: 'always' }
+    { source: 'input_processor', target: 'token_monitor', conditionType: 'always', label: '' },
+    { source: 'token_monitor', target: 'memory_check', conditionType: 'always', label: '' },
+    { source: 'memory_check', target: 'rag_retriever', conditionType: 'conditional', label: '涉及记忆' },
+    { source: 'memory_check', target: 'context_builder', conditionType: 'conditional', label: '无需检索' },
+    { source: 'rag_retriever', target: 'context_builder', conditionType: 'always', label: '' },
+    { source: 'context_builder', target: 'response_generator', conditionType: 'always', label: '' },
+    { source: 'response_generator', target: 'token_response', conditionType: 'always', label: '' },
+    { source: 'token_response', target: 'output_formatter', conditionType: 'always', label: '' }
   ]
 };

@@ -95,6 +95,10 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
       source: edge.source,
       target: edge.target,
       label: edge.label || undefined,
+      labelStyle: { fill: '#374151', fontWeight: 500, fontSize: 11 },
+      labelBgStyle: { fill: '#fff', fillOpacity: 0.9 },
+      labelBgPadding: [4, 2] as [number, number],
+      labelBgBorderRadius: 4,
       animated: true, // Always animate to show flow direction
       markerEnd: {
         type: MarkerType.ArrowClosed,
@@ -102,7 +106,7 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
       },
       style: {
         stroke: edge.conditionType === 'conditional' ? '#f97316' : '#22c55e',
-        strokeWidth: 2,
+        strokeWidth: 2.5,
       },
     }));
     setFlowEdges(converted);
