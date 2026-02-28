@@ -1,7 +1,7 @@
 // web/app/admin/langgraph/components/PromptEditor.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Info, FileText } from 'lucide-react';
 import type { DynamicSource } from '../hooks/useLangGraph';
@@ -24,6 +24,11 @@ export function PromptEditor({
   const [value, setValue] = useState(
     promptType === 'static' ? staticPrompt : editableSection
   );
+
+  // Update value when props change (switching nodes)
+  useEffect(() => {
+    setValue(promptType === 'static' ? staticPrompt : editableSection);
+  }, [promptType, staticPrompt, editableSection]);
 
   const handleChange = (newValue: string) => {
     setValue(newValue);
