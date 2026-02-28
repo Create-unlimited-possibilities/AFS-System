@@ -1924,4 +1924,280 @@ After completing Phase 2:
 
 ---
 
-## Phase 3: Node Integration (To be continued...)
+## Phase 3: Node Integration
+
+### Task 3.1: Modify XiaoShuDong Nodes to Use ConfigLoader
+
+**Files:**
+- Modify: `server/src/modules/xiaoshudong/nodes/listeningResponse.js`
+- Modify: `server/src/modules/xiaoshudong/nodes/conversationCompressor.js`
+- Modify: `server/src/modules/xiaoshudong/nodes/fortuneGenerator.js`
+- Modify: `server/src/modules/xiaoshudong/nodes/psychologistResponse.js`
+- Modify: `server/src/modules/xiaoshudong/nodes/intentClassifier.js`
+
+**Step 1: Modify listeningResponse.js**
+
+Add import and use configLoader:
+
+```javascript
+// Add at top of file
+import { configLoader } from '../../langgraph/configLoader.js';
+
+// In generateListeningLLMResponse function, replace:
+// let systemPrompt = LISTENING_SYSTEM_PROMPT;
+// With:
+let systemPrompt = configLoader.getPrompt('xiaoshudong', 'listening_response') || LISTENING_SYSTEM_PROMPT;
+
+// Get LLM config from configLoader
+const nodeConfig = configLoader.getNodeConfig('xiaoshudong', 'listening_response');
+const llmOptions = {
+  temperature: nodeConfig?.llmConfig?.temperature || 0.7,
+  maxTokens: nodeConfig?.llmConfig?.maxTokens || 200
+};
+```
+
+**Step 2: Modify conversationCompressor.js**
+
+```javascript
+// Add at top of file
+import { configLoader } from '../../langgraph/configLoader.js';
+
+// In conversationCompressorNode function, replace:
+// { role: 'system', content: COMPRESSOR_SYSTEM_PROMPT },
+// With:
+const systemPrompt = configLoader.getPrompt('xiaoshudong', 'conversation_compressor') || COMPRESSOR_SYSTEM_PROMPT;
+// ... use systemPrompt in messages
+
+// Get LLM config
+const nodeConfig = configLoader.getNodeConfig('xiaoshudong', 'conversation_compressor');
+const llmOptions = {
+  temperature: nodeConfig?.llmConfig?.temperature || 0.3,
+  maxTokens: nodeConfig?.llmConfig?.maxTokens || 500
+};
+```
+
+**Step 3: Modify fortuneGenerator.js**
+
+```javascript
+// Add import
+import { configLoader } from '../../langgraph/configLoader.js';
+
+// In buildFortunePrompt or generate function, use editable section:
+const editableSection = configLoader.getPrompt('xiaoshudong', 'fortune_generator');
+// Append editableSection to the prompt
+
+// Get LLM config for model selection
+const nodeConfig = configLoader.getNodeConfig('xiaoshudong', 'fortune_generator');
+// Use nodeConfig.llmConfig.model for model selection
+```
+
+**Step 4: Modify psychologistResponse.js**
+
+```javascript
+// Add import
+import { configLoader } from '../../langgraph/configLoader.js';
+
+// Replace PSYCHOLOGIST_SYSTEM_PROMPT with configLoader.getPrompt
+const systemPrompt = configLoader.getPrompt('xiaoshudong', 'psychologist_response') || PSYCHOLOGIST_SYSTEM_PROMPT;
+
+// Get LLM config
+const nodeConfig = configLoader.getNodeConfig('xiaoshudong', 'psychologist_response');
+```
+
+**Step 5: Modify intentClassifier.js**
+
+```javascript
+// Add import
+import { configLoader } from '../../langgraph/configLoader.js';
+
+// Replace INTENT_CLASSIFICATION_PROMPT with configLoader.getPrompt
+const systemPrompt = configLoader.getPrompt('xiaoshudong', 'intent_classifier') || INTENT_CLASSIFICATION_PROMPT;
+
+// Get LLM config
+const nodeConfig = configLoader.getNodeConfig('xiaoshudong', 'intent_classifier');
+```
+
+**Step 6: Verify syntax**
+
+Run:
+```bash
+cd F:/FPY/AFS-System/server && node --check src/modules/xiaoshudong/nodes/listeningResponse.js
+cd F:/FPY/AFS-System/server && node --check src/modules/xiaoshudong/nodes/conversationCompressor.js
+cd F:/FPY/AFS-System/server && node --check src/modules/xiaoshudong/nodes/fortuneGenerator.js
+cd F:/FPY/AFS-System/server && node --check src/modules/xiaoshudong/nodes/psychologistResponse.js
+cd F:/FPY/AFS-System/server && node --check src/modules/xiaoshudong/nodes/intentClassifier.js
+```
+Expected: No output (success)
+
+**Step 7: Commit**
+
+```bash
+git add server/src/modules/xiaoshudong/nodes/
+git commit -m "feat(langgraph): integrate configLoader into xiaoshudong nodes"
+```
+
+---
+
+### Task 3.2: Modify Role Card Node to Use ConfigLoader
+
+**Files:**
+- Modify: `server/src/modules/chat/nodes/responseGenerator.js`
+
+**Step 1: Add configLoader import and usage**
+
+```javascript
+// Add import
+import { configLoader } from '../../langgraph/configLoader.js';
+
+// In responseGeneratorNode function, after getting llmClient:
+const nodeConfig = configLoader.getNodeConfig('rolecard', 'response_generator');
+
+// Use config for LLM options if available
+const llmOptions = {
+  temperature: nodeConfig?.llmConfig?.temperature || 0.7,
+  maxTokens: nodeConfig?.llmConfig?.maxTokens || 500
+};
+
+// Note: Prompt comes from role card, so we only use LLM config here
+```
+
+**Step 2: Verify syntax**
+
+Run: `cd F:/FPY/AFS-System/server && node --check src/modules/chat/nodes/responseGenerator.js`
+Expected: No output (success)
+
+**Step 3: Commit**
+
+```bash
+git add server/src/modules/chat/nodes/responseGenerator.js
+git commit -m "feat(langgraph): integrate configLoader into rolecard response generator"
+```
+
+---
+
+### Task 3.3: Final Verification and Testing
+
+**Step 1: Start server and verify initialization**
+
+Run: `cd F:/FPY/AFS-System/server && npm run dev`
+
+Expected log output:
+```
+[LANGGRAPH_CONFIG] Created config from defaults: rolecard
+[LANGGRAPH_CONFIG] Created config from defaults: xiaoshudong
+[LANGGRAPH_CONFIG] LangGraph ConfigLoader initialized
+LangGraph module initialized
+```
+
+**Step 2: Test API endpoints**
+
+```bash
+# Get flows
+curl -H "Authorization: Bearer <admin_token>" http://localhost:3001/api/admin/langgraph/flows
+
+# Get flow detail
+curl -H "Authorization: Bearer <admin_token>" http://localhost:3001/api/admin/langgraph/flows/xiaoshudong
+
+# Get available models
+curl -H "Authorization: Bearer <admin_token>" http://localhost:3001/api/admin/langgraph/models
+
+# Update node config
+curl -X PUT -H "Authorization: Bearer <admin_token>" -H "Content-Type: application/json" \
+  -d '{"llmConfig":{"temperature":0.8}}' \
+  http://localhost:3001/api/admin/langgraph/flows/xiaoshudong/nodes/listening_response
+```
+
+**Step 3: Test frontend**
+
+1. Login as admin with `langgraph:edit` permission
+2. Navigate to `/admin/langgraph`
+3. Verify tab switching works
+4. Verify flow canvas displays nodes
+5. Click a node and verify editor panel shows
+6. Edit prompt and save
+7. Verify success message
+
+**Step 4: Verify config persistence**
+
+1. After saving changes, restart server
+2. Check that changes persisted in MongoDB
+3. Verify nodes use updated config
+
+**Step 5: Final commit**
+
+```bash
+git add -A
+git commit -m "feat(langgraph): complete LangGraph visual editor implementation
+
+- Backend: Model, service, controller, routes for flow config
+- Frontend: React Flow visualization, node editor panel
+- Integration: ConfigLoader integrated into xiaoshudong and rolecard nodes
+- Permission: langgraph:edit permission for access control
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+```
+
+---
+
+## Phase 3 Complete ✅
+
+After completing Phase 3:
+- XiaoShuDong nodes use configLoader for prompts and LLM config
+- Role card node uses configLoader for LLM config
+- Configuration persists in MongoDB
+- Changes take effect on server restart
+
+---
+
+## Implementation Complete 🎉
+
+All phases completed:
+- **Phase 1**: Backend foundation (model, service, routes)
+- **Phase 2**: Frontend page (React Flow, editor components)
+- **Phase 3**: Node integration (configLoader in nodes)
+
+### Key Features:
+- ✅ Tab-based flow switching (AI角色卡 | 小树洞)
+- ✅ Visual flow diagram with React Flow
+- ✅ Node editor for prompt and model configuration
+- ✅ Static and dynamic prompt types supported
+- ✅ Ollama and API model selection
+- ✅ Permission-based access control
+- ✅ MongoDB persistence
+- ✅ Configuration loaded on server restart
+
+### File Summary:
+
+**Backend (New):**
+- `server/src/modules/langgraph/model.js`
+- `server/src/modules/langgraph/service.js`
+- `server/src/modules/langgraph/controller.js`
+- `server/src/modules/langgraph/route.js`
+- `server/src/modules/langgraph/configLoader.js`
+- `server/src/modules/langgraph/index.js`
+- `server/src/modules/langgraph/defaults/index.js`
+- `server/src/modules/langgraph/defaults/rolecard.js`
+- `server/src/modules/langgraph/defaults/xiaoshudong.js`
+- `server/src/modules/langgraph/migrations/addPermission.js`
+
+**Backend (Modified):**
+- `server/src/server.js`
+- `server/src/modules/xiaoshudong/nodes/listeningResponse.js`
+- `server/src/modules/xiaoshudong/nodes/conversationCompressor.js`
+- `server/src/modules/xiaoshudong/nodes/fortuneGenerator.js`
+- `server/src/modules/xiaoshudong/nodes/psychologistResponse.js`
+- `server/src/modules/xiaoshudong/nodes/intentClassifier.js`
+- `server/src/modules/chat/nodes/responseGenerator.js`
+
+**Frontend (New):**
+- `web/app/admin/langgraph/page.tsx`
+- `web/app/admin/langgraph/hooks/useLangGraph.ts`
+- `web/app/admin/langgraph/components/FlowTabs.tsx`
+- `web/app/admin/langgraph/components/FlowCanvas.tsx`
+- `web/app/admin/langgraph/components/NodeEditor.tsx`
+- `web/app/admin/langgraph/components/PromptEditor.tsx`
+- `web/app/admin/langgraph/components/ModelSelector.tsx`
+
+**Frontend (Modified):**
+- `web/package.json` (added reactflow)
+- `web/components/admin/AdminSidebar.tsx`
