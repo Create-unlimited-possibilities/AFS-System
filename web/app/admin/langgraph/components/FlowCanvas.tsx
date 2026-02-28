@@ -1,7 +1,7 @@
 // web/app/admin/langgraph/components/FlowCanvas.tsx
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -10,8 +10,6 @@ import ReactFlow, {
   MiniMap,
   MarkerType,
   NodeTypes,
-  useNodesState,
-  useEdgesState,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { cn } from '@/lib/utils';
@@ -54,24 +52,28 @@ const nodeTypes: NodeTypes = {
 };
 
 export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCanvasProps) {
-  // Convert to ReactFlow format
-  const flowNodes: Node[] = useMemo(() =>
-    nodes.map((node) => ({
+  const [flowNodes, setFlowNodes] = useState<Node[]>([]);
+  const [flowEdges, setFlowEdges] = useState<Edge[]>([]);
+
+  // Update nodes when props change
+  useEffect(() => {
+    const converted: Node[] = nodes.map((node) => ({
       id: node.nodeId,
       type: 'custom',
-      position: { x: node.position.x, y: node.position.y },
+      position: { x: node.position?.x || 0, y: node.position?.y || 0 },
       data: {
         label: node.nodeName,
         nodeType: node.nodeType,
         promptType: node.promptType,
         llmEnabled: node.llmEnabled,
       },
-    })),
-    [nodes]
-  );
+    }));
+    setFlowNodes(converted);
+  }, [nodes]);
 
-  const flowEdges: Edge[] = useMemo(() =>
-    edges.map((edge, index) => ({
+  // Update edges when props change
+  useEffect(() => {
+    const converted: Edge[] = edges.map((edge, index) => ({
       id: `edge-${index}`,
       source: edge.source,
       target: edge.target,
@@ -83,21 +85,9 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
       style: {
         stroke: edge.conditionType === 'conditional' ? '#f97316' : '#94a3b8',
       },
-    })),
-    [edges]
-  );
-
-  const [reactNodes, setReactNodes, onNodesChange] = useNodesState(flowNodes);
-  const [reactEdges, setReactEdges, onEdgesChange] = useEdgesState(flowEdges);
-
-  // Update nodes when props change
-  useMemo(() => {
-    setReactNodes(flowNodes);
-  }, [flowNodes, setReactNodes]);
-
-  useMemo(() => {
-    setReactEdges(flowEdges);
-  }, [flowEdges, setReactEdges]);
+    }));
+    setFlowEdges(converted);
+  }, [edges]);
 
   const onNodeClickHandler = useCallback(
     (_event: React.MouseEvent, node: Node) => {
@@ -109,15 +99,25 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
     [nodes, onNodeClick]
   );
 
+  // Show placeholder if no nodes
+  if (nodes.length === 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-gray-400">
+        <div className="text-center">
+          <p className="text-lg">暂无流程数据</p>
+          <p className="text-sm mt-2">请检查后端服务是否正常运行</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full">
       <ReactFlow
-        nodes={reactNodes}
-        edges={reactEdges}
+        nodes={flowNodes}
+        edges={flowEdges}
         onNodeClick={onNodeClickHandler}
         nodeTypes={nodeTypes}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
         fitView
         attributionPosition="bottom-left"
       >
