@@ -1,7 +1,7 @@
 // web/app/admin/langgraph/components/FlowCanvas.tsx
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -24,25 +24,38 @@ interface FlowCanvasProps {
 
 // Custom node component
 function CustomNode({ data, selected }: { data: any; selected: boolean }) {
-  const isEditable = data.promptType !== 'none' || data.llmEnabled;
+  // 可编辑：有静态prompt 或 动态prompt 或 LLM可配置
+  const hasStaticPrompt = data.promptType === 'static';
+  const hasDynamicPrompt = data.promptType === 'dynamic';
+  const hasLLMConfig = data.llmEnabled;
+  const isEditable = hasStaticPrompt || hasDynamicPrompt || hasLLMConfig;
 
   return (
     <div
       className={cn(
-        'px-4 py-2 rounded-lg border-2 min-w-[120px] text-center transition-all',
-        selected ? 'border-orange-500 shadow-lg' : 'border-gray-300',
-        isEditable ? 'bg-white cursor-pointer hover:border-orange-400' : 'bg-gray-100 cursor-default',
+        'px-4 py-3 rounded-lg border-2 min-w-[140px] text-center transition-all',
+        selected ? 'border-orange-500 shadow-lg ring-2 ring-orange-200' : '',
+        isEditable
+          ? 'bg-green-50 border-green-400 cursor-pointer hover:border-green-500 hover:shadow-md'
+          : 'bg-gray-100 border-gray-300 cursor-pointer hover:border-gray-400',
         data.nodeType === 'condition' && 'rounded-full'
       )}
     >
       <div className="font-medium text-sm">{data.label}</div>
-      {isEditable && (
-        <div className="text-xs text-gray-500 mt-1">
-          {data.promptType === 'static' && '📝 静态Prompt'}
-          {data.promptType === 'dynamic' && '⚡ 动态Prompt'}
-          {data.promptType === 'none' && '🤖 仅模型'}
-        </div>
-      )}
+      <div className="text-xs mt-1 flex flex-wrap gap-1 justify-center">
+        {hasStaticPrompt && (
+          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">📝 静态</span>
+        )}
+        {hasDynamicPrompt && (
+          <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">⚡ 动态</span>
+        )}
+        {hasLLMConfig && !hasStaticPrompt && !hasDynamicPrompt && (
+          <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">🤖 模型</span>
+        )}
+        {!isEditable && (
+          <span className="px-1.5 py-0.5 bg-gray-200 text-gray-600 rounded">🔒 只读</span>
+        )}
+      </div>
     </div>
   );
 }

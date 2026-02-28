@@ -7,6 +7,7 @@ import { useLangGraph } from './hooks/useLangGraph';
 import { FlowTabs } from './components/FlowTabs';
 import { FlowCanvas } from './components/FlowCanvas';
 import { NodeEditor } from './components/NodeEditor';
+import { NodeInfo } from './components/NodeInfo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { GitBranch, AlertCircle, Loader2 } from 'lucide-react';
 import type { LangGraphNode } from './hooks/useLangGraph';
@@ -47,10 +48,8 @@ export default function LangGraphPage() {
   };
 
   const handleNodeClick = (node: LangGraphNode) => {
-    // Only select nodes that have editable content
-    if (node.promptType !== 'none' || node.llmEnabled) {
-      setSelectedNode(node);
-    }
+    // All nodes can be clicked to view details
+    setSelectedNode(node);
   };
 
   const handleSaveNode = async (updates: {
@@ -142,12 +141,22 @@ export default function LangGraphPage() {
             </CardHeader>
             <CardContent className="overflow-y-auto h-[520px]">
               {selectedNode ? (
-                <NodeEditor
-                  node={selectedNode}
-                  models={models}
-                  onSave={handleSaveNode}
-                  onCancel={() => setSelectedNode(null)}
-                />
+                // 判断节点是否可完全编辑（有静态或动态prompt）
+                selectedNode.promptType !== 'none' ? (
+                  <NodeEditor
+                    node={selectedNode}
+                    models={models}
+                    onSave={handleSaveNode}
+                    onCancel={() => setSelectedNode(null)}
+                  />
+                ) : (
+                  <NodeInfo
+                    node={selectedNode}
+                    models={models}
+                    onSave={handleSaveNode}
+                    onClose={() => setSelectedNode(null)}
+                  />
+                )
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-gray-400">
                   <GitBranch className="w-12 h-12 mb-2" />
