@@ -18,6 +18,12 @@ import {
   Menu,
   X,
   ChevronRight,
+  BookOpen,
+  MessageSquareHeart,
+  Cpu,
+  Trash2,
+  FileText,
+  GitBranch,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -56,6 +62,30 @@ const navItems: NavItem[] = [
     permission: 'memory:view',
   },
   {
+    title: '算命书籍',
+    href: '/admin/knowledge',
+    icon: BookOpen,
+    permission: 'memory:view',
+  },
+  {
+    title: '小树洞统计',
+    href: '/admin/xiaoshudong-stats',
+    icon: MessageSquareHeart,
+    permission: 'memory:view',
+  },
+  {
+    title: '模型管理',
+    href: '/admin/models',
+    icon: Cpu,
+    permission: 'system:view',
+  },
+  {
+    title: 'LangGraph 管理',
+    href: '/admin/langgraph',
+    icon: GitBranch,
+    permission: 'langgraph:edit',
+  },
+  {
     title: '角色管理',
     href: '/admin/roles',
     icon: ShieldIcon,
@@ -84,6 +114,18 @@ const navItems: NavItem[] = [
         href: '/admin/roles',
         icon: ShieldIcon,
         permission: 'role:view',
+      },
+      {
+        title: '回收站',
+        href: '/admin/recycle-bin',
+        icon: Trash2,
+        permission: 'system:view',
+      },
+      {
+        title: '操作日志',
+        href: '/admin/activity-logs',
+        icon: FileText,
+        permission: 'system:view',
       },
     ],
   },
