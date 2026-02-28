@@ -869,6 +869,1059 @@ After completing Phase 1:
 
 ---
 
-## Phase 2: Frontend Page (To be continued...)
+## Phase 2: Frontend Page
+
+### Task 2.1: Install React Flow Dependency
+
+**Step 1: Install reactflow**
+
+Run:
+```bash
+cd F:/FPY/AFS-System/web && npm install reactflow
+```
+
+Expected: Package installed successfully
+
+**Step 2: Verify installation**
+
+Run: `cd F:/FPY/AFS-System/web && cat package.json | grep reactflow`
+Expected: `"reactflow": "^11.x.x"`
+
+**Step 3: Commit**
+
+```bash
+git add web/package.json web/package-lock.json
+git commit -m "feat(langgraph): add reactflow dependency for flow visualization"
+```
+
+---
+
+### Task 2.2: Create API Hook
+
+**Files:**
+- Create: `web/app/admin/langgraph/hooks/useLangGraph.ts`
+
+**Step 1: Create the hook**
+
+```typescript
+// web/app/admin/langgraph/hooks/useLangGraph.ts
+import { useState, useCallback } from 'react';
+import { adminApiRequest } from '@/lib/admin-api';
+
+export interface LangGraphFlow {
+  flowId: string;
+  flowName: string;
+  nodeCount: number;
+}
+
+export interface DynamicSource {
+  name: string;
+  description: string;
+}
+
+export interface LLMConfig {
+  source: 'ollama' | 'api';
+  model: string;
+  apiProvider?: 'deepseek' | 'openai' | null;
+  temperature: number;
+  maxTokens: number;
+}
+
+export interface LangGraphNode {
+  nodeId: string;
+  nodeName: string;
+  nodeType: 'start' | 'process' | 'condition' | 'end';
+  promptType: 'static' | 'dynamic' | 'none';
+  staticPrompt: string;
+  dynamicSources: DynamicSource[];
+  editableSection: string;
+  llmEnabled: boolean;
+  llmConfig: LLMConfig;
+  position: { x: number; y: number };
+}
+
+export interface LangGraphEdge {
+  source: string;
+  target: string;
+  label: string;
+  conditionType: 'always' | 'conditional';
+}
+
+export interface LangGraphFlowDetail {
+  flowId: string;
+  flowName: string;
+  description: string;
+  nodes: LangGraphNode[];
+  edges: LangGraphEdge[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AvailableModels {
+  ollama: string[];
+  api: {
+    deepseek: string[];
+    openai: string[];
+  };
+}
+
+export function useLangGraph() {
+  const [flows, setFlows] = useState<LangGraphFlow[]>([]);
+  const [currentFlow, setCurrentFlow] = useState<LangGraphFlowDetail | null>(null);
+  const [models, setModels] = useState<AvailableModels | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchFlows = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await adminApiRequest<{ success: boolean; data: LangGraphFlow[] }>('/admin/langgraph/flows');
+      if (result.success && result.data) {
+        setFlows(result.data);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch flows');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const fetchFlowDetail = useCallback(async (flowId: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await adminApiRequest<{ success: boolean; data: LangGraphFlowDetail }>(`/admin/langgraph/flows/${flowId}`);
+      if (result.success && result.data) {
+        setCurrentFlow(result.data);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch flow detail');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const updateNodeConfig = useCallback(async (
+    flowId: string,
+    nodeId: string,
+    updates: {
+      staticPrompt?: string;
+      editableSection?: string;
+      llmConfig?: Partial<LLMConfig>;
+    }
+  ) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await adminApiRequest<{ success: boolean; message: string; data: any }>(
+        `/admin/langgraph/flows/${flowId}/nodes/${nodeId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(updates),
+        }
+      );
+      if (result.success) {
+        // Refresh flow detail
+        await fetchFlowDetail(flowId);
+        return { success: true, message: result.message };
+      }
+      return { success: false, message: 'Update failed' };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update node';
+      setError(message);
+      return { success: false, message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fetchFlowDetail]);
+
+  const fetchModels = useCallback(async () => {
+    try {
+      const result = await adminApiRequest<{ success: boolean; data: AvailableModels }>('/admin/langgraph/models');
+      if (result.success && result.data) {
+        setModels(result.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch models:', err);
+    }
+  }, []);
+
+  return {
+    flows,
+    currentFlow,
+    models,
+    isLoading,
+    error,
+    fetchFlows,
+    fetchFlowDetail,
+    updateNodeConfig,
+    fetchModels,
+  };
+}
+```
+
+**Step 2: Verify TypeScript**
+
+Run: `cd F:/FPY/AFS-System/web && npx tsc --noEmit`
+Expected: No errors
+
+**Step 3: Commit**
+
+```bash
+git add web/app/admin/langgraph/hooks/useLangGraph.ts
+git commit -m "feat(langgraph): add useLangGraph API hook"
+```
+
+---
+
+### Task 2.3: Create Page Layout and Tabs
+
+**Files:**
+- Create: `web/app/admin/langgraph/page.tsx`
+- Create: `web/app/admin/langgraph/components/FlowTabs.tsx`
+
+**Step 1: Create FlowTabs component**
+
+```typescript
+// web/app/admin/langgraph/components/FlowTabs.tsx
+'use client';
+
+import { cn } from '@/lib/utils';
+import { GitBranch, MessageSquareHeart, User } from 'lucide-react';
+
+interface FlowTab {
+  flowId: string;
+  flowName: string;
+  icon: React.ReactNode;
+}
+
+const flowTabs: FlowTab[] = [
+  { flowId: 'rolecard', flowName: 'AI角色卡对话', icon: <User className="w-4 h-4" /> },
+  { flowId: 'xiaoshudong', flowName: '小树洞对话', icon: <MessageSquareHeart className="w-4 h-4" /> },
+];
+
+interface FlowTabsProps {
+  activeFlowId: string;
+  onFlowChange: (flowId: string) => void;
+}
+
+export function FlowTabs({ activeFlowId, onFlowChange }: FlowTabsProps) {
+  return (
+    <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-lg">
+      {flowTabs.map((tab) => (
+        <button
+          key={tab.flowId}
+          onClick={() => onFlowChange(tab.flowId)}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors',
+            activeFlowId === tab.flowId
+              ? 'bg-white text-orange-600 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+          )}
+        >
+          {tab.icon}
+          {tab.flowName}
+        </button>
+      ))}
+    </div>
+  );
+}
+```
+
+**Step 2: Create main page**
+
+```typescript
+// web/app/admin/langgraph/page.tsx
+'use client';
+
+import { useEffect, useState } from 'react';
+import { usePermissionStore } from '@/stores/permission';
+import { useLangGraph } from './hooks/useLangGraph';
+import { FlowTabs } from './components/FlowTabs';
+import { FlowCanvas } from './components/FlowCanvas';
+import { NodeEditor } from './components/NodeEditor';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { GitBranch, AlertCircle, Loader2 } from 'lucide-react';
+import type { LangGraphNode } from './hooks/useLangGraph';
+
+export default function LangGraphPage() {
+  const { can } = usePermissionStore();
+  const {
+    flows,
+    currentFlow,
+    models,
+    isLoading,
+    error,
+    fetchFlows,
+    fetchFlowDetail,
+    updateNodeConfig,
+    fetchModels,
+  } = useLangGraph();
+
+  const [activeFlowId, setActiveFlowId] = useState<string>('xiaoshudong');
+  const [selectedNode, setSelectedNode] = useState<LangGraphNode | null>(null);
+
+  useEffect(() => {
+    if (can('langgraph:edit')) {
+      fetchFlows();
+      fetchModels();
+    }
+  }, [can, fetchFlows, fetchModels]);
+
+  useEffect(() => {
+    if (activeFlowId) {
+      fetchFlowDetail(activeFlowId);
+      setSelectedNode(null);
+    }
+  }, [activeFlowId, fetchFlowDetail]);
+
+  const handleFlowChange = (flowId: string) => {
+    setActiveFlowId(flowId);
+  };
+
+  const handleNodeClick = (node: LangGraphNode) => {
+    // Only select nodes that have editable content
+    if (node.promptType !== 'none' || node.llmEnabled) {
+      setSelectedNode(node);
+    }
+  };
+
+  const handleSaveNode = async (updates: {
+    staticPrompt?: string;
+    editableSection?: string;
+    llmConfig?: any;
+  }) => {
+    if (!selectedNode) return;
+
+    const result = await updateNodeConfig(activeFlowId, selectedNode.nodeId, updates);
+    if (result.success) {
+      // Show success message
+      alert('配置已保存，重启服务后生效');
+    } else {
+      alert('保存失败: ' + result.message);
+    }
+  };
+
+  if (!can('langgraph:edit')) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-gray-500">您没有权限访问 LangGraph 管理</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <GitBranch className="w-6 h-6 text-orange-500" />
+            LangGraph 管理
+          </h1>
+          <p className="text-gray-600">可视化编辑 LangGraph 流程配置</p>
+        </div>
+      </div>
+
+      {/* Flow Tabs */}
+      <FlowTabs activeFlowId={activeFlowId} onFlowChange={handleFlowChange} />
+
+      {/* Error Alert */}
+      {error && (
+        <div className="flex items-center gap-2 p-4 bg-red-50 text-red-700 rounded-lg">
+          <AlertCircle className="w-5 h-5" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Flow Canvas */}
+        <div className="lg:col-span-2">
+          <Card className="h-[600px]">
+            <CardHeader>
+              <CardTitle className="text-lg">
+                {currentFlow?.flowName || '流程图'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="h-[520px] p-0">
+              {isLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                </div>
+              ) : currentFlow ? (
+                <FlowCanvas
+                  nodes={currentFlow.nodes}
+                  edges={currentFlow.edges}
+                  selectedNodeId={selectedNode?.nodeId}
+                  onNodeClick={handleNodeClick}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-400">
+                  选择一个流程查看
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Node Editor Panel */}
+        <div className="lg:col-span-1">
+          <Card className="h-[600px]">
+            <CardHeader>
+              <CardTitle className="text-lg">
+                {selectedNode ? selectedNode.nodeName : '节点编辑'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-y-auto h-[520px]">
+              {selectedNode ? (
+                <NodeEditor
+                  node={selectedNode}
+                  models={models}
+                  onSave={handleSaveNode}
+                  onCancel={() => setSelectedNode(null)}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                  <GitBranch className="w-12 h-12 mb-2" />
+                  <p>点击流程图中的节点进行编辑</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+**Step 3: Commit**
+
+```bash
+git add web/app/admin/langgraph/page.tsx web/app/admin/langgraph/components/FlowTabs.tsx
+git commit -m "feat(langgraph): add main page layout with flow tabs"
+```
+
+---
+
+### Task 2.4: Create Flow Canvas Component
+
+**Files:**
+- Create: `web/app/admin/langgraph/components/FlowCanvas.tsx`
+
+**Step 1: Create FlowCanvas component**
+
+```typescript
+// web/app/admin/langgraph/components/FlowCanvas.tsx
+'use client';
+
+import { useCallback, useMemo } from 'react';
+import ReactFlow, {
+  Node,
+  Edge,
+  Background,
+  Controls,
+  MiniMap,
+  MarkerType,
+  NodeTypes,
+  useNodesState,
+  useEdgesState,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import { cn } from '@/lib/utils';
+import type { LangGraphNode, LangGraphEdge } from '../hooks/useLangGraph';
+
+interface FlowCanvasProps {
+  nodes: LangGraphNode[];
+  edges: LangGraphEdge[];
+  selectedNodeId: string | null;
+  onNodeClick: (node: LangGraphNode) => void;
+}
+
+// Custom node component
+function CustomNode({ data, selected }: { data: any; selected: boolean }) {
+  const isEditable = data.promptType !== 'none' || data.llmEnabled;
+
+  return (
+    <div
+      className={cn(
+        'px-4 py-2 rounded-lg border-2 min-w-[120px] text-center transition-all',
+        selected ? 'border-orange-500 shadow-lg' : 'border-gray-300',
+        isEditable ? 'bg-white cursor-pointer hover:border-orange-400' : 'bg-gray-100 cursor-default',
+        data.nodeType === 'condition' && 'rounded-full'
+      )}
+    >
+      <div className="font-medium text-sm">{data.label}</div>
+      {isEditable && (
+        <div className="text-xs text-gray-500 mt-1">
+          {data.promptType === 'static' && '📝 静态Prompt'}
+          {data.promptType === 'dynamic' && '⚡ 动态Prompt'}
+          {data.promptType === 'none' && '🤖 仅模型'}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const nodeTypes: NodeTypes = {
+  custom: CustomNode,
+};
+
+export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCanvasProps) {
+  // Convert to ReactFlow format
+  const flowNodes: Node[] = useMemo(() =>
+    nodes.map((node) => ({
+      id: node.nodeId,
+      type: 'custom',
+      position: { x: node.position.x, y: node.position.y },
+      data: {
+        label: node.nodeName,
+        nodeType: node.nodeType,
+        promptType: node.promptType,
+        llmEnabled: node.llmEnabled,
+      },
+    })),
+    [nodes]
+  );
+
+  const flowEdges: Edge[] = useMemo(() =>
+    edges.map((edge, index) => ({
+      id: `edge-${index}`,
+      source: edge.source,
+      target: edge.target,
+      label: edge.label || undefined,
+      animated: edge.conditionType === 'conditional',
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+      },
+      style: {
+        stroke: edge.conditionType === 'conditional' ? '#f97316' : '#94a3b8',
+      },
+    })),
+    [edges]
+  );
+
+  const [reactNodes, setReactNodes, onNodesChange] = useNodesState(flowNodes);
+  const [reactEdges, setReactEdges, onEdgesChange] = useEdgesState(flowEdges);
+
+  // Update nodes when props change
+  useMemo(() => {
+    setReactNodes(flowNodes);
+  }, [flowNodes, setReactNodes]);
+
+  useMemo(() => {
+    setReactEdges(flowEdges);
+  }, [flowEdges, setReactEdges]);
+
+  const onNodeClickHandler = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      const originalNode = nodes.find((n) => n.nodeId === node.id);
+      if (originalNode) {
+        onNodeClick(originalNode);
+      }
+    },
+    [nodes, onNodeClick]
+  );
+
+  return (
+    <div className="w-full h-full">
+      <ReactFlow
+        nodes={reactNodes}
+        edges={reactEdges}
+        onNodeClick={onNodeClickHandler}
+        nodeTypes={nodeTypes}
+        fitView
+        attributionPosition="bottom-left"
+      >
+        <Background color="#e5e7eb" gap={16} />
+        <Controls />
+        <MiniMap
+          nodeColor={(node) => {
+            if (node.id === selectedNodeId) return '#f97316';
+            return '#94a3b8';
+          }}
+          maskColor="rgba(0, 0, 0, 0.1)"
+        />
+      </ReactFlow>
+    </div>
+  );
+}
+```
+
+**Step 2: Commit**
+
+```bash
+git add web/app/admin/langgraph/components/FlowCanvas.tsx
+git commit -m "feat(langgraph): add FlowCanvas component with React Flow"
+```
+
+---
+
+### Task 2.5: Create Node Editor Panel
+
+**Files:**
+- Create: `web/app/admin/langgraph/components/NodeEditor.tsx`
+- Create: `web/app/admin/langgraph/components/PromptEditor.tsx`
+- Create: `web/app/admin/langgraph/components/ModelSelector.tsx`
+
+**Step 1: Create PromptEditor component**
+
+```typescript
+// web/app/admin/langgraph/components/PromptEditor.tsx
+'use client';
+
+import { useState } from 'react';
+import { cn } from '@/lib/utils';
+import { Info, FileText } from 'lucide-react';
+import type { DynamicSource } from '../hooks/useLangGraph';
+
+interface PromptEditorProps {
+  promptType: 'static' | 'dynamic' | 'none';
+  staticPrompt: string;
+  dynamicSources: DynamicSource[];
+  editableSection: string;
+  onChange: (value: string) => void;
+}
+
+export function PromptEditor({
+  promptType,
+  staticPrompt,
+  dynamicSources,
+  editableSection,
+  onChange,
+}: PromptEditorProps) {
+  const [value, setValue] = useState(
+    promptType === 'static' ? staticPrompt : editableSection
+  );
+
+  const handleChange = (newValue: string) => {
+    setValue(newValue);
+    onChange(newValue);
+  };
+
+  if (promptType === 'none') {
+    return (
+      <div className="p-4 bg-gray-50 rounded-lg text-gray-500 text-sm">
+        此节点的 Prompt 由系统动态生成，不可编辑
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Prompt Type Badge */}
+      <div className="flex items-center gap-2">
+        <span
+          className={cn(
+            'px-2 py-1 text-xs font-medium rounded-full',
+            promptType === 'static'
+              ? 'bg-blue-100 text-blue-700'
+              : 'bg-purple-100 text-purple-700'
+          )}
+        >
+          {promptType === 'static' ? '📝 静态 Prompt' : '⚡ 动态 Prompt'}
+        </span>
+      </div>
+
+      {/* Dynamic Sources Info */}
+      {promptType === 'dynamic' && dynamicSources.length > 0 && (
+        <div className="p-3 bg-purple-50 rounded-lg">
+          <div className="flex items-center gap-2 text-purple-700 font-medium text-sm mb-2">
+            <Info className="w-4 h-4" />
+            动态数据来源
+          </div>
+          <ul className="space-y-1">
+            {dynamicSources.map((source, index) => (
+              <li key={index} className="text-sm text-purple-600">
+                • <strong>{source.name}</strong>: {source.description}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Prompt Textarea */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {promptType === 'static' ? 'Prompt 内容' : '可编辑部分'}
+        </label>
+        <textarea
+          value={value}
+          onChange={(e) => handleChange(e.target.value)}
+          className="w-full h-64 p-3 border border-gray-300 rounded-lg text-sm font-mono resize-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+          placeholder="在此编辑 Prompt..."
+        />
+      </div>
+    </div>
+  );
+}
+```
+
+**Step 2: Create ModelSelector component**
+
+```typescript
+// web/app/admin/langgraph/components/ModelSelector.tsx
+'use client';
+
+import { useState } from 'react';
+import { cn } from '@/lib/utils';
+import { Cpu, Cloud } from 'lucide-react';
+import type { AvailableModels, LLMConfig } from '../hooks/useLangGraph';
+
+interface ModelSelectorProps {
+  config: LLMConfig;
+  models: AvailableModels | null;
+  onChange: (config: Partial<LLMConfig>) => void;
+}
+
+export function ModelSelector({ config, models, onChange }: ModelSelectorProps) {
+  const [source, setSource] = useState<'ollama' | 'api'>(config.source);
+
+  const handleSourceChange = (newSource: 'ollama' | 'api') => {
+    setSource(newSource);
+    onChange({ source: newSource });
+  };
+
+  const handleModelChange = (model: string) => {
+    onChange({ model });
+  };
+
+  const handleProviderChange = (provider: 'deepseek' | 'openai') => {
+    onChange({ apiProvider: provider });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Model Source Selection */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          模型来源
+        </label>
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleSourceChange('ollama')}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-colors',
+              source === 'ollama'
+                ? 'border-orange-500 bg-orange-50 text-orange-700'
+                : 'border-gray-200 hover:border-gray-300'
+            )}
+          >
+            <Cpu className="w-4 h-4" />
+            Ollama (本地)
+          </button>
+          <button
+            onClick={() => handleSourceChange('api')}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-colors',
+              source === 'api'
+                ? 'border-orange-500 bg-orange-50 text-orange-700'
+                : 'border-gray-200 hover:border-gray-300'
+            )}
+          >
+            <Cloud className="w-4 h-4" />
+            API (远程)
+          </button>
+        </div>
+      </div>
+
+      {/* Ollama Model Selection */}
+      {source === 'ollama' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Ollama 模型
+          </label>
+          <select
+            value={config.model}
+            onChange={(e) => handleModelChange(e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+          >
+            <option value="">选择模型...</option>
+            {models?.ollama?.map((model) => (
+              <option key={model} value={model}>
+                {model}
+              </option>
+            ))}
+          </select>
+          {(!models?.ollama || models.ollama.length === 0) && (
+            <p className="mt-1 text-xs text-gray-500">
+              无法获取 Ollama 模型列表，请手动输入
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* API Provider Selection */}
+      {source === 'api' && (
+        <>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              API 提供商
+            </label>
+            <select
+              value={config.apiProvider || 'deepseek'}
+              onChange={(e) => handleProviderChange(e.target.value as 'deepseek' | 'openai')}
+              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="deepseek">DeepSeek</option>
+              <option value="openai">OpenAI</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              API 模型
+            </label>
+            <select
+              value={config.model}
+              onChange={(e) => handleModelChange(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="">选择模型...</option>
+              {config.apiProvider === 'openai'
+                ? models?.api?.openai?.map((model) => (
+                    <option key={model} value={model}>
+                      {model}
+                    </option>
+                  ))
+                : models?.api?.deepseek?.map((model) => (
+                    <option key={model} value={model}>
+                      {model}
+                    </option>
+                  ))}
+            </select>
+          </div>
+        </>
+      )}
+
+      {/* Temperature */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Temperature: {config.temperature}
+        </label>
+        <input
+          type="range"
+          min="0"
+          max="2"
+          step="0.1"
+          value={config.temperature}
+          onChange={(e) => onChange({ temperature: parseFloat(e.target.value) })}
+          className="w-full"
+        />
+        <div className="flex justify-between text-xs text-gray-500">
+          <span>精确 (0)</span>
+          <span>创意 (2)</span>
+        </div>
+      </div>
+
+      {/* Max Tokens */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Max Tokens
+        </label>
+        <input
+          type="number"
+          min="50"
+          max="8192"
+          value={config.maxTokens}
+          onChange={(e) => onChange({ maxTokens: parseInt(e.target.value) })}
+          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+        />
+      </div>
+    </div>
+  );
+}
+```
+
+**Step 3: Create NodeEditor component**
+
+```typescript
+// web/app/admin/langgraph/components/NodeEditor.tsx
+'use client';
+
+import { useState, useEffect } from 'react';
+import { PromptEditor } from './PromptEditor';
+import { ModelSelector } from './ModelSelector';
+import { Button } from '@/components/ui/button';
+import { Save, X, AlertTriangle } from 'lucide-react';
+import type { LangGraphNode, AvailableModels, LLMConfig } from '../hooks/useLangGraph';
+
+interface NodeEditorProps {
+  node: LangGraphNode;
+  models: AvailableModels | null;
+  onSave: (updates: {
+    staticPrompt?: string;
+    editableSection?: string;
+    llmConfig?: Partial<LLMConfig>;
+  }) => void;
+  onCancel: () => void;
+}
+
+export function NodeEditor({ node, models, onSave, onCancel }: NodeEditorProps) {
+  const [promptValue, setPromptValue] = useState(
+    node.promptType === 'static' ? node.staticPrompt : node.editableSection
+  );
+  const [llmConfig, setLlmConfig] = useState<LLMConfig>(node.llmConfig);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  useEffect(() => {
+    setPromptValue(
+      node.promptType === 'static' ? node.staticPrompt : node.editableSection
+    );
+    setLlmConfig(node.llmConfig);
+    setHasChanges(false);
+  }, [node]);
+
+  const handlePromptChange = (value: string) => {
+    setPromptValue(value);
+    setHasChanges(true);
+  };
+
+  const handleLLMConfigChange = (updates: Partial<LLMConfig>) => {
+    setLlmConfig((prev) => ({ ...prev, ...updates }));
+    setHasChanges(true);
+  };
+
+  const handleSave = () => {
+    const updates: any = {};
+
+    if (node.promptType === 'static') {
+      updates.staticPrompt = promptValue;
+    } else if (node.promptType === 'dynamic') {
+      updates.editableSection = promptValue;
+    }
+
+    if (node.llmEnabled) {
+      updates.llmConfig = llmConfig;
+    }
+
+    onSave(updates);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Node Info */}
+      <div className="p-3 bg-gray-50 rounded-lg">
+        <div className="font-medium">{node.nodeName}</div>
+        <div className="text-sm text-gray-500">ID: {node.nodeId}</div>
+      </div>
+
+      {/* Prompt Editor (if applicable) */}
+      {node.promptType !== 'none' && (
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Prompt 配置</h3>
+          <PromptEditor
+            promptType={node.promptType}
+            staticPrompt={node.staticPrompt}
+            dynamicSources={node.dynamicSources}
+            editableSection={node.editableSection}
+            onChange={handlePromptChange}
+          />
+        </div>
+      )}
+
+      {/* LLM Config (if enabled) */}
+      {node.llmEnabled && (
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">LLM 模型配置</h3>
+          <ModelSelector
+            config={llmConfig}
+            models={models}
+            onChange={handleLLMConfigChange}
+          />
+        </div>
+      )}
+
+      {/* Restart Warning */}
+      <div className="flex items-start gap-2 p-3 bg-yellow-50 rounded-lg">
+        <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+        <div className="text-sm text-yellow-700">
+          <strong>注意:</strong> 配置保存后需要重启服务才能生效
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-2 pt-4 border-t">
+        <Button
+          variant="outline"
+          onClick={onCancel}
+          className="flex-1"
+        >
+          <X className="w-4 h-4 mr-2" />
+          取消
+        </Button>
+        <Button
+          onClick={handleSave}
+          disabled={!hasChanges}
+          className="flex-1 bg-orange-500 hover:bg-orange-600"
+        >
+          <Save className="w-4 h-4 mr-2" />
+          保存配置
+        </Button>
+      </div>
+    </div>
+  );
+}
+```
+
+**Step 4: Commit**
+
+```bash
+git add web/app/admin/langgraph/components/NodeEditor.tsx web/app/admin/langgraph/components/PromptEditor.tsx web/app/admin/langgraph/components/ModelSelector.tsx
+git commit -m "feat(langgraph): add node editor panel with prompt and model config"
+```
+
+---
+
+### Task 2.6: Update Sidebar Menu
+
+**Files:**
+- Modify: `web/components/admin/AdminSidebar.tsx`
+- Modify: `web/lib/admin-api.ts`
+
+**Step 1: Add menu item to AdminSidebar.tsx**
+
+In `navItems` array (around line 80), add new item:
+
+```typescript
+{
+  title: 'LangGraph 管理',
+  href: '/admin/langgraph',
+  icon: GitBranch,
+  permission: 'langgraph:edit',
+},
+```
+
+Also add import for GitBranch if not already present:
+```typescript
+import { GitBranch } from 'lucide-react';
+```
+
+**Step 2: Verify TypeScript**
+
+Run: `cd F:/FPY/AFS-System/web && npx tsc --noEmit`
+Expected: No errors
+
+**Step 3: Commit**
+
+```bash
+git add web/components/admin/AdminSidebar.tsx
+git commit -m "feat(langgraph): add LangGraph menu item to admin sidebar"
+```
+
+---
+
+## Phase 2 Complete ✅
+
+After completing Phase 2:
+- React Flow installed for visualization
+- API hook for data fetching
+- Page layout with tab switching
+- Flow canvas with node visualization
+- Node editor panel with prompt/model editing
+- Sidebar menu updated
+
+---
 
 ## Phase 3: Node Integration (To be continued...)
