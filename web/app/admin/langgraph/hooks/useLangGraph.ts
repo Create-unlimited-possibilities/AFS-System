@@ -85,21 +85,13 @@ export function useLangGraph() {
     setIsLoading(true);
     setError(null);
     try {
-      console.log('[useLangGraph] Fetching flow detail for:', flowId);
       const result = await adminApiRequest<{ success: boolean; data: LangGraphFlowDetail }>(`/admin/langgraph/flows/${flowId}`);
-      console.log('[useLangGraph] Flow detail result:', JSON.stringify(result, null, 2));
-      console.log('[useLangGraph] result.success:', result.success);
-      console.log('[useLangGraph] result.data:', result.data);
-      console.log('[useLangGraph] result.data?.nodes:', result.data?.nodes);
       if (result.success && result.data) {
-        console.log('[useLangGraph] Setting current flow with nodes:', result.data.nodes?.length);
         setCurrentFlow(result.data);
       } else {
-        console.log('[useLangGraph] No data in result or success false');
         setError((result as any).error || 'Failed to load flow data');
       }
     } catch (err) {
-      console.error('[useLangGraph] Error fetching flow detail:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch flow detail');
     } finally {
       setIsLoading(false);
