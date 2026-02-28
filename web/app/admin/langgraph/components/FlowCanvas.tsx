@@ -1,7 +1,7 @@
 // web/app/admin/langgraph/components/FlowCanvas.tsx
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -60,6 +60,7 @@ function CustomNode({ data, selected }: { data: any; selected: boolean }) {
   );
 }
 
+// Define nodeTypes outside component to prevent recreation
 const nodeTypes: NodeTypes = {
   custom: CustomNode,
 };
@@ -86,7 +87,10 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
 
   // Update edges when props change - all edges animated for flow visualization
   useEffect(() => {
-    const converted: Edge[] = edges.map((edge, index) => ({
+    // Filter out edges with invalid source/target
+    const validEdges = edges.filter(edge => edge.source && edge.target);
+
+    const converted: Edge[] = validEdges.map((edge, index) => ({
       id: `edge-${index}`,
       source: edge.source,
       target: edge.target,
