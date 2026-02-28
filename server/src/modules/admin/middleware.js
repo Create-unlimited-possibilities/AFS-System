@@ -119,7 +119,7 @@ export const requirePermission = (permission) => {
         });
       }
 
-      const role = await Role.findById(user.role._id);
+      const role = await Role.findById(user.role._id).populate('permissions');
 
       if (!role) {
         return res.status(403).json({
