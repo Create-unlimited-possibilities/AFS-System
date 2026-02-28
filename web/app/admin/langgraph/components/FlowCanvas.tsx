@@ -55,8 +55,16 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
   const [flowNodes, setFlowNodes] = useState<Node[]>([]);
   const [flowEdges, setFlowEdges] = useState<Edge[]>([]);
 
+  // Debug: log incoming props
+  useEffect(() => {
+    console.log('[FlowCanvas] Received nodes:', nodes);
+    console.log('[FlowCanvas] Received edges:', edges);
+    console.log('[FlowCanvas] nodes length:', nodes?.length);
+  }, [nodes, edges]);
+
   // Update nodes when props change
   useEffect(() => {
+    console.log('[FlowCanvas] Converting nodes:', nodes);
     const converted: Node[] = nodes.map((node) => ({
       id: node.nodeId,
       type: 'custom',
@@ -68,6 +76,7 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
         llmEnabled: node.llmEnabled,
       },
     }));
+    console.log('[FlowCanvas] Converted nodes:', converted);
     setFlowNodes(converted);
   }, [nodes]);
 

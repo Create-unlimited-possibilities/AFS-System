@@ -37,10 +37,18 @@ export default function LangGraphPage() {
 
   useEffect(() => {
     if (activeFlowId) {
+      console.log('[LangGraphPage] Fetching flow detail for:', activeFlowId);
       fetchFlowDetail(activeFlowId);
       setSelectedNode(null);
     }
   }, [activeFlowId, fetchFlowDetail]);
+
+  // Debug: log currentFlow changes
+  useEffect(() => {
+    console.log('[LangGraphPage] currentFlow changed:', currentFlow);
+    console.log('[LangGraphPage] currentFlow.nodes:', currentFlow?.nodes);
+    console.log('[LangGraphPage] currentFlow.nodes length:', currentFlow?.nodes?.length);
+  }, [currentFlow]);
 
   const handleFlowChange = (flowId: string) => {
     setActiveFlowId(flowId);
