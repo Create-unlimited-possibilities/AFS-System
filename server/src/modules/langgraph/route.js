@@ -38,4 +38,10 @@ router.put('/flows/:flowId/nodes/:nodeId', (req, res) => langGraphController.upd
  */
 router.get('/models', (req, res) => langGraphController.getAvailableModels(req, res));
 
+/**
+ * @route   POST /api/admin/langgraph/flows/:flowId/reset
+ * @desc    Reset flow config to defaults
+ */
+router.post('/flows/:flowId/reset', (req, res) => langGraphController.resetFlowConfig(req, res));
+
 export default router;

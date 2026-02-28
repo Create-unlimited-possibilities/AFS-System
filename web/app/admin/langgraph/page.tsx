@@ -9,7 +9,8 @@ import { FlowCanvas } from './components/FlowCanvas';
 import { NodeEditor } from './components/NodeEditor';
 import { NodeInfo } from './components/NodeInfo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { GitBranch, AlertCircle, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { GitBranch, AlertCircle, Loader2, RotateCcw } from 'lucide-react';
 import type { LangGraphNode } from './hooks/useLangGraph';
 
 export default function LangGraphPage() {
@@ -24,6 +25,7 @@ export default function LangGraphPage() {
     fetchFlowDetail,
     updateNodeConfig,
     fetchModels,
+    resetFlowConfig,
   } = useLangGraph();
 
   const [activeFlowId, setActiveFlowId] = useState<string>('xiaoshudong');
@@ -68,6 +70,20 @@ export default function LangGraphPage() {
     }
   };
 
+  const handleResetFlow = async () => {
+    if (!confirm(`确定要重置「${currentFlow?.flowName || activeFlowId}」流程为默认配置吗？\n\n这将删除所有自定义配置！`)) {
+      return;
+    }
+
+    const result = await resetFlowConfig(activeFlowId);
+    if (result.success) {
+      alert(result.message || '重置成功');
+      setSelectedNode(null);
+    } else {
+      alert('重置失败: ' + result.message);
+    }
+  };
+
   if (!can('langgraph:edit')) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -106,9 +122,21 @@ export default function LangGraphPage() {
         <div className="lg:col-span-2">
           <Card className="h-[600px]">
             <CardHeader>
-              <CardTitle className="text-lg">
-                {currentFlow?.flowName || '流程图'}
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">
+                  {currentFlow?.flowName || '流程图'}
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetFlow}
+                  disabled={isLoading}
+                  className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                >
+                  <RotateCcw className="w-4 h-4 mr-1" />
+                  重置为默认
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="h-[520px] p-0">
               {isLoading ? (

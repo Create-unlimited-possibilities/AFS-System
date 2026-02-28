@@ -53,6 +53,20 @@ class LangGraphController {
       res.status(500).json({ success: false, error: error.message });
     }
   }
+
+  async resetFlowConfig(req, res) {
+    try {
+      const { flowId } = req.params;
+      const config = await langGraphService.resetFlowConfig(flowId);
+      res.json({
+        success: true,
+        message: `流程 ${flowId} 已重置为默认配置`,
+        data: config
+      });
+    } catch (error) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  }
 }
 
 export default new LangGraphController();

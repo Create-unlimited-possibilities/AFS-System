@@ -143,6 +143,28 @@ export function useLangGraph() {
     }
   }, []);
 
+  const resetFlowConfig = useCallback(async (flowId: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await adminApiRequest<{ success: boolean; data: LangGraphFlowDetail; message: string }>(
+        `/admin/langgraph/flows/${flowId}/reset`,
+        { method: 'POST' }
+      );
+      if (result.success && result.data) {
+        setCurrentFlow(result.data);
+        return { success: true, message: result.message };
+      }
+      return { success: false, message: (result as any).error || 'Reset failed' };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to reset flow';
+      setError(message);
+      return { success: false, message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   return {
     flows,
     currentFlow,
@@ -153,5 +175,6 @@ export function useLangGraph() {
     fetchFlowDetail,
     updateNodeConfig,
     fetchModels,
+    resetFlowConfig,
   };
 }

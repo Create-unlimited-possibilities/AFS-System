@@ -104,6 +104,27 @@ class LangGraphService {
 
     return models;
   }
+
+  /**
+   * Reset flow config to defaults
+   */
+  async resetFlowConfig(flowId) {
+    const { getDefaultConfig } = await import('./defaults/index.js');
+
+    // Delete existing config
+    await LangGraphConfig.deleteOne({ flowId });
+
+    // Create new from defaults
+    const defaultConfig = getDefaultConfig(flowId);
+    const created = await LangGraphConfig.create(defaultConfig);
+
+    // Reload in memory
+    await configLoader.reloadConfig(flowId);
+
+    serviceLogger.info(`Reset flow config to defaults: ${flowId}`);
+
+    return created.toObject();
+  }
 }
 
 export default new LangGraphService();
