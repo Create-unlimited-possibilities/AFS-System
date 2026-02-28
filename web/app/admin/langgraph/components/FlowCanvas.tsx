@@ -84,19 +84,21 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
     setFlowNodes(converted);
   }, [nodes]);
 
-  // Update edges when props change
+  // Update edges when props change - all edges animated for flow visualization
   useEffect(() => {
     const converted: Edge[] = edges.map((edge, index) => ({
       id: `edge-${index}`,
       source: edge.source,
       target: edge.target,
       label: edge.label || undefined,
-      animated: edge.conditionType === 'conditional',
+      animated: true, // Always animate to show flow direction
       markerEnd: {
         type: MarkerType.ArrowClosed,
+        color: edge.conditionType === 'conditional' ? '#f97316' : '#22c55e',
       },
       style: {
-        stroke: edge.conditionType === 'conditional' ? '#f97316' : '#94a3b8',
+        stroke: edge.conditionType === 'conditional' ? '#f97316' : '#22c55e',
+        strokeWidth: 2,
       },
     }));
     setFlowEdges(converted);
@@ -139,7 +141,12 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
         <MiniMap
           nodeColor={(node) => {
             if (node.id === selectedNodeId) return '#f97316';
-            return '#94a3b8';
+            // Match the node colors
+            const nodeData = nodes.find(n => n.nodeId === node.id);
+            if (nodeData && (nodeData.promptType !== 'none' || nodeData.llmEnabled)) {
+              return '#22c55e'; // Green for editable
+            }
+            return '#9ca3af'; // Gray for non-editable
           }}
           maskColor="rgba(0, 0, 0, 0.1)"
         />
