@@ -1,38 +1,24 @@
 /**
- * Chart Retriever Node v2.0
- * Smart chart calculation with time-span aware horoscope selection
+ * Chart Retriever Node v3.0
+ * Reads pre-generated natal chart from storage (MongoDB/Local file)
  *
  * This node:
- * 1. Fetches user profile from database
- * 2. Gets horoscope type from compressed data (daily/monthly/small_limit/major_limit)
- * 3. Computes natal chart + appropriate horoscope
- * 4. Formats chart data in beautiful Markdown for 8B model
+ * 1. Reads pre-generated chart from ZiweiChartService (MongoDB or local file)
+ * 2. Formats chart data in clean Markdown for LLM consumption
+ * 3. Identifies relevant palaces based on user input
  *
  * @author AFS Team
- * @version 2.0.0
+ * @version 3.0.0
  */
 
-import {
-  computeNatalChart,
-  computeHoroscope,
-  getSimplifiedChartData
-} from '../../../core/ziwei/ziweiService.js';
-import { genderToIztroFormat } from '../../../core/utils/timeConverter.js';
-import User from '../../user/model.js';
+import ZiweiChartService from '../../ziwei/services/ziweiChartService.js';
 import logger from '../../../core/utils/logger.js';
 
-/**
- * Convert birth hour (0-23) to iztro hour index (0-12)
- * iztro has 13 time indices because 子时 is split into early (0) and late (12)
- */
-function convertHourToIndex(birthHour) {
-  if (typeof birthHour !== 'number') {
-    throw new Error('birthHour must be a number');
-  }
-  if (birthHour === 23) return 12;  // 晚子时
-  if (birthHour === 0) return 0;    // 早子时
-  return Math.floor((birthHour + 1) / 2);
-}
+const chartLogger = {
+  info: (msg, meta = {}) => logger.info(msg, { ...meta, module: 'CHART_RETRIEVER' }),
+  error: (msg, meta = {}) => logger.error(msg, { ...meta, module: 'CHART_RETRIEVER' }),
+  warn: (msg, meta = {}) => logger.warn(msg, { ...meta, module: 'CHART_RETRIEVER' }),
+};
 
 /**
  * Palace name keywords for context extraction
@@ -40,12 +26,14 @@ function convertHourToIndex(birthHour) {
 const PALACE_KEYWORDS = {
   '事业': '命宫',
   '前途': '命宫',
+  '工作': '官禄宫',
   '财运': '财帛宫',
   '财富': '财帛宫',
   '金钱': '财帛宫',
   '感情': '夫妻宫',
   '婚姻': '夫妻宫',
   '配偶': '夫妻宫',
+  '恋爱': '夫妻宫',
   '健康': '疾厄宫',
   '身体': '疾厄宫',
   '家庭': '田宅宫',
@@ -61,102 +49,71 @@ const PALACE_KEYWORDS = {
 };
 
 /**
- * Shichen names for display
- */
-const SHICHEN_NAMES = [
-  '子时 (23:00-01:00)', '丑时 (01:00-03:00)', '寅时 (03:00-05:00)',
-  '卯时 (05:00-07:00)', '辰时 (07:00-09:00)', '巳时 (09:00-11:00)',
-  '午时 (11:00-13:00)', '未时 (13:00-15:00)', '申时 (15:00-17:00)',
-  '酉时 (17:00-19:00)', '戌时 (19:00-21:00)', '亥时 (21:00-23:00)'
-];
-
-/**
- * Retrieve or compute natal chart with smart horoscope selection
+ * Retrieve pre-generated natal chart from storage
  *
  * @param {XiaoShuDongState} state - Conversation state
- * @returns {Promise<XiaoShuDongState>} Updated state with natal chart and horoscope
+ * @returns {Promise<XiaoShuDongState>} Updated state with natal chart
  */
 export async function chartRetrieverNode(state) {
   try {
-    logger.info(`[ChartRetriever] Fetching chart for user: ${state.userId}`);
+    chartLogger.info(`[ChartRetriever] Reading chart from storage for user: ${state.userId}`);
 
-    // Get user profile
-    const user = await User.findById(state.userId);
-    if (!user) {
-      logger.warn(`[ChartRetriever] User not found: ${state.userId}`);
+    // Try to get chart from storage (MongoDB first, then local file)
+    let chart = null;
+
+    try {
+      chart = await ZiweiChartService.getChart(state.userId);
+      chartLogger.info(`[ChartRetriever] Chart loaded from MongoDB for user: ${state.userId}`);
+    } catch (dbError) {
+      // Try local file as fallback
+      chartLogger.warn(`[ChartRetriever] MongoDB read failed, trying local file: ${dbError.message}`);
+      chart = await ZiweiChartService.getFromLocalFile(state.userId);
+
+      if (chart) {
+        chartLogger.info(`[ChartRetriever] Chart loaded from local file for user: ${state.userId}`);
+      }
+    }
+
+    if (!chart) {
+      chartLogger.warn(`[ChartRetriever] No chart found for user: ${state.userId}`);
       state.metadata.chartRetrieved = false;
-      state.metadata.chartRetrievalError = 'User not found';
+      state.metadata.chartRetrievalError = 'No chart data found. Please generate chart first.';
       return state;
     }
 
-    const profile = user.profile || {};
-    const birthDate = profile.birthDate;
-    const birthHour = profile.birthHour;
-    const birthCalendar = profile.birthCalendar || 'solar';
-    const gender = genderToIztroFormat(profile.gender);
-
-    // Check if we have all required fields
-    // birthHour is stored as 0-23, we need to convert it to iztro index (0-12)
-    if (!birthDate || birthHour === undefined || birthHour === null) {
-      logger.warn(`[ChartRetriever] Incomplete birth info for user: ${state.userId}`);
-      state.metadata.chartRetrieved = false;
-      state.metadata.chartRetrievalError = 'Incomplete birth information';
-      state.metadata.missingFields = [];
-      if (!birthDate) state.metadata.missingFields.push('birthDate');
-      if (birthHour === undefined || birthHour === null) state.metadata.missingFields.push('birthHour');
-      return state;
-    }
-
-    // Convert birthHour (0-23) to iztro hour index (0-12)
-    const hourIndex = convertHourToIndex(birthHour);
-
-    // Format date as YYYY-MM-DD
-    const dateStr = typeof birthDate === 'string'
-      ? birthDate.split('T')[0]
-      : new Date(birthDate).toISOString().split('T')[0];
-
-    // Compute natal chart using iztro
-    const astrolabe = computeNatalChart({
-      birthDate: dateStr,
-      hourIndex: hourIndex,
-      gender,
-      isSolar: birthCalendar === 'solar'
-    });
-
-    // Get simplified chart data
-    state.natalChart = getSimplifiedChartData(astrolabe);
-
-    // Get horoscope type from compressed data (determined by conversationCompressor)
-    const horoscopeType = state.compressedData?.horoscopeType || 'monthly';
-    const today = new Date().toISOString().split('T')[0];
-
-    // Compute appropriate horoscope based on time span
-    state.horoscope = computeHoroscope(astrolabe, today);
-    state.horoscopeType = horoscopeType;
+    // Store chart data in state
+    state.natalChart = {
+      solarDate: chart.solarDate,
+      lunarDate: chart.lunarDate,
+      chineseDate: chart.chineseDate,
+      zodiac: chart.zodiac,
+      fiveElementsClass: chart.fiveElementsClass,
+      soul: chart.soul,
+      body: chart.body,
+      palaces: chart.palaces
+    };
 
     // Identify relevant palaces based on user input
     state.relevantPalaces = identifyRelevantPalaces(state.currentInput, state.natalChart);
 
-    // Generate formatted chart text for 8B model (beautiful Markdown)
-    state.formattedChartText = formatChartForLLM(state.natalChart, state.horoscope, horoscopeType, profile);
+    // Generate formatted chart text for LLM (clean Markdown)
+    state.formattedChartText = formatChartForLLM(state.natalChart);
 
     state.metadata.chartRetrieved = true;
     state.metadata.chartRetrievedAt = new Date();
-    state.metadata.birthDateUsed = dateStr;
-    state.metadata.birthHourUsed = birthHour;
-    state.metadata.birthHourIndexUsed = hourIndex;
-    state.metadata.calendarType = birthCalendar;
-    state.metadata.horoscopeType = horoscopeType;
+    state.metadata.chartSource = chart._id ? 'mongodb' : 'local_file';
+    state.metadata.relevantPalaces = state.relevantPalaces.map(p => p.name);
 
-    logger.info(
-      `[ChartRetriever] Chart computed - Date: ${dateStr}, Hour: ${birthHour} (index ${hourIndex}), ` +
-      `HoroscopeType: ${horoscopeType}, ` +
-      `RelevantPalaces: ${state.relevantPalaces.map(p => p.name).join(', ') || 'none'}`
+    chartLogger.info(
+      `[ChartRetriever] Chart retrieved successfully - ` +
+      `Source: ${state.metadata.chartSource}, ` +
+      `RelevantPalaces: ${state.metadata.relevantPalaces.join(', ') || 'none'}`
     );
 
     return state;
+
   } catch (error) {
-    logger.error('[ChartRetriever] Failed to compute chart:', error);
+    chartLogger.error('[ChartRetriever] Failed to retrieve chart:', error);
     state.addError(error);
     state.metadata.chartRetrieved = false;
     state.metadata.chartRetrievalError = error.message;
@@ -165,133 +122,74 @@ export async function chartRetrieverNode(state) {
 }
 
 /**
- * Format chart data into beautiful Markdown for LLM consumption
+ * Format chart data into clean Markdown for LLM consumption
+ * No table characters (|), no constellation (星座), no horoscope (运限)
  *
- * @param {Object} natalChart - Natal chart data
- * @param {Object} horoscope - Horoscope data
- * @param {string} horoscopeType - Type of horoscope focus
- * @param {Object} profile - User profile
+ * @param {Object} natalChart - Natal chart data from storage
  * @returns {string} Formatted Markdown text
  */
-function formatChartForLLM(natalChart, horoscope, horoscopeType, profile) {
+function formatChartForLLM(natalChart) {
   let md = '';
 
   // Header
-  md += `# 紫微斗数命盘分析\n\n`;
+  md += `# 紫微斗数命盘\n\n`;
 
-  // Basic info
+  // Basic info - clean format without table characters
   md += `## 基本信息\n\n`;
-  md += `| 项目 | 内容 |\n`;
-  md += `|------|------|\n`;
-  if (natalChart.solarDate) md += `| 公历 | ${natalChart.solarDate} |\n`;
-  if (natalChart.lunarDate) md += `| 农历 | ${natalChart.lunarDate} |\n`;
-  if (natalChart.chineseDate) md += `| 四柱 | ${natalChart.chineseDate} |\n`;
-  if (natalChart.zodiac) md += `| 生肖 | ${natalChart.zodiac} |\n`;
-  if (natalChart.sign) md += `| 星座 | ${natalChart.sign} |\n`;
-  if (natalChart.fiveElementsClass) md += `| 命主 | ${natalChart.fiveElementsClass} |\n`;
-  if (natalChart.soul) md += `| 命宫 | ${natalChart.soul} |\n`;
-  if (natalChart.body) md += `| 身宫 | ${natalChart.body} |\n`;
+  if (natalChart.solarDate) md += `**公历**: ${natalChart.solarDate}\n`;
+  if (natalChart.lunarDate) md += `**农历**: ${natalChart.lunarDate}\n`;
+  if (natalChart.chineseDate) md += `**四柱**: ${natalChart.chineseDate}\n`;
+  if (natalChart.zodiac) md += `**生肖**: ${natalChart.zodiac}\n`;
+  if (natalChart.fiveElementsClass) md += `**命主**: ${natalChart.fiveElementsClass}\n`;
+  if (natalChart.soul) md += `**命宫主星**: ${natalChart.soul}\n`;
+  if (natalChart.body) md += `**身宫主星**: ${natalChart.body}\n`;
   md += `\n`;
 
   // Twelve palaces
   md += `## 十二宫详解\n\n`;
   if (natalChart.palaces && natalChart.palaces.length > 0) {
     for (const palace of natalChart.palaces) {
-      md += `### ${palace.name}\n\n`;
+      md += `### ${palace.name}\n`;
+      md += `天干地支: ${palace.heavenlyStem || ''}${palace.earthlyBranch || ''}\n`;
 
-      // Heavenly stem and earthly branch
-      md += `**天干地支**: ${palace.heavenlyStem || ''}${palace.earthlyBranch || ''}\n\n`;
-
-      // Major stars
+      // Major stars with brightness
       if (palace.majorStars && palace.majorStars.length > 0) {
-        md += `**主星**: `;
-        md += palace.majorStars.map(s => {
-          let starText = s.name;
-          if (s.brightness) starText += ` (${s.brightness})`;
-          return starText;
+        const starsText = palace.majorStars.map(s => {
+          if (s.brightness) {
+            return `${s.name}(${s.brightness})`;
+          }
+          return s.name;
         }).join('、');
-        md += `\n\n`;
+        md += `主星: ${starsText}\n`;
       } else {
-        md += `**主星**: 无主星\n\n`;
+        md += `主星: 无主星\n`;
       }
 
       // Minor stars
       if (palace.minorStars && palace.minorStars.length > 0) {
-        md += `**辅星**: ${palace.minorStars.map(s => s.name).join('、')}\n\n`;
+        md += `辅星: ${palace.minorStars.map(s => s.name).join('、')}\n`;
       }
 
-      md += `---\n\n`;
-    }
-  }
-
-  // Horoscope info based on type
-  md += `## 运限分析\n\n`;
-  md += `> 根据事件时间跨度，重点分析: **${getHoroscopeTypeLabel(horoscopeType)}**\n\n`;
-
-  if (horoscope) {
-    // Big limit (大限)
-    if (horoscope.majorLimit) {
-      md += `### 大限\n`;
-      md += `- 年龄范围: ${horoscope.majorLimit.range || 'N/A'}\n`;
-      if (horoscope.majorLimit.palaceName) {
-        md += `- 所在宫位: ${horoscope.majorLimit.palaceName}\n`;
+      // Adjective stars (杂曜)
+      if (palace.adjectiveStars && palace.adjectiveStars.length > 0) {
+        md += `杂曜: ${palace.adjectiveStars.map(s => s.name).join('、')}\n`;
       }
-      md += `\n`;
-    }
 
-    // Small limit (小限)
-    if (horoscope.minorLimit) {
-      md += `### 小限 (流年)\n`;
-      md += `- 年龄: ${horoscope.minorLimit.age || 'N/A'}\n`;
-      if (horoscope.minorLimit.palaceName) {
-        md += `- 所在宫位: ${horoscope.minorLimit.palaceName}\n`;
+      // Changsheng 12 (长生12神)
+      if (palace.changsheng12) {
+        md += `长生十二神: ${palace.changsheng12}\n`;
       }
-      md += `\n`;
-    }
 
-    // Yearly (流年)
-    if (horoscope.yearly) {
-      md += `### 流年 ${horoscope.yearly.age || ''}岁\n`;
-      if (horoscope.yearly.palaceName) {
-        md += `- 流年宫位: ${horoscope.yearly.palaceName}\n`;
+      // Decadal range (大限范围)
+      if (palace.decadal && palace.decadal.range) {
+        md += `大限: ${palace.decadal.range}岁\n`;
       }
-      md += `\n`;
-    }
 
-    // Monthly (流月)
-    if (horoscope.monthly && (horoscopeType === 'monthly' || horoscopeType === 'weekly' || horoscopeType === 'daily')) {
-      md += `### 流月\n`;
-      if (horoscope.monthly.palaceName) {
-        md += `- 流月宫位: ${horoscope.monthly.palaceName}\n`;
-      }
-      md += `\n`;
-    }
-
-    // Daily (流日)
-    if (horoscope.daily && (horoscopeType === 'daily' || horoscopeType === 'weekly')) {
-      md += `### 流日\n`;
-      if (horoscope.daily.palaceName) {
-        md += `- 流日宫位: ${horoscope.daily.palaceName}\n`;
-      }
       md += `\n`;
     }
   }
 
   return md;
-}
-
-/**
- * Get human-readable label for horoscope type
- */
-function getHoroscopeTypeLabel(type) {
-  const labels = {
-    'daily': '流日 (适合短期事件)',
-    'weekly': '流周/流月 (适合一周内事件)',
-    'monthly': '流月 (适合一个月内事件)',
-    'small_limit': '小限 (适合多个月事件)',
-    'major_limit': '大限 (适合长期事件)'
-  };
-  return labels[type] || '流月';
 }
 
 /**
@@ -302,18 +200,17 @@ function identifyRelevantPalaces(input, natalChart) {
     return [];
   }
 
-  const inputLower = input.toLowerCase();
   const relevantPalaces = [];
 
   for (const [keyword, palaceName] of Object.entries(PALACE_KEYWORDS)) {
-    if (inputLower.includes(keyword)) {
+    if (input.includes(keyword)) {
       const palace = natalChart.palaces.find(p => p.name === palaceName);
       if (palace) {
         relevantPalaces.push({
           name: palaceName,
           keyword: keyword,
-          majorStars: palace.majorStars.map(s => s.name).filter(n => n),
-          description: `${palaceName} (triggered by "${keyword}")`
+          majorStars: palace.majorStars?.map(s => s.name).filter(n => n) || [],
+          description: `${palaceName} (关键词: "${keyword}")`
         });
       }
     }

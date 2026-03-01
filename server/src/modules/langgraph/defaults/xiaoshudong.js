@@ -67,8 +67,9 @@ export const xiaoshudongDefault = {
       promptType: 'none',
       staticPrompt: '',
       dynamicSources: [
-        { name: '用户数据', description: '用户的出生信息' },
-        { name: '命盘缓存', description: '已生成的命盘数据' }
+        { name: '{userId}', description: '用户ID，用于检索命盘' },
+        { name: '{natalChart}', description: '从存储读取的命盘数据（12宫、星曜等）' },
+        { name: '{userInput}', description: '用户输入，用于识别相关宫位' }
       ],
       llmEnabled: false,
       llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.3, maxTokens: 100 },
