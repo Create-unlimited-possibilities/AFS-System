@@ -72,59 +72,105 @@ export async function fortuneGeneratorNode(state) {
 }
 
 /**
+ * Build user context section from compressed data
+ * @param {Object} compressedData - Compressed conversation data
+ * @returns {string} Formatted user context section
+ */
+function buildUserContextSection(compressedData) {
+  if (!compressedData?.eventSummary) return '';
+  let section = `# 用户情况\n\n`;
+  section += `事件摘要: ${compressedData.eventSummary}\n`;
+  if (compressedData.emotionalState) {
+    section += `情绪状态: ${compressedData.emotionalState}\n`;
+  }
+  if (compressedData.coreConcerns?.length > 0) {
+    section += `核心关注: ${compressedData.coreConcerns.join('、')}\n`;
+  }
+  if (compressedData.informationGathered) {
+    const info = compressedData.informationGathered;
+    if (info.situation) section += `用户处境: ${info.situation}\n`;
+    if (info.duration) section += `持续时间: ${info.duration}\n`;
+    if (info.mainWorry) section += `主要担忧: ${info.mainWorry}\n`;
+  }
+  section += '\n---\n\n';
+  return section;
+}
+
+/**
+ * Build editable section from configLoader
+ * @returns {string} Formatted editable section
+ */
+function buildEditableSection() {
+  const editableSection = configLoader.getPrompt('xiaoshudong', 'fortune_generator');
+  if (editableSection) {
+    return `# 分析指引\n\n${editableSection}\n\n---\n\n`;
+  }
+  // Fallback
+  return `# 分析指引\n\n请根据以下命盘信息和用户情况，提供专业的紫微斗数分析报告。\n\n---\n\n`;
+}
+
+/**
+ * Build chart section from formatted chart text
+ * @param {string} chartText - Formatted chart text in Markdown
+ * @returns {string} Formatted chart section
+ */
+function buildChartSection(chartText) {
+  if (!chartText) return '';
+  return `${chartText}\n\n---\n\n`;
+}
+
+/**
+ * Build RAG context section from retrieved knowledge
+ * @param {Array} ragContext - RAG retrieved context items
+ * @returns {string} Formatted RAG section
+ */
+function buildRagSection(ragContext) {
+  if (!ragContext?.length) return '';
+  let section = `# 参考知识\n\n`;
+  const maxContext = Math.min(ragContext.length, 3);
+  for (let i = 0; i < maxContext; i++) {
+    section += `${i + 1}. ${ragContext[i].content}\n\n`;
+  }
+  section += '---\n\n';
+  return section;
+}
+
+/**
+ * Build user question section
+ * @param {string} userQuestion - User's original question
+ * @returns {string} Formatted user question section
+ */
+function buildUserQuestionSection(userQuestion) {
+  if (!userQuestion) return '';
+  return `# 用户问题\n\n${userQuestion}\n`;
+}
+
+/**
  * Build prompt for ziwei model
+ * Assembles System Prompt in the following order:
+ * 1. 用户情况 (compressedData)
+ * 2. 可编辑固定Prompt (editableSection from configLoader)
+ * 3. 命盘检索结果 (formattedChartText)
+ * 4. 知识检索结果 (ragContext)
+ * 5. 用户原始问题 (userQuestion)
  */
 function buildFortunePrompt(chartText, compressedData, userQuestion, ragContext) {
   let prompt = '';
 
-  // Add formatted chart text
-  if (chartText) {
-    prompt += chartText;
-    prompt += '\n\n';
-  }
+  // 1. 用户情况 (来自 conversation_compressor)
+  prompt += buildUserContextSection(compressedData);
 
-  // Add user context from compression
-  if (compressedData.eventSummary) {
-    prompt += `## 用户情况\n\n`;
-    prompt += `事件摘要: ${compressedData.eventSummary}\n`;
-    if (compressedData.emotionalState) {
-      prompt += `情绪状态: ${compressedData.emotionalState}\n`;
-    }
-    if (compressedData.coreConcerns?.length > 0) {
-      prompt += `核心关注: ${compressedData.coreConcerns.join('、')}\n`;
-    }
-    prompt += '\n';
-  }
+  // 2. 可编辑固定Prompt (来自 LangGraph 配置)
+  prompt += buildEditableSection();
 
-  // Add RAG context if available
-  if (ragContext?.length > 0) {
-    prompt += `## 参考书籍内容\n\n`;
-    const maxContext = Math.min(ragContext.length, 3);
-    for (let i = 0; i < maxContext; i++) {
-      prompt += `${i + 1}. ${ragContext[i].content}\n`;
-    }
-    prompt += '\n';
-  }
+  // 3. 命盘检索结果 (来自 chart_retriever)
+  prompt += buildChartSection(chartText);
 
-  // Add user question
-  if (userQuestion) {
-    prompt += `## 用户问题\n\n${userQuestion}\n\n`;
-  }
+  // 4. 知识检索结果 (来自 rag_retriever)
+  prompt += buildRagSection(ragContext);
 
-  // Get editable section from configLoader
-  const editableSection = configLoader.getPrompt('xiaoshudong', 'fortune_generator');
-  if (editableSection) {
-    prompt += editableSection;
-  } else {
-    // Fallback analysis instructions
-    prompt += `## 分析要求\n\n`;
-    prompt += `请根据以上命盘信息和用户情况，提供专业的紫微斗数分析报告。要求：\n`;
-    prompt += `1. 分析用户当前面临的情况\n`;
-    prompt += `2. 从命盘角度解读优势和挑战\n`;
-    prompt += `3. 结合运限给出时间节点建议\n`;
-    prompt += `4. 提供具体的行动建议\n\n`;
-    prompt += `请用专业但通俗的语言撰写分析报告。`;
-  }
+  // 5. 用户原始问题
+  prompt += buildUserQuestionSection(userQuestion);
 
   return prompt;
 }

@@ -96,9 +96,10 @@ export const xiaoshudongDefault = {
       promptType: 'dynamic',
       staticPrompt: '',
       dynamicSources: [
-        { name: '用户情况', description: '事件摘要、情绪状态、核心关注' },
-        { name: '书籍内容', description: 'RAG检索的紫微斗数知识' },
-        { name: '用户问题', description: '用户的原始问题' }
+        { name: '{compressedData}', description: '用户情况：来自对话压缩节点的事件摘要、情绪状态、核心关注' },
+        { name: '{editableSection}', description: '可编辑分析指引：管理员在后台编辑的分析要求' },
+        { name: '{formattedChartText}', description: '命盘MD：从存储读取的命盘数据，包含12宫详解' },
+        { name: '{ragContext}', description: '知识检索：RAG检索的紫微斗数书籍内容' }
       ],
       editableSection: `## 分析要求
 请根据以上命盘信息和用户情况，提供专业的紫微斗数分析报告。要求：
