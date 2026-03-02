@@ -3,29 +3,19 @@
  * Monitors token usage and triggers warnings/termination when approaching context limits
  *
  * @author AFS Team
- * @version 2.0.0
+ * @version 2.1.0 - Dynamic context limits from modelInfoService
  *
  * 注意：结束意图检测已移至 inputProcessor.js，使用 LLM 语义判断
  */
 
 import logger from '../../../core/utils/logger.js';
+import modelInfoService from '../../../core/llm/modelInfoService.js';
 
 const tokenLogger = {
   info: (message, meta = {}) => logger.info(message, { ...meta, module: 'TOKEN_MONITOR' }),
   error: (message, meta = {}) => logger.error(message, { ...meta, module: 'TOKEN_MONITOR' }),
   warn: (message, meta = {}) => logger.warn(message, { ...meta, module: 'TOKEN_MONITOR' }),
   debug: (message, meta = {}) => logger.debug(message, { ...meta, module: 'TOKEN_MONITOR' }),
-};
-
-// Model context limits
-const MODEL_LIMITS = {
-  'deepseek-r1:14b': 65536,
-  'deepseek-r1': 65536,
-  'deepseek-chat': 65536,
-  'deepseek-reasoner': 65536,
-  'qwen2.5': 32768,
-  'qwen2.5:7b': 32768,
-  'default': 65536
 };
 
 // Thresholds for token-based prompts
@@ -49,7 +39,9 @@ export async function tokenMonitorNode(state) {
     tokenLogger.info('[TokenMonitor] Starting token monitoring');
 
     const modelUsed = state.metadata?.modelUsed || 'deepseek-r1:14b';
-    const contextLimit = MODEL_LIMITS[modelUsed] || MODEL_LIMITS.default;
+
+    // Get context limit dynamically from modelInfoService
+    const contextLimit = await modelInfoService.getContextLimit(modelUsed);
 
     // Calculate token usage
     const tokenUsage = calculateConversationTokens(state);
@@ -145,10 +137,22 @@ export async function tokenMonitorNode(state) {
       stack: error.stack
     });
 
-    // On error, allow conversation to continue
+    // On error, allow conversation to continue with default context limit
     state.tokenInfo = {
+      modelUsed: state.metadata?.modelUsed || 'deepseek-r1:14b',
+      contextLimit: 65536, // Default fallback
+      usage: {
+        systemPrompt: 0,
+        messages: 0,
+        memories: 0,
+        currentInput: 0,
+        responseBuffer: RESPONSE_BUFFER,
+        total: RESPONSE_BUFFER
+      },
+      usageRatio: 0,
       action: 'continue',
-      error: error.message
+      error: error.message,
+      checkedAt: new Date().toISOString()
     };
 
     return state;
@@ -244,15 +248,6 @@ export function estimateTokens(text) {
   }
 
   return Math.ceil(tokenCount);
-}
-
-/**
- * Get model context limit
- * @param {string} model - Model name
- * @returns {number} Context limit in tokens
- */
-export function getModelContextLimit(model) {
-  return MODEL_LIMITS[model] || MODEL_LIMITS.default;
 }
 
 /**

@@ -3,17 +3,17 @@
  * Tests the token monitoring and conversation termination functionality
  *
  * @author AFS Team
- * @version 1.0.0
+ * @version 2.1.0 - Updated for dynamic context limits
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import {
-  tokenMonitorNode,
-  estimateTokens,
-  detectEndIntent,
-  getModelContextLimit,
-  getThresholds
-} from '../../../src/modules/chat/nodes/tokenMonitor.js';
+
+// Mock modelInfoService before importing tokenMonitor
+vi.mock('../../../src/core/llm/modelInfoService.js', () => ({
+  default: {
+    getContextLimit: vi.fn()
+  }
+}));
 
 // Mock the logger
 vi.mock('../../../src/core/utils/logger.js', () => ({
@@ -25,7 +25,20 @@ vi.mock('../../../src/core/utils/logger.js', () => ({
   }
 }));
 
+import modelInfoService from '../../../src/core/llm/modelInfoService.js';
+import {
+  tokenMonitorNode,
+  estimateTokens,
+  getThresholds
+} from '../../../src/modules/chat/nodes/tokenMonitor.js';
+
 describe('TokenMonitor', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default mock return value
+    modelInfoService.getContextLimit.mockResolvedValue(65536);
+  });
+
   describe('estimateTokens', () => {
     it('should estimate tokens for Chinese text correctly', () => {
       // Chinese characters: ~1.5 tokens each
@@ -98,112 +111,12 @@ describe('TokenMonitor', () => {
     });
   });
 
-  describe('detectEndIntent', () => {
-    it('should detect exact goodbye phrases', () => {
-      const goodbyes = ['再见', '拜拜', '不聊了', 'bye', 'goodbye'];
-
-      for (const phrase of goodbyes) {
-        const result = detectEndIntent(phrase);
-
-        expect(result.isEndIntent).toBe(true);
-        expect(result.confidence).toBe(1.0);
-        expect(result.matchType).toBe('exact');
-      }
-    });
-
-    it('should detect goodbye phrases in longer messages', () => {
-      const messages = [
-        '我们下次再聊吧，再见',
-        '我先走了，拜拜',
-        '今天先这样，bye'
-      ];
-
-      for (const message of messages) {
-        const result = detectEndIntent(message);
-
-        expect(result.isEndIntent).toBe(true);
-        expect(result.confidence).toBeGreaterThanOrEqual(0.7);
-        expect(result.matchType).toBe('include');
-      }
-    });
-
-    it('should give higher confidence when phrase is at end', () => {
-      const atEnd = detectEndIntent('我们聊得很开心，再见');
-      const inMiddle = detectEndIntent('再见，我们下次再聊');
-
-      expect(atEnd.confidence).toBeGreaterThan(inMiddle.confidence);
-    });
-
-    it('should detect partial matches with keywords', () => {
-      const result = detectEndIntent('我觉得可以结束了');
-
-      expect(result.isEndIntent).toBe(true);
-      expect(result.confidence).toBeGreaterThan(0);
-      expect(result.matchType).toBe('keyword');
-    });
-
-    it('should return false for normal conversation', () => {
-      const normalMessages = [
-        '今天天气真好',
-        '你觉得呢？',
-        '我还有个问题想问',
-        '这个话题很有意思'
-      ];
-
-      for (const message of normalMessages) {
-        const result = detectEndIntent(message);
-        expect(result.isEndIntent).toBe(false);
-      }
-    });
-
-    it('should handle null/undefined input', () => {
-      expect(detectEndIntent(null).isEndIntent).toBe(false);
-      expect(detectEndIntent(undefined).isEndIntent).toBe(false);
-      expect(detectEndIntent('').isEndIntent).toBe(false);
-    });
-
-    it('should handle case insensitivity', () => {
-      const result = detectEndIntent('BYE BYE');
-
-      expect(result.isEndIntent).toBe(true);
-    });
-
-    it('should detect multiple end keywords with higher confidence', () => {
-      const result = detectEndIntent('再见，不聊了，拜拜');
-
-      expect(result.isEndIntent).toBe(true);
-      expect(result.confidence).toBeGreaterThanOrEqual(0.7);
-    });
-  });
-
-  describe('getModelContextLimit', () => {
-    it('should return correct limit for deepseek-r1:14b', () => {
-      const limit = getModelContextLimit('deepseek-r1:14b');
-      expect(limit).toBe(65536);
-    });
-
-    it('should return correct limit for deepseek-r1', () => {
-      const limit = getModelContextLimit('deepseek-r1');
-      expect(limit).toBe(65536);
-    });
-
-    it('should return correct limit for qwen2.5', () => {
-      const limit = getModelContextLimit('qwen2.5');
-      expect(limit).toBe(32768);
-    });
-
-    it('should return default limit for unknown models', () => {
-      const limit = getModelContextLimit('unknown-model');
-      expect(limit).toBe(65536);
-    });
-  });
-
   describe('getThresholds', () => {
     it('should return threshold configuration', () => {
       const thresholds = getThresholds();
 
-      expect(thresholds.gentleReminder).toBe(0.6);
-      expect(thresholds.forceTerminate).toBe(0.7);
+      expect(thresholds.fatiguePrompt).toBe(0.6);
+      expect(thresholds.forceOffline).toBe(0.7);
     });
   });
 
@@ -250,12 +163,11 @@ describe('TokenMonitor', () => {
 
       // Usage should be very low, so action should be 'continue'
       expect(result.tokenInfo.action).toBe('continue');
-      expect(result.tokenInfo.message).toBeNull();
     });
 
-    it('should set action to remind when at 60% threshold', async () => {
+    it('should set action to fatigue_prompt when at 60% threshold', async () => {
       // Create state with usage at ~60%
-      const limit = getModelContextLimit('deepseek-r1:14b');
+      const limit = 65536;
       const targetTokens = Math.floor(limit * 0.61); // Slightly above 60%
 
       // Create content that will result in ~60% usage
@@ -271,13 +183,12 @@ describe('TokenMonitor', () => {
 
       const result = await tokenMonitorNode(state);
 
-      expect(result.tokenInfo.action).toBe('remind');
-      expect(result.tokenInfo.message).not.toBeNull();
+      expect(result.tokenInfo.action).toBe('fatigue_prompt');
     });
 
-    it('should set action to terminate when at 70% threshold', async () => {
+    it('should set action to force_offline when at 70% threshold', async () => {
       // Create state with usage at ~70%
-      const limit = getModelContextLimit('deepseek-r1:14b');
+      const limit = 65536;
       const targetTokens = Math.floor(limit * 0.72); // Slightly above 70%
 
       // Create content that will result in ~72% usage
@@ -293,8 +204,7 @@ describe('TokenMonitor', () => {
 
       const result = await tokenMonitorNode(state);
 
-      expect(result.tokenInfo.action).toBe('terminate');
-      expect(result.tokenInfo.message).not.toBeNull();
+      expect(result.tokenInfo.action).toBe('force_offline');
     });
 
     it('should include response buffer in total', async () => {
@@ -390,11 +300,37 @@ describe('TokenMonitor', () => {
       expect(result.tokenInfo.checkedAt).toBeDefined();
       expect(new Date(result.tokenInfo.checkedAt)).toBeInstanceOf(Date);
     });
+
+    it('should use dynamic context limit from modelInfoService', async () => {
+      modelInfoService.getContextLimit.mockResolvedValueOnce(131072);
+
+      const state = createMockState({
+        metadata: { modelUsed: 'ziwei-8b' }
+      });
+
+      const result = await tokenMonitorNode(state);
+
+      expect(modelInfoService.getContextLimit).toHaveBeenCalledWith('ziwei-8b');
+      expect(result.tokenInfo.contextLimit).toBe(131072);
+    });
+
+    it('should fallback to default when modelInfoService fails', async () => {
+      modelInfoService.getContextLimit.mockRejectedValueOnce(new Error('API error'));
+
+      const state = createMockState({
+        metadata: { modelUsed: 'unknown-model' }
+      });
+
+      const result = await tokenMonitorNode(state);
+
+      // modelInfoService returns default 65536 on error
+      expect(result.tokenInfo.contextLimit).toBe(65536);
+    });
   });
 
   describe('Token Threshold Actions', () => {
-    it('should return reminder message at 60% threshold', async () => {
-      const limit = getModelContextLimit('deepseek-r1:14b');
+    it('should set fatigue_prompt action at 60% threshold', async () => {
+      const limit = 65536;
       const targetTokens = Math.floor(limit * 0.65); // 65%
 
       const systemPrompt = 'A'.repeat(Math.floor(targetTokens / 0.25));
@@ -404,18 +340,16 @@ describe('TokenMonitor', () => {
         systemPrompt,
         messages: [],
         currentInput: '',
-        retrievedMemories: [],
-        userName: '测试用户'
+        retrievedMemories: []
       };
 
       const result = await tokenMonitorNode(state);
 
-      expect(result.tokenInfo.action).toBe('remind');
-      expect(result.tokenInfo.message).toContain('测试用户');
+      expect(result.tokenInfo.action).toBe('fatigue_prompt');
     });
 
-    it('should return termination message at 70% threshold', async () => {
-      const limit = getModelContextLimit('deepseek-r1:14b');
+    it('should set force_offline action at 70% threshold', async () => {
+      const limit = 65536;
       const targetTokens = Math.floor(limit * 0.75); // 75%
 
       const systemPrompt = 'A'.repeat(Math.floor(targetTokens / 0.25));
@@ -425,19 +359,17 @@ describe('TokenMonitor', () => {
         systemPrompt,
         messages: [],
         currentInput: '',
-        retrievedMemories: [],
-        userName: '测试用户'
+        retrievedMemories: []
       };
 
       const result = await tokenMonitorNode(state);
 
-      expect(result.tokenInfo.action).toBe('terminate');
-      expect(result.tokenInfo.message).toBeDefined();
+      expect(result.tokenInfo.action).toBe('force_offline');
     });
   });
 
   describe('Model-specific behavior', () => {
-    it('should use correct limits for different models', async () => {
+    it('should use context limits from modelInfoService for different models', async () => {
       const models = [
         { name: 'deepseek-r1:14b', expectedLimit: 65536 },
         { name: 'deepseek-r1', expectedLimit: 65536 },
@@ -446,6 +378,8 @@ describe('TokenMonitor', () => {
       ];
 
       for (const { name, expectedLimit } of models) {
+        modelInfoService.getContextLimit.mockResolvedValueOnce(expectedLimit);
+
         const state = {
           metadata: { modelUsed: name },
           systemPrompt: 'Test',
@@ -456,6 +390,7 @@ describe('TokenMonitor', () => {
 
         const result = await tokenMonitorNode(state);
 
+        expect(modelInfoService.getContextLimit).toHaveBeenCalledWith(name);
         expect(result.tokenInfo.contextLimit).toBe(expectedLimit);
       }
     });
