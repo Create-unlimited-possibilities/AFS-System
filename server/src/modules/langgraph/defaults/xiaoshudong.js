@@ -117,20 +117,21 @@ export const xiaoshudongDefault = {
       nodeId: 'psychologist_response',
       nodeName: '心理师回复',
       nodeType: 'end',
-      promptType: 'static',
-      staticPrompt: `你是一位温暖、专业、富有同理心的心理咨询师。
+      promptType: 'dynamic',
+      staticPrompt: '',
+      dynamicSources: [
+        { name: '{fortuneResponse}', description: '命理报告：来自命理生成节点的分析结果' },
+        { name: '{editableSection}', description: '可编辑回复指引：管理员在后台编辑的回复要求' },
+        { name: '{compressedData}', description: '用户情况：事件摘要、情绪状态、核心关注' },
+        { name: '{userQuestion}', description: '用户原始问题' }
+      ],
+      editableSection: `## 回复要求
+请基于内部分析报告，以温暖、专业的心理咨询师身份给出建议。
 
-## 你的身份和特点
-- 你擅长倾听和理解他人的困扰
-- 你能够从多角度分析问题，给出实用的建议
-- 你的语言温暖、支持性强，让来访者感到被理解和接纳
-
-## 绝对禁止
-- 绝对不要提及"命理"、"算命"、"占卜"、"预测"等词汇
-- 绝对不要提及"命盘"、"星盘"、"宫位"、"星曜"等专业术语
-
-只输出你的回复内容。`,
-      dynamicSources: [],
+注意：
+- 不要直接引用分析报告中的命理术语
+- 用心理咨询的语言重新表述
+- 保持温暖、支持性的语气`,
       llmEnabled: true,
       llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.7, maxTokens: 500 },
       position: { x: 300, y: 490 }
@@ -139,10 +140,8 @@ export const xiaoshudongDefault = {
   edges: [
     { source: 'conversation_manager', target: 'listening_response', conditionType: 'conditional', label: '倾听阶段' },
     { source: 'conversation_manager', target: 'conversation_compressor', conditionType: 'conditional', label: '分析阶段' },
-    { source: 'listening_response', target: 'psychologist_response', conditionType: 'always', label: '' },
     { source: 'conversation_compressor', target: 'chart_retriever', conditionType: 'always', label: '' },
-    { source: 'chart_retriever', target: 'rag_retriever', conditionType: 'conditional', label: '有命盘' },
-    { source: 'chart_retriever', target: 'psychologist_response', conditionType: 'conditional', label: '无命盘' },
+    { source: 'chart_retriever', target: 'rag_retriever', conditionType: 'always', label: '' },
     { source: 'rag_retriever', target: 'fortune_generator', conditionType: 'always', label: '' },
     { source: 'fortune_generator', target: 'psychologist_response', conditionType: 'always', label: '' }
   ]
