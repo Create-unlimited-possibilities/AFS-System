@@ -14,6 +14,8 @@ import ChatSession from '../chat/model.js';
 import InviteCode from './models/inviteCode.js';
 import logger from '../../core/utils/logger.js';
 import mongoose from 'mongoose';
+import ChromaDBService from '../../core/storage/chroma.js';
+import modelInfoService from '../../core/llm/modelInfoService.js';
 
 class AdminService {
   /**
@@ -82,13 +84,32 @@ class AdminService {
       AssistRelation.countDocuments({ $or: [{ targetId: userId }, { assistantId: userId }] })
     ]);
 
+    // Calculate profile completion for ziwei chart
+    const profile = user.profile;
+    const missingFields = [];
+    if (!profile?.gender || profile.gender === '其他') {
+      missingFields.push('性别');
+    }
+    if (!profile?.birthDate) {
+      missingFields.push('出生日期');
+    }
+    if (profile?.birthHour === undefined || profile?.birthHour === null) {
+      missingFields.push('出生时辰');
+    }
+
+    const profileCompletion = {
+      isComplete: missingFields.length === 0,
+      missingFields
+    };
+
     return {
       ...user,
       stats: {
         answerCount,
         sessionCount,
         relationCount
-      }
+      },
+      profileCompletion
     };
   }
 
@@ -1009,12 +1030,21 @@ class AdminService {
         status: 'unknown',
         totalIndexes: 0
       },
+      ziweiModel: {
+        registered: false,
+        name: process.env.ZIWEI_MODEL || 'ziwei-8b',
+        size: undefined
+      },
       checkMethod: 'api'
     };
 
     // Import services for real API health checks
     const LLMClient = (await import('../../core/llm/client.js')).default;
     const ChromaDBService = (await import('../../core/storage/chroma.js')).default;
+
+    // Ollama base URL for model list check
+    const ollamaBaseUrl = process.env.OLLAMA_BASE_URL || 'http://modelserver:11434';
+    const ziweiModelName = process.env.ZIWEI_MODEL || 'ziwei-8b';
 
     // Run all health checks in parallel
     const [
@@ -1024,7 +1054,8 @@ class AdminService {
       mongoHealth,
       chromaHealth,
       llmApiHealthy,
-      totalIndexes
+      totalIndexes,
+      ziweiModelInfo
     ] = await Promise.all([
       // Docker container checks (as fallback info)
       this._checkDockerContainer('mongoserver').catch(() => false),
@@ -1082,6 +1113,44 @@ class AdminService {
           logger.warn('[AdminService] Failed to count vector indexes:', error.message);
           return 0;
         }
+      })(),
+
+      // Check if configured ZIWEI_MODEL is registered in Ollama
+      (async () => {
+        try {
+          const response = await fetch(`${ollamaBaseUrl}/api/tags`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(healthCheckTimeout)
+          });
+
+          if (!response.ok) {
+            return { registered: false, name: ziweiModelName, size: undefined };
+          }
+
+          const data = await response.json();
+          const models = data.models || [];
+
+          // Find the configured model (exact match or prefix match for tags like :latest)
+          // e.g., ZIWEI_MODEL=mingli-14b should match "mingli-14b:latest"
+          const configuredModel = models.find(m =>
+            m.name === ziweiModelName ||
+            m.name.startsWith(ziweiModelName + ':')
+          );
+
+          if (configuredModel) {
+            return {
+              registered: true,
+              name: configuredModel.name,
+              size: configuredModel.size || 0
+            };
+          }
+
+          return { registered: false, name: ziweiModelName, size: undefined };
+        } catch (error) {
+          logger.warn('[AdminService] Failed to check ziwei model:', error.message);
+          return { registered: false, name: ziweiModelName, size: undefined };
+        }
       })()
     ]);
 
@@ -1099,6 +1168,8 @@ class AdminService {
 
     status.vectorStore.status = chromaHealth.connected ? 'ready' : 'error';
     status.vectorStore.totalIndexes = totalIndexes;
+
+    status.ziweiModel = ziweiModelInfo;
 
     return status;
   }
@@ -1464,6 +1535,654 @@ class AdminService {
       .lean();
 
     return permissions;
+  }
+
+  /**
+   * Get ziwei chart for a user (for admin panel)
+   * Uses cached chart from ziweiChartService
+   */
+  async getZiweiChart(userId, { targetDate } = {}) {
+    const ziweiChartService = (await import('../ziwei/services/ziweiChartService.js')).default;
+
+    // Get cached chart
+    const chart = await ziweiChartService.getChart(userId);
+
+    if (!chart) {
+      return {
+        success: false,
+        error: '用户命盘不存在'
+      };
+    }
+
+    // Convert Mongoose document to plain object if needed
+    const chartData = chart.toObject ? chart.toObject() : chart;
+
+    // Always compute horoscope (real-time, not stored)
+    const horoscopeDate = targetDate || new Date().toISOString().split('T')[0];
+    let horoscope = null;
+    try {
+      const result = await ziweiChartService.computeHoroscope(userId, horoscopeDate);
+      // computeHoroscope returns { userId, targetDate, horoscope }
+      // We only want the inner horoscope object
+      horoscope = result.horoscope || result;
+    } catch (error) {
+      logger.warn('[AdminService] Failed to compute horoscope:', error.message);
+    }
+
+    return {
+      success: true,
+      userId,
+      chart: {
+        ...chartData,
+        horoscope
+      }
+    };
+  }
+
+  /**
+   * ============================================
+   * Model Management Methods
+   * ============================================
+   */
+
+  /**
+   * Helper: Get Ollama base URL
+   */
+  _getOllamaBaseUrl() {
+    return process.env.OLLAMA_BASE_URL || 'http://modelserver:11434';
+  }
+
+  /**
+   * Helper: Fetch models from Ollama API
+   */
+  async _fetchOllamaModels() {
+    const ollamaBaseUrl = this._getOllamaBaseUrl();
+    const timeout = parseInt(process.env.HEALTH_CHECK_TIMEOUT_MS || '5000', 10);
+
+    try {
+      const response = await fetch(`${ollamaBaseUrl}/api/tags`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(timeout)
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+      return data.models || [];
+    } catch (error) {
+      logger.warn('[AdminService] Failed to fetch Ollama models:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Get model management status
+   * Returns status of ziwei model, GGUF files, and registered models
+   */
+  async getModelManagementStatus() {
+    const ollamaBaseUrl = this._getOllamaBaseUrl();
+    const ziweiModelName = process.env.ZIWEI_MODEL || 'ziwei-8b';
+
+    // Fetch all data in parallel
+    const [ollamaModels, ggufFiles, modelfiles] = await Promise.all([
+      this._fetchOllamaModels(),
+      this.listGgufFiles().catch(() => []),
+      this.listModelfiles().catch(() => [])
+    ]);
+
+    // Fetch context limits for all models in parallel
+    let modelsWithLimits = [];
+    if (ollamaModels && ollamaModels.length > 0) {
+      const limitPromises = ollamaModels.map(async (model) => {
+        try {
+          const contextLimit = await modelInfoService.getContextLimit(model.name);
+          return { ...model, contextLimit };
+        } catch (error) {
+          logger.warn(`[AdminService] Failed to get context limit for ${model.name}: ${error.message}`);
+          return { ...model, contextLimit: 65536 }; // Default fallback
+        }
+      });
+      modelsWithLimits = await Promise.all(limitPromises);
+    }
+
+    // Check ziwei model registration
+    let ziweiModelStatus = { registered: false, name: ziweiModelName, size: undefined };
+    if (modelsWithLimits.length > 0) {
+      const ziweiModel = modelsWithLimits.find(m =>
+        m.name === ziweiModelName ||
+        m.name.startsWith(ziweiModelName + ':')
+      );
+      if (ziweiModel) {
+        ziweiModelStatus = {
+          registered: true,
+          name: ziweiModel.name,
+          size: ziweiModel.size || 0,
+          contextLimit: ziweiModel.contextLimit
+        };
+      }
+    }
+
+    // Return format matching frontend ModelStatus interface
+    return {
+      ollama: {
+        baseUrl: ollamaBaseUrl,
+        models: modelsWithLimits || []
+      },
+      ggufFiles: ggufFiles.map(f => f.name),  // string array
+      modelfiles: modelfiles.map(f => f.name), // string array
+      ziweiModel: ziweiModelStatus,
+      envConfig: {
+        ZIWEI_MODEL: ziweiModelName,
+        ZIWEI_TIMEOUT: process.env.ZIWEI_TIMEOUT || '120000',
+        OLLAMA_BASE_URL: ollamaBaseUrl
+      }
+    };
+  }
+
+  /**
+   * List all Ollama models
+   */
+  async listOllamaModels() {
+    const models = await this._fetchOllamaModels();
+    return models || [];
+  }
+
+  /**
+   * Get detailed info for a specific model
+   */
+  async getModelInfo(modelName) {
+    const ollamaBaseUrl = this._getOllamaBaseUrl();
+    const timeout = parseInt(process.env.HEALTH_CHECK_TIMEOUT_MS || '10000', 10);
+
+    try {
+      const response = await fetch(`${ollamaBaseUrl}/api/show`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: modelName }),
+        signal: AbortSignal.timeout(timeout)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to get model info: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      logger.error('[AdminService] Failed to get model info:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * List available GGUF model files
+   */
+  async listGgufFiles() {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+
+    // GGUF files directory - check common locations
+    // Docker volume mount: .\modelserver\models\gguf -> /app/models/gguf
+    const ggufDirs = [
+      '/app/models/gguf',        // Docker container path (mounted)
+      './modelserver/models/gguf', // Local development
+      '../modelserver/models/gguf' // Alternative local path
+    ];
+
+    const files = [];
+
+    for (const dir of ggufDirs) {
+      try {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.isFile() && entry.name.endsWith('.gguf')) {
+            const filePath = path.join(dir, entry.name);
+            const stats = await fs.stat(filePath);
+            files.push({
+              name: entry.name,
+              path: filePath,
+              size: stats.size,
+              modified: stats.mtime
+            });
+          }
+        }
+        // If we found files in this directory, stop searching
+        if (files.length > 0) break;
+      } catch (error) {
+        // Directory doesn't exist, try next
+        continue;
+      }
+    }
+
+    return files;
+  }
+
+  /**
+   * List available Modelfile files
+   */
+  async listModelfiles() {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+
+    // Modelfiles are stored in the same directory as GGUF files
+    // Docker volume mount: .\modelserver\models\gguf -> /app/models/gguf
+    const modelfileDirs = [
+      '/app/models/gguf',          // Docker container path (mounted)
+      './modelserver/models/gguf', // Local development
+      '../modelserver/models/gguf' // Alternative local path
+    ];
+
+    const files = [];
+
+    for (const dir of modelfileDirs) {
+      try {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          // Modelfiles: Modelfile.* or *.modelfile
+          if (entry.isFile() && !entry.name.startsWith('.') && !entry.name.endsWith('.gguf') && !entry.name.endsWith('.md')) {
+            const filePath = path.join(dir, entry.name);
+            const stats = await fs.stat(filePath);
+            files.push({
+              name: entry.name,
+              path: filePath,
+              size: stats.size,
+              modified: stats.mtime
+            });
+          }
+        }
+        // If we found files in this directory, stop searching
+        if (files.length > 0) break;
+      } catch (error) {
+        // Directory doesn't exist, try next
+        continue;
+      }
+    }
+
+    return files;
+  }
+
+  /**
+   * Read Modelfile content
+   */
+  async readModelfile(filename) {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+
+    // Sanitize filename to prevent path traversal
+    const safeName = path.basename(filename);
+
+    const modelfileDirs = [
+      '/app/models/gguf',          // Docker container path (mounted)
+      './modelserver/models/gguf', // Local development
+      '../modelserver/models/gguf' // Alternative local path
+    ];
+
+    for (const dir of modelfileDirs) {
+      const filePath = path.join(dir, safeName);
+      try {
+        const content = await fs.readFile(filePath, 'utf-8');
+        return { name: safeName, content };
+      } catch (error) {
+        continue;
+      }
+    }
+
+    throw new Error(`Modelfile not found: ${safeName}`);
+  }
+
+  /**
+   * Save Modelfile content
+   */
+  async saveModelfile(filename, content) {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+
+    // Sanitize filename to prevent path traversal
+    const safeName = path.basename(filename);
+
+    // Primary directory to save (Docker mounted path)
+    const modelfileDir = '/app/models/gguf';
+
+    try {
+      // Ensure directory exists
+      await fs.mkdir(modelfileDir, { recursive: true });
+    } catch (error) {
+      // Directory might already exist
+    }
+
+    const filePath = path.join(modelfileDir, safeName);
+    await fs.writeFile(filePath, content, 'utf-8');
+
+    logger.info(`[AdminService] Modelfile saved: ${safeName}`);
+    return { success: true, name: safeName, message: 'Modelfile saved successfully' };
+  }
+
+  /**
+   * Create a new Ollama model from Modelfile
+   */
+  async createModel(modelName, modelfileName, options = {}) {
+    const ollamaBaseUrl = this._getOllamaBaseUrl();
+    const timeout = parseInt(process.env.OLLAMA_TIMEOUT || '300000', 10); // 5 minutes default
+
+    // Read modelfile content
+    const { content: modelfileContent } = await this.readModelfile(modelfileName);
+
+    try {
+      const response = await fetch(`${ollamaBaseUrl}/api/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: modelName,
+          modelfile: modelfileContent,
+          stream: false
+        }),
+        signal: AbortSignal.timeout(timeout)
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Failed to create model: ${error}`);
+      }
+
+      const result = await response.json();
+      logger.info(`[AdminService] Model created: ${modelName}`);
+
+      return {
+        success: true,
+        message: `Model ${modelName} created successfully`,
+        details: result
+      };
+    } catch (error) {
+      logger.error('[AdminService] Failed to create model:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete an Ollama model
+   */
+  async deleteModel(modelName, options = {}) {
+    const ollamaBaseUrl = this._getOllamaBaseUrl();
+    const timeout = parseInt(process.env.HEALTH_CHECK_TIMEOUT_MS || '30000', 10);
+
+    try {
+      const response = await fetch(`${ollamaBaseUrl}/api/delete`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: modelName }),
+        signal: AbortSignal.timeout(timeout)
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Failed to delete model: ${error}`);
+      }
+
+      logger.info(`[AdminService] Model deleted: ${modelName}`);
+
+      return {
+        success: true,
+        message: `Model ${modelName} deleted successfully`
+      };
+    } catch (error) {
+      logger.error('[AdminService] Failed to delete model:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Get Ziwei Books (fortune-telling knowledge base) content
+   * Reads from ChromaDB 'ziwei_books' collection
+   * @param {Object} options - Query options
+   * @param {number} options.page - Page number
+   * @param {number} options.limit - Items per page
+   * @param {string} options.search - Search query
+   * @param {string} options.source - Filter by source book
+   * @returns {Promise<Object>} Books data with pagination
+   */
+  async getZiweiBooks({ page = 1, limit = 20, search = '', source = '' } = {}) {
+    try {
+      const chromaService = new ChromaDBService();
+      await chromaService.initialize();
+
+      const collection = await chromaService.getCollection('ziwei_books');
+      if (!collection) {
+        logger.warn('[AdminService] ziwei_books collection not found');
+        return {
+          books: [],
+          pagination: { page, limit, total: 0, totalPages: 0 }
+        };
+      }
+
+      // Get all documents from collection
+      const allDocs = await collection.get({
+        include: ['documents', 'metadatas']
+      });
+
+      let books = (allDocs.documents || []).map((doc, index) => ({
+        _id: allDocs.ids[index],
+        content: doc,
+        source: allDocs.metadatas?.[index]?.source || 'unknown',
+        chunk_id: allDocs.metadatas?.[index]?.chunk_id || 0
+      }));
+
+      // Filter by source if provided
+      if (source) {
+        books = books.filter(book => book.source === source);
+      }
+
+      // Filter by search query if provided
+      if (search) {
+        const searchLower = search.toLowerCase();
+        books = books.filter(book =>
+          book.content.toLowerCase().includes(searchLower) ||
+          book.source.toLowerCase().includes(searchLower)
+        );
+      }
+
+      // Calculate pagination
+      const total = books.length;
+      const totalPages = Math.ceil(total / limit);
+      const skip = (page - 1) * limit;
+      const paginatedBooks = books.slice(skip, skip + limit);
+
+      logger.info(`[AdminService] Retrieved ${paginatedBooks.length} ziwei books (page ${page}/${totalPages})`);
+
+      return {
+        books: paginatedBooks,
+        pagination: { page, limit, total, totalPages }
+      };
+    } catch (error) {
+      logger.error('[AdminService] Failed to get ziwei books:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Get Ziwei Books sources list
+   * Returns distinct sources and their chunk counts
+   * @returns {Promise<Object>} Sources list with counts
+   */
+  async getZiweiBooksSources() {
+    try {
+      const chromaService = new ChromaDBService();
+      await chromaService.initialize();
+
+      const collection = await chromaService.getCollection('ziwei_books');
+      if (!collection) {
+        logger.warn('[AdminService] ziwei_books collection not found');
+        return { sources: [] };
+      }
+
+      // Get all documents from collection
+      const allDocs = await collection.get({
+        include: ['metadatas']
+      });
+
+      // Count by source
+      const sourceCounts = {};
+      for (const meta of (allDocs.metadatas || [])) {
+        const source = meta?.source || 'unknown';
+        sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+      }
+
+      // Convert to array format
+      const sources = Object.entries(sourceCounts)
+        .map(([source, count]) => ({ source, count }))
+        .sort((a, b) => b.count - a.count);
+
+      logger.info(`[AdminService] Found ${sources.length} ziwei book sources`);
+
+      return { sources };
+    } catch (error) {
+      logger.error('[AdminService] Failed to get ziwei books sources:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Get XiaoShuDong (小树洞) usage statistics
+   * @param {Object} options - Query options
+   * @param {string} options.startDate - Start date filter (ISO string)
+   * @param {string} options.endDate - End date filter (ISO string)
+   * @param {string} options.userId - Filter by specific user
+   * @returns {Promise<Object>} Statistics data
+   */
+  async getXiaoshudongStats({ startDate, endDate, userId } = {}) {
+    try {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+
+      // Determine base path
+      const isDocker = process.env.DOCKER_CONTAINER === 'true' || process.env.NODE_ENV === 'docker';
+      const basePath = isDocker
+        ? '/app/storage/userdata'
+        : path.join(process.cwd(), 'server', 'storage', 'userdata');
+
+      // Parse date filters
+      const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const end = endDate ? new Date(endDate) : new Date();
+
+      // Initialize stats
+      const stats = {
+        totalConversations: 0,
+        totalUsers: 0,
+        activeSessions: 0,
+        dailyStats: [],
+        phaseDistribution: {
+          listening: 0,
+          analysis: 0,
+          transition: 0
+        },
+        avgTurnCount: 0,
+        period: {
+          start: start.toISOString(),
+          end: end.toISOString()
+        }
+      };
+
+      // Get active sessions from orchestrator
+      try {
+        const orchestrator = (await import('../xiaoshudong/orchestrator.js')).default;
+        stats.activeSessions = orchestrator.getSessionCount();
+      } catch (error) {
+        logger.warn('[AdminService] Could not get active sessions from orchestrator:', error.message);
+      }
+
+      // Read all user directories
+      let userDirs;
+      try {
+        userDirs = await fs.readdir(basePath);
+      } catch (error) {
+        if (error.code === 'ENOENT') {
+          logger.info('[AdminService] No userdata directory found');
+          return stats;
+        }
+        throw error;
+      }
+
+      // Daily stats map: date string -> count
+      const dailyMap = new Map();
+      let totalTurnCount = 0;
+      let conversationCount = 0;
+      const userSet = new Set();
+
+      // Process each user directory
+      for (const userDir of userDirs) {
+        // Skip if filtering by userId and this is not the target user
+        if (userId && userDir !== userId) continue;
+
+        const xiaoshudongPath = path.join(basePath, userDir, 'conversations', 'with_xiaoshudong');
+
+        try {
+          const files = await fs.readdir(xiaoshudongPath);
+
+          for (const file of files) {
+            if (!file.endsWith('.json')) continue;
+
+            try {
+              const filePath = path.join(xiaoshudongPath, file);
+              const content = await fs.readFile(filePath, 'utf-8');
+              const memory = JSON.parse(content);
+
+              // Get creation date
+              const createdAt = memory.meta?.createdAt ? new Date(memory.meta.createdAt) : null;
+
+              // Filter by date range
+              if (createdAt && createdAt >= start && createdAt <= end) {
+                conversationCount++;
+                userSet.add(userDir);
+
+                // Count message turns
+                const msgCount = memory.meta?.messageCount || 0;
+                totalTurnCount += msgCount;
+
+                // Daily stats
+                const dateKey = createdAt.toISOString().split('T')[0];
+                dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + 1);
+
+                // Phase distribution
+                const phase = memory.content?.processed?.phase || 'listening';
+                if (phase === 'listening') {
+                  stats.phaseDistribution.listening++;
+                } else if (phase === 'analysis') {
+                  stats.phaseDistribution.analysis++;
+                } else {
+                  stats.phaseDistribution.transition++;
+                }
+              }
+            } catch (parseError) {
+              logger.warn(`[AdminService] Failed to parse memory file: ${file}`, parseError.message);
+            }
+          }
+        } catch (dirError) {
+          // Directory doesn't exist for this user, skip
+          if (dirError.code !== 'ENOENT') {
+            logger.warn(`[AdminService] Error reading xiaoshudong directory for user ${userDir}:`, dirError.message);
+          }
+        }
+      }
+
+      // Set final stats
+      stats.totalConversations = conversationCount;
+      stats.totalUsers = userSet.size;
+      stats.avgTurnCount = conversationCount > 0 ? totalTurnCount / conversationCount : 0;
+
+      // Convert daily map to sorted array
+      stats.dailyStats = Array.from(dailyMap.entries())
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      logger.info(`[AdminService] XiaoShuDong stats: ${stats.totalConversations} conversations, ${stats.totalUsers} users`);
+
+      return stats;
+    } catch (error) {
+      logger.error('[AdminService] Failed to get XiaoShuDong stats:', error.message);
+      throw error;
+    }
   }
 }
 

@@ -33,6 +33,7 @@ interface OllamaModel {
   name: string
   size: number
   modified: string
+  contextLimit?: number
   details?: {
     format?: string
     family?: string
@@ -752,10 +753,15 @@ export default function ModelManagementPage() {
                         className="flex items-center justify-between p-2 border rounded hover:bg-gray-50"
                       >
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-sm truncate">{model.name}</span>
                             {model.name.includes('ziwei') && (
                               <Badge variant="outline" className="text-xs flex-shrink-0">命理</Badge>
+                            )}
+                            {model.contextLimit && (
+                              <Badge variant="secondary" className="text-xs flex-shrink-0 bg-blue-100 text-blue-700">
+                                {(model.contextLimit / 1024).toFixed(0)}K ctx
+                              </Badge>
                             )}
                           </div>
                           <div className="text-xs text-gray-500">
