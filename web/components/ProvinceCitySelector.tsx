@@ -124,7 +124,7 @@ export default function ProvinceCitySelector({
           onValueChange={handleProvinceChange}
           disabled={disabled || loadingProvinces}
         >
-          <SelectTrigger id="province">
+          <SelectTrigger id="province" className={disabled ? 'bg-gray-50 text-gray-500' : ''}>
             <SelectValue placeholder={loadingProvinces ? '加载中...' : '请选择省份'} />
           </SelectTrigger>
           <SelectContent>
@@ -147,7 +147,7 @@ export default function ProvinceCitySelector({
           onValueChange={handleCityChange}
           disabled={disabled || loadingCities || !value?.provinceCode}
         >
-          <SelectTrigger id="city">
+          <SelectTrigger id="city" className={disabled ? 'bg-gray-50 text-gray-500' : ''}>
             <SelectValue placeholder={
               !value?.provinceCode
                 ? '请先选择省份'

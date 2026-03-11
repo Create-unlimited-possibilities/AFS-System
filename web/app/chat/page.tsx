@@ -18,7 +18,8 @@ export default function ChatPage() {
     loadContacts,
     selectContact,
     sendMessage,
-    setSelectedContact
+    setSelectedContact,
+    hasCompleteBirthInfo
   } = useChat()
 
   const [showAddModal, setShowAddModal] = useState(false)
@@ -67,6 +68,7 @@ export default function ChatPage() {
           onSend={sendMessage}
           onBack={handleBack}
           isMobile={isMobile}
+          hasCompleteBirthInfo={hasCompleteBirthInfo}
         />
       )}
 

@@ -9,6 +9,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import logger from '../../../core/utils/logger.js';
+import activityLogService from './activityLogService.js';
 
 // Environment variable configuration
 const ENV_CONFIG = {
@@ -438,7 +439,7 @@ class EnvVarService {
    * Update environment variables
    */
   async updateEnvironmentVariables(updates, options = {}) {
-    const { backup = true, skipValidation = false } = options;
+    const { backup = true, skipValidation = false, actorId, actorName } = options;
 
     // Read current .env file
     const { envVars, comments } = await this.readEnvFile();
@@ -469,6 +470,19 @@ class EnvVarService {
     }
 
     if (errors.length > 0) {
+      // Log failed update attempt
+      if (actorId) {
+        await activityLogService.log({
+          operation: 'env_var_updated',
+          category: 'system',
+          actorId: actorId,
+          actorName: actorName || 'Admin',
+          targetType: 'env_var',
+          description: '环境变量更新失败',
+          details: { errors },
+          success: false
+        });
+      }
       return { success: false, errors };
     }
 
@@ -494,6 +508,23 @@ class EnvVarService {
     logger.info('[EnvVarService] Environment variables updated:', {
       keys: Object.keys(validatedUpdates)
     });
+
+    // Log activity
+    if (actorId) {
+      await activityLogService.log({
+        operation: 'env_var_updated',
+        category: 'system',
+        actorId: actorId,
+        actorName: actorName || 'Admin',
+        targetType: 'env_var',
+        description: `更新环境变量: ${Object.keys(validatedUpdates).join(', ')}`,
+        details: {
+          updated: Object.keys(validatedUpdates),
+          backupCreated: backup
+        },
+        success: true
+      });
+    }
 
     return {
       success: true,

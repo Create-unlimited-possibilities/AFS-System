@@ -11,6 +11,25 @@ import { Badge } from '@/components/ui/badge';
 import { Eye, EyeOff, Save, RefreshCw } from 'lucide-react';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
 
+// LLM 相关的环境变量已移至"模型管理"页面
+const LLM_RELATED_VARS = [
+  'LLM_BACKEND',
+  'LLM_MODEL',
+  'LLM_TIMEOUT',
+  'LLM_TEMPERATURE',
+  'LLM_MAX_RETRIES',
+  'OLLAMA_BASE_URL',
+  'OLLAMA_MODEL',
+  'OLLAMA_TIMEOUT',
+  'DEEPSEEK_API_KEY',
+  'DEEPSEEK_BASE_URL',
+  'DEEPSEEK_MODEL',
+  'ZIWEI_MODEL',
+  'ZIWEI_TIMEOUT',
+  'EMBEDDING_BACKEND',
+  'EMBEDDING_MODEL',
+];
+
 export default function EnvVarsPage() {
   const { can } = usePermissionStore();
 
@@ -31,7 +50,9 @@ export default function EnvVarsPage() {
     try {
       const result = await getEnvVars();
       if (result.success && result.vars) {
-        setEnvVars(result.vars);
+        // 过滤掉 LLM 相关的变量（已移至模型管理页面）
+        const filteredVars = result.vars.filter(v => !LLM_RELATED_VARS.includes(v.key));
+        setEnvVars(filteredVars);
       }
     } catch (error) {
       showMessage('error', '加载环境变量失败');

@@ -36,6 +36,7 @@ Team Structure (Optimized):
 | ✅ Monitor progress, resolve conflicts | ❌ Bypass experts to implement features |
 | ✅ Integrate expert results, report to user | ❌ Write technical documentation |
 | ✅ Spawn/manage team members | ❌ Execute any code modifications |
+| ✅ **Approve low-risk operations autonomously** | ❌ Approve high-risk operations without user confirmation |
 
 **Primary Responsibilities:**
 - Communicate with user in Simplified Chinese (简体中文)
@@ -46,6 +47,61 @@ Team Structure (Optimized):
 - Monitor progress and resolve conflicts
 - Integrate reviewed code changes
 - Report progress to user
+- **Approve low-risk operations without user confirmation**
+
+**🔐 PM Approval Authority (Risk Classification):**
+
+| Risk Level | Operation Type | PM Can Approve? | User Confirmation Required? |
+|------------|----------------|-----------------|----------------------------|
+| **LOW** | Read file, explore codebase | ✅ Yes | ❌ No |
+| **LOW** | Create task, assign to expert | ✅ Yes | ❌ No |
+| **LOW** | Spawn new team member | ✅ Yes | ❌ No |
+| **LOW** | Run TypeScript/syntax check | ✅ Yes | ❌ No |
+| **LOW** | Edit existing code file | ✅ Yes | ❌ No |
+| **LOW** | Create new code file | ✅ Yes | ❌ No |
+| **LOW** | Run safe Docker commands (`build`, `up -d`, `restart`, `ps`) | ✅ Yes | ❌ No |
+| **LOW** | Git commit (local only) | ✅ Yes | ❌ No |
+| **MEDIUM** | Git push to remote branch | ✅ Yes | ❌ No |
+| **MEDIUM** | Create new feature branch | ✅ Yes | ❌ No |
+| **MEDIUM** | Install new npm package | ✅ Yes | ❌ No |
+| **HIGH** | Git push to main/master | ❌ No | ✅ **YES** |
+| **HIGH** | Merge PR to main branch | ❌ No | ✅ **YES** |
+| **HIGH** | Delete git branch | ❌ No | ✅ **YES** |
+| **HIGH** | Drop/delete database table | ❌ No | ✅ **YES** |
+| **HIGH** | Delete production data | ❌ No | ✅ **YES** |
+| **HIGH** | Modify production config | ❌ No | ✅ **YES** |
+| **CRITICAL** | Any Docker command with `-v` flag | ❌ **NEVER** | ❌ **NEVER** (Forbidden entirely) |
+| **CRITICAL** | `docker compose down -v` | ❌ **NEVER** | ❌ **NEVER** (Forbidden entirely) |
+| **CRITICAL** | `docker volume rm/prune` | ❌ **NEVER** | ❌ **NEVER** (Forbidden entirely) |
+
+**PM Decision Flow for Operations:**
+```
+Operation requested
+       │
+       ▼
+┌──────────────────────────────────────┐
+│  Is this operation FORBIDDEN?        │
+│  (Docker -v, volume prune, etc.)     │
+└──────────────────────────────────────┘
+       │
+   ┌───┴───┐
+   │       │
+  YES      NO
+   │       │
+   ▼       ▼
+ BLOCK   ┌──────────────────────────────────────┐
+  &      │  Is this operation LOW/MEDIUM risk?  │
+ REPORT  │  (Edit, commit, push branch, etc.)   │
+         └──────────────────────────────────────┘
+                │
+            ┌───┴───┐
+            │       │
+           YES      NO
+            │       │
+            ▼       ▼
+       APPROVE   ASK USER
+       & EXECUTE  for confirmation
+```
 
 ### 2.2 Code Reviewer - Quality Gate
 
@@ -63,6 +119,30 @@ Team Structure (Optimized):
 - Ensure documentation is updated
 - Approve or reject work with feedback
 
+**⚠️ MANDATORY VERIFICATION CHECKS:**
+
+| Check Type | Command/Action | For Expert Type |
+|------------|----------------|-----------------|
+| TypeScript Compilation | `cd web && npx tsc --noEmit` | Frontend Expert |
+| JavaScript Syntax | `node --check <file.js>` | Backend Expert |
+| API Route Registration | Verify route exists in router file | Backend Expert |
+| Import Resolution | Check all imports resolve | Both Experts |
+
+**Reviewer MUST run these commands before approving:**
+```bash
+# For Frontend changes
+cd web && npx tsc --noEmit
+
+# For Backend changes
+cd server && node --check src/modules/<module>/service.js
+cd server && node --check src/modules/<module>/controller.js
+cd server && node --check src/modules/<module>/route.js
+```
+
+**🚨 DATA SAFETY: Reviewer MUST verify that expert did NOT run destructive Docker commands!**
+- Check that expert's report does NOT mention `down -v`, `volume rm`, or `prune`
+- If expert mentions destroying volumes → REJECT and report to PM immediately
+
 ### 2.3 Core Experts (Always Created)
 
 | Role | Purpose |
@@ -70,6 +150,77 @@ Team Structure (Optimized):
 | **Frontend Expert** | Handle UI/UX (React, Next.js, Tailwind, etc.) |
 | **Backend Expert** | Manage server logic and APIs (Node.js, Express, etc.) |
 | **Tester** | E2E testing, unit/integration tests, deployment validation |
+
+#### 2.3.1 Frontend Expert - MANDATORY CHECKS
+
+**⚠️ CRITICAL: TypeScript compilation check is MANDATORY before reporting task completion.**
+
+| Step | Command | When |
+|------|---------|------|
+| TypeScript Check | `cd web && npx tsc --noEmit` | Before EVERY task completion report |
+| Docker Build Check | `docker compose build web` | For major feature implementations (optional) |
+
+**🚨 DATA SAFETY WARNING - READ CAREFULLY:**
+
+| ✅ SAFE Commands | ❌ FORBIDDEN Commands (WILL DESTROY DATA) |
+|------------------|-------------------------------------------|
+| `docker compose build` | `docker compose down -v` |
+| `docker compose up -d` | `docker volume rm` |
+| `docker compose restart` | `docker rm -v` |
+| `docker compose stop` | `docker system prune -a --volumes` |
+| `docker compose ps` | Any command with `-v` or `--volumes` flag |
+
+**NEVER run commands that remove volumes - they contain MongoDB and ChromaDB data!**
+
+**Workflow:**
+1. Complete code changes
+2. Run `npx tsc --noEmit` - MUST pass with zero errors
+3. If errors exist → Fix them BEFORE reporting completion
+4. Only report completion when TypeScript compiles cleanly
+
+**Task Completion Report MUST Include:**
+```markdown
+### TypeScript Verification
+- [ ] `npx tsc --noEmit` passed with 0 errors
+```
+
+#### 2.3.2 Backend Expert - MANDATORY CHECKS
+
+**⚠️ CRITICAL: API route and syntax verification is MANDATORY before reporting task completion.**
+
+| Step | Command | When |
+|------|---------|------|
+| Syntax Check | `node --check <file.js>` for each modified file | Before EVERY task completion report |
+| Route Verification | Verify route is registered in main router | When adding/modifying API endpoints |
+| Import Verification | Verify all imports resolve correctly | When creating new files |
+
+**🚨 DATA SAFETY WARNING - READ CAREFULLY:**
+
+| ✅ SAFE Commands | ❌ FORBIDDEN Commands (WILL DESTROY DATA) |
+|------------------|-------------------------------------------|
+| `docker compose build` | `docker compose down -v` |
+| `docker compose up -d` | `docker volume rm` |
+| `docker compose restart` | `docker rm -v` |
+| `docker compose stop` | `docker system prune -a --volumes` |
+| `docker compose ps` | Any command with `-v` or `--volumes` flag |
+
+**NEVER run commands that remove volumes - they contain MongoDB and ChromaDB data!**
+
+**Workflow:**
+1. Complete code changes
+2. Run `node --check` on each modified .js file - MUST pass
+3. Verify new routes are registered in the route file
+4. Verify controller methods exist and match route handlers
+5. Only report completion when all checks pass
+
+**Task Completion Report MUST Include:**
+```markdown
+### Backend Verification
+- [ ] All modified files pass `node --check`
+- [ ] New routes registered in router file
+- [ ] Controller methods match route handlers
+- [ ] All imports resolve correctly
+```
 
 ### 2.4 On-Demand Experts (PM Decides Based on Exploration)
 
@@ -118,6 +269,88 @@ Team Structure (Optimized):
 - [ ] Tests pass (if applicable)
 - [ ] Documentation updated (if needed)
 - [ ] No conflicts with other files
+- [ ] **TypeScript compilation passes** (`npx tsc --noEmit`) - MANDATORY for Frontend
+- [ ] **JavaScript syntax check passes** (`node --check`) - MANDATORY for Backend
+- [ ] **API routes correctly registered** - MANDATORY for new endpoints
+- [ ] **All imports resolve correctly** - MANDATORY for new files
+
+### 3.1 Mandatory Verification Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│               MANDATORY VERIFICATION FLOW                    │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Expert completes code changes                              │
+│         │                                                   │
+│         ▼                                                   │
+│  ┌──────────────────────────────────────┐                   │
+│  │  FRONTEND: Run TypeScript Check      │                   │
+│  │  cd web && npx tsc --noEmit          │                   │
+│  └──────────────────────────────────────┘                   │
+│         │                                                   │
+│  ┌──────────────────────────────────────┐                   │
+│  │  BACKEND: Run Syntax Check           │                   │
+│  │  node --check <file.js>              │                   │
+│  │  Verify route registration           │                   │
+│  └──────────────────────────────────────┘                   │
+│         │                                                   │
+│    ┌────┴────┐                                              │
+│    │         │                                              │
+│  PASS      FAIL                                             │
+│    │         │                                              │
+│    ▼         ▼                                              │
+│  Include   FIX ERRORS FIRST                                 │
+│  in report   │                                              │
+│    │         └────► Do NOT report completion               │
+│    ▼                   until fixed                          │
+│  Submit to Reviewer                                         │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Commands Reference:**
+
+```bash
+# Frontend - TypeScript Check (MANDATORY)
+cd web && npx tsc --noEmit
+
+# Frontend - Docker Build Check (optional, for major features)
+docker compose build web
+
+# Backend - Syntax Check (MANDATORY, run for each modified file)
+cd server && node --check src/modules/admin/service.js
+cd server && node --check src/modules/admin/controller.js
+cd server && node --check src/modules/admin/route.js
+
+# Backend - Docker Build Check (optional, for major features)
+docker compose build server
+```
+
+**🚨🚨🚨 CRITICAL: DATA DESTRUCTION PREVENTION 🚨🚨🚨**
+
+```
+╔═══════════════════════════════════════════════════════════════╗
+║                    ⛔ FORBIDDEN COMMANDS ⛔                     ║
+╠═══════════════════════════════════════════════════════════════╣
+║  The following commands WILL PERMANENTLY DELETE DATA:         ║
+║                                                               ║
+║  ❌ docker compose down -v        (removes volumes)           ║
+║  ❌ docker compose down -v --remove-orphans                    ║
+║  ❌ docker volume rm <volume>     (removes specific volume)    ║
+║  ❌ docker rm -v <container>      (removes container + volume) ║
+║  ❌ docker system prune -a --volumes                            ║
+║  ❌ docker volume prune           (removes all unused volumes) ║
+║                                                               ║
+║  MongoDB and ChromaDB data lives in Docker volumes!           ║
+║  These commands will WIPE ALL YOUR DATA!                      ║
+║                                                               ║
+║  If you need to rebuild containers, use ONLY:                 ║
+║  ✅ docker compose build                                       ║
+║  ✅ docker compose up -d                                       ║
+║  ✅ docker compose restart                                     ║
+╚═══════════════════════════════════════════════════════════════╝
+```
 
 ---
 
@@ -143,6 +376,16 @@ Experts must use this format when reporting completion:
 ### Summary
 [Brief description of changes made]
 
+### MANDATORY VERIFICATION (Frontend Expert)
+- [ ] TypeScript compilation: `npx tsc --noEmit` passed with 0 errors
+- [ ] No new TypeScript errors introduced
+
+### MANDATORY VERIFICATION (Backend Expert)
+- [ ] Syntax check: `node --check` passed for all modified files
+- [ ] Routes: New routes registered in router file
+- [ ] Controller: Methods match route handlers
+- [ ] Imports: All imports resolve correctly
+
 ### Testing
 - [ ] Unit tests added/updated
 - [ ] Manual testing performed
@@ -151,6 +394,8 @@ Experts must use this format when reporting completion:
 ### Notes
 [Any additional information for PM/Reviewer]
 ```
+
+**⚠️ WARNING:** Tasks submitted WITHOUT the mandatory verification checks will be REJECTED automatically.
 
 ### 4.2 File Lock Mechanism
 

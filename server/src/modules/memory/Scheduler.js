@@ -19,6 +19,8 @@ import ChatSession from '../chat/model.js';
 import User from '../user/model.js';
 import ConversationState from '../chat/state/ConversationState.js';
 import MemoryExtractor from './MemoryExtractor.js';
+import recycleBinService from '../admin/services/recycleBinService.js';
+import activityLogService from '../admin/services/activityLogService.js';
 import logger from '../../core/utils/logger.js';
 
 const memoryLogger = {
@@ -49,6 +51,12 @@ class Scheduler {
     this.timeoutTimerId = null;
     this.isTimeoutCheckerRunning = false;
     this.lastTimeoutCheckTime = null;
+
+    // Recycle bin purge settings (30-day expiration)
+    this.recycleBinPurgeIntervalMs = 24 * 60 * 60 * 1000; // Daily
+    this.recycleBinPurgeTimerId = null;
+    this.isRecycleBinPurgerRunning = false;
+    this.lastRecycleBinPurgeTime = null;
 
     memoryLogger.info('Scheduler initialized', {
       timeoutThresholdMinutes: this.timeoutThresholdMs / 60000
@@ -105,6 +113,9 @@ class Scheduler {
 
     // Start timeout detection checker
     this.startTimeoutChecker();
+
+    // Start recycle bin purge checker
+    this.startRecycleBinPurger();
   }
 
   /**
@@ -119,6 +130,9 @@ class Scheduler {
 
     // Stop timeout checker
     this.stopTimeoutChecker();
+
+    // Stop recycle bin purger
+    this.stopRecycleBinPurger();
 
     this.isRunning = false;
     this.nextRunTime = null;
@@ -165,6 +179,121 @@ class Scheduler {
     this.isTimeoutCheckerRunning = false;
 
     memoryLogger.info('Session timeout checker stopped');
+  }
+
+  // ==================== RECYCLE BIN PURGE SYSTEM ====================
+
+  /**
+   * Start the recycle bin purge checker
+   * Runs daily to purge expired items (30+ days old)
+   */
+  startRecycleBinPurger() {
+    if (this.isRecycleBinPurgerRunning) {
+      memoryLogger.warn('Recycle bin purger is already running');
+      return;
+    }
+
+    this.isRecycleBinPurgerRunning = true;
+
+    memoryLogger.info('Recycle bin purge checker started', {
+      checkIntervalHours: this.recycleBinPurgeIntervalMs / 3600000
+    });
+
+    // Run first check after 1 minute (to allow system to initialize)
+    setTimeout(() => {
+      this.purgeExpiredRecycleBinItems();
+
+      // Then schedule daily checks
+      this.recycleBinPurgeTimerId = setInterval(() => {
+        this.purgeExpiredRecycleBinItems();
+      }, this.recycleBinPurgeIntervalMs);
+    }, 60000);
+  }
+
+  /**
+   * Stop the recycle bin purge checker
+   */
+  stopRecycleBinPurger() {
+    if (this.recycleBinPurgeTimerId) {
+      clearInterval(this.recycleBinPurgeTimerId);
+      this.recycleBinPurgeTimerId = null;
+    }
+    this.isRecycleBinPurgerRunning = false;
+
+    memoryLogger.info('Recycle bin purge checker stopped');
+  }
+
+  /**
+   * Purge expired recycle bin items
+   * Items with expiresAt < now are permanently deleted
+   * @returns {Promise<Object>} Purge results
+   */
+  async purgeExpiredRecycleBinItems() {
+    const purgeStartTime = Date.now();
+    this.lastRecycleBinPurgeTime = new Date().toISOString();
+
+    memoryLogger.info('Starting recycle bin purge', {
+      time: this.lastRecycleBinPurgeTime
+    });
+
+    const results = {
+      processed: 0,
+      failed: 0,
+      errors: []
+    };
+
+    try {
+      const purgeResults = await recycleBinService.processExpiredItems();
+
+      results.processed = purgeResults.processed;
+      results.failed = purgeResults.failed;
+      results.errors = purgeResults.errors || [];
+
+      const duration = Date.now() - purgeStartTime;
+
+      memoryLogger.info('Recycle bin purge completed', {
+        ...results,
+        durationMs: duration
+      });
+
+      // Log activity for the purge
+      if (results.processed > 0) {
+        await activityLogService.log({
+          operation: 'recycle_bin_auto_purge',
+          category: 'system',
+          actorId: null,
+          actorName: 'System Cron',
+          targetType: 'recycle_bin',
+          description: `Auto-purged ${results.processed} expired items from recycle bin`,
+          details: results,
+          success: results.failed === 0
+        });
+      }
+
+      return results;
+
+    } catch (error) {
+      memoryLogger.error('Recycle bin purge failed', {
+        error: error.message,
+        stack: error.stack
+      });
+
+      results.errors.push({
+        type: 'global',
+        error: error.message
+      });
+
+      return results;
+    }
+  }
+
+  /**
+   * Manually trigger recycle bin purge (for testing)
+   * @returns {Promise<Object>} Purge results
+   */
+  async triggerRecycleBinPurge() {
+    memoryLogger.info('Manual recycle bin purge triggered');
+    return this.purgeExpiredRecycleBinItems();
   }
 
   /**
@@ -879,6 +1008,12 @@ class Scheduler {
         lastCheckTime: this.lastTimeoutCheckTime,
         checkIntervalMinutes: this.timeoutCheckIntervalMs / 60000,
         timeoutThresholdMinutes: this.timeoutThresholdMs / 60000
+      },
+      // Recycle bin purger status
+      recycleBinPurger: {
+        isRunning: this.isRecycleBinPurgerRunning,
+        lastPurgeTime: this.lastRecycleBinPurgeTime,
+        checkIntervalHours: this.recycleBinPurgeIntervalMs / 3600000
       }
     };
   }
@@ -901,6 +1036,11 @@ class Scheduler {
         timeoutChecker: {
           isRunning: this.isTimeoutCheckerRunning,
           lastCheckTime: this.lastTimeoutCheckTime
+        },
+        // Recycle bin purger health
+        recycleBinPurger: {
+          isRunning: this.isRecycleBinPurgerRunning,
+          lastPurgeTime: this.lastRecycleBinPurgeTime
         }
       };
     } catch (error) {

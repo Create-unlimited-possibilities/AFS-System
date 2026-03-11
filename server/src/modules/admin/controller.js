@@ -54,8 +54,9 @@ class AdminController {
     try {
       const { id } = req.params;
       const updateData = req.body;
+      const adminId = req.user.id;
 
-      const user = await adminService.updateUser(id, updateData);
+      const user = await adminService.updateUser(id, updateData, adminId);
 
       res.json({
         success: true,
@@ -70,10 +71,42 @@ class AdminController {
     }
   }
 
+  /**
+   * Reset user password (admin action)
+   */
+  async resetUserPassword(req, res) {
+    try {
+      const { id } = req.params;
+      const { newPassword } = req.body;
+      const adminId = req.user.id;
+
+      if (!newPassword) {
+        return res.status(400).json({
+          success: false,
+          error: '请输入新密码'
+        });
+      }
+
+      const result = await adminService.resetUserPassword(id, newPassword, adminId);
+
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (error) {
+      logger.error('[AdminController] resetUserPassword error:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
   async deleteUser(req, res) {
     try {
       const { id } = req.params;
-      const result = await adminService.deleteUser(id);
+      const adminId = req.user.id;
+      const result = await adminService.deleteUser(id, adminId);
 
       res.json({
         success: true,
@@ -130,7 +163,8 @@ class AdminController {
   async createQuestion(req, res) {
     try {
       const questionData = req.body;
-      const question = await adminService.createQuestion(questionData);
+      const adminId = req.user.id;
+      const question = await adminService.createQuestion(questionData, adminId);
 
       res.json({
         success: true,
@@ -149,8 +183,9 @@ class AdminController {
     try {
       const { id } = req.params;
       const updateData = req.body;
+      const adminId = req.user.id;
 
-      const question = await adminService.updateQuestion(id, updateData);
+      const question = await adminService.updateQuestion(id, updateData, adminId);
 
       res.json({
         success: true,
@@ -168,7 +203,8 @@ class AdminController {
   async deleteQuestion(req, res) {
     try {
       const { id } = req.params;
-      const result = await adminService.deleteQuestion(id);
+      const adminId = req.user.id;
+      const result = await adminService.deleteQuestion(id, adminId);
 
       res.json({
         success: true,
@@ -187,8 +223,9 @@ class AdminController {
     try {
       const { id } = req.params;
       const { newOrder } = req.body;
+      const adminId = req.user.id;
 
-      const question = await adminService.reorderQuestion(id, newOrder);
+      const question = await adminService.reorderQuestion(id, newOrder, adminId);
 
       res.json({
         success: true,
@@ -207,8 +244,9 @@ class AdminController {
     try {
       const { id } = req.params;
       const { active } = req.body;
+      const adminId = req.user.id;
 
-      const question = await adminService.toggleQuestionStatus(id, active);
+      const question = await adminService.toggleQuestionStatus(id, active, adminId);
 
       res.json({
         success: true,
@@ -226,8 +264,9 @@ class AdminController {
   async batchImportQuestions(req, res) {
     try {
       const { questions } = req.body;
+      const adminId = req.user.id;
 
-      const result = await adminService.batchImportQuestions(questions);
+      const result = await adminService.batchImportQuestions(questions, adminId);
 
       res.json({
         success: true,
@@ -320,8 +359,9 @@ class AdminController {
   async getUserMemories(req, res) {
     try {
       const { userId } = req.params;
+      const { partnerId, category } = req.query;
 
-      const result = await adminService.getUserMemories(userId);
+      const result = await adminService.getUserMemories(userId, { partnerId, category });
 
       res.json({
         success: true,
@@ -359,7 +399,10 @@ class AdminController {
     try {
       const { userId } = req.params;
 
-      const result = await adminService.rebuildUserVectorIndex(userId);
+      const result = await adminService.rebuildUserVectorIndex(userId, {
+        actorId: req.user.id,
+        actorName: req.user.name || req.user.email
+      });
 
       res.json({
         success: true,
@@ -378,7 +421,10 @@ class AdminController {
     try {
       const { userId } = req.params;
 
-      const data = await adminService.exportUserMemories(userId);
+      const data = await adminService.exportUserMemories(userId, {
+        actorId: req.user.id,
+        actorName: req.user.name || req.user.email
+      });
 
       res.json({
         success: true,
@@ -461,7 +507,7 @@ class AdminController {
   async deleteInviteCode(req, res) {
     try {
       const { id } = req.params;
-      const result = await adminService.deleteInviteCode(id);
+      const result = await adminService.deleteInviteCode(id, { deletedBy: req.user.id });
 
       res.json({
         success: true,
@@ -520,7 +566,11 @@ class AdminController {
     try {
       const { updates, backup = true } = req.body;
 
-      const result = await envService.updateEnvironmentVariables(updates, { backup });
+      const result = await envService.updateEnvironmentVariables(updates, {
+        backup,
+        actorId: req.user.id,
+        actorName: req.user.name || req.user.email
+      });
 
       if (result.success) {
         res.json({
@@ -746,7 +796,8 @@ class AdminController {
   async createRole(req, res) {
     try {
       const roleData = req.body;
-      const role = await adminService.createRole(roleData);
+      const adminId = req.user.id;
+      const role = await adminService.createRole(roleData, adminId);
 
       res.json({
         success: true,
@@ -765,8 +816,9 @@ class AdminController {
     try {
       const { id } = req.params;
       const updateData = req.body;
+      const adminId = req.user.id;
 
-      const role = await adminService.updateRole(id, updateData);
+      const role = await adminService.updateRole(id, updateData, adminId);
 
       res.json({
         success: true,
@@ -784,7 +836,8 @@ class AdminController {
   async deleteRole(req, res) {
     try {
       const { id } = req.params;
-      const result = await adminService.deleteRole(id);
+      const adminId = req.user.id;
+      const result = await adminService.deleteRole(id, adminId);
 
       res.json({
         success: true,
@@ -810,6 +863,707 @@ class AdminController {
     } catch (error) {
       logger.error('[AdminController] getAllPermissions error:', error);
       res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Get Ziwei Books (fortune-telling knowledge base) content
+   */
+  async getZiweiBooks(req, res) {
+    try {
+      const { page = 1, limit = 20, search = '', source = '' } = req.query;
+
+      const result = await adminService.getZiweiBooks({
+        page: parseInt(page),
+        limit: parseInt(limit),
+        search,
+        source
+      });
+
+      // Transform books to chunks format for frontend compatibility
+      const chunks = (result.books || []).map(book => ({
+        id: book._id,
+        content: book.content,
+        source: book.source,
+        chunk_id: book.chunk_id || 0
+      }));
+
+      res.json({
+        success: true,
+        chunks,
+        pagination: result.pagination,
+        stats: {
+          totalChunks: result.pagination?.total || 0,
+          sources: []
+        }
+      });
+    } catch (error) {
+      logger.error('[AdminController] getZiweiBooks error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Get Ziwei Books sources list
+   */
+  async getZiweiBooksSources(req, res) {
+    try {
+      const result = await adminService.getZiweiBooksSources();
+
+      // Transform sources format for frontend compatibility
+      const sources = (result.sources || []).map(s => ({
+        name: s.source,
+        count: s.count
+      }));
+
+      const totalChunks = sources.reduce((sum, s) => sum + s.count, 0);
+
+      res.json({
+        success: true,
+        sources,
+        totalChunks
+      });
+    } catch (error) {
+      logger.error('[AdminController] getZiweiBooksSources error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * XiaoShuDong Statistics
+   * Get usage statistics for XiaoShuDong feature
+   */
+  async getXiaoshudongStats(req, res) {
+    try {
+      const { startDate, endDate, userId } = req.query;
+
+      const stats = await adminService.getXiaoshudongStats({
+        startDate,
+        endDate,
+        userId
+      });
+
+      res.json({
+        success: true,
+        stats
+      });
+    } catch (error) {
+      logger.error('[AdminController] getXiaoshudongStats error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Get XiaoShuDong conversations for a user
+   */
+  async getUserXiaoshudongConversations(req, res) {
+    try {
+      const { id } = req.params;
+      const { page, limit } = req.query;
+
+      const result = await adminService.getUserXiaoshudongConversations(id, {
+        page: parseInt(page) || 1,
+        limit: parseInt(limit) || 20
+      });
+
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (error) {
+      logger.error('[AdminController] getUserXiaoshudongConversations error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  // ======== Model Management ========
+
+  /**
+   * Get model management status overview
+   */
+  async getModelManagementStatus(req, res) {
+    try {
+      const status = await adminService.getModelManagementStatus();
+      res.json({
+        success: true,
+        status
+      });
+    } catch (error) {
+      logger.error('[AdminController] getModelManagementStatus error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * List all Ollama models
+   */
+  async listOllamaModels(req, res) {
+    try {
+      const models = await adminService.listOllamaModels();
+      res.json({
+        success: true,
+        models
+      });
+    } catch (error) {
+      logger.error('[AdminController] listOllamaModels error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Get model info
+   */
+  async getModelInfo(req, res) {
+    try {
+      const { name } = req.params;
+      const info = await adminService.getModelInfo(name);
+      if (!info) {
+        return res.status(404).json({
+          success: false,
+          error: '模型不存在'
+        });
+      }
+      res.json({
+        success: true,
+        info
+      });
+    } catch (error) {
+      logger.error('[AdminController] getModelInfo error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * List GGUF files
+   */
+  async listGgufFiles(req, res) {
+    try {
+      const files = await adminService.listGgufFiles();
+      res.json({
+        success: true,
+        files
+      });
+    } catch (error) {
+      logger.error('[AdminController] listGgufFiles error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * List Modelfiles
+   */
+  async listModelfiles(req, res) {
+    try {
+      const files = await adminService.listModelfiles();
+      res.json({
+        success: true,
+        files
+      });
+    } catch (error) {
+      logger.error('[AdminController] listModelfiles error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Read Modelfile content
+   */
+  async readModelfile(req, res) {
+    try {
+      const { filename } = req.params;
+      const result = await adminService.readModelfile(filename);
+      if (!result.success) {
+        return res.status(404).json(result);
+      }
+      res.json(result);
+    } catch (error) {
+      logger.error('[AdminController] readModelfile error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Save Modelfile content
+   */
+  async saveModelfile(req, res) {
+    try {
+      const { filename } = req.params;
+      const { content } = req.body;
+
+      if (!content) {
+        return res.status(400).json({
+          success: false,
+          error: '内容不能为空'
+        });
+      }
+
+      const result = await adminService.saveModelfile(filename, content);
+      res.json(result);
+    } catch (error) {
+      logger.error('[AdminController] saveModelfile error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Create model from Modelfile
+   */
+  async createModel(req, res) {
+    try {
+      const { modelName, modelfileName } = req.body;
+
+      if (!modelName || !modelfileName) {
+        return res.status(400).json({
+          success: false,
+          error: 'modelName 和 modelfileName 不能为空'
+        });
+      }
+
+      const result = await adminService.createModel(modelName, modelfileName, {
+        actorId: req.user.id,
+        actorName: req.user.name || req.user.email
+      });
+      res.json(result);
+    } catch (error) {
+      logger.error('[AdminController] createModel error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Delete model
+   */
+  async deleteModel(req, res) {
+    try {
+      const { name } = req.params;
+      const result = await adminService.deleteModel(name, {
+        actorId: req.user.id,
+        actorName: req.user.name || req.user.email
+      });
+      res.json(result);
+    } catch (error) {
+      logger.error('[AdminController] deleteModel error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  // ======== Memory Deletion ========
+
+  /**
+   * Delete a single conversation memory
+   */
+  async deleteMemory(req, res) {
+    try {
+      const { userId, memoryId } = req.params;
+      const adminId = req.user.id;
+
+      const result = await adminService.deleteMemory(userId, memoryId, adminId);
+
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (error) {
+      logger.error('[AdminController] deleteMemory error:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Batch delete conversation memories
+   */
+  async batchDeleteMemories(req, res) {
+    try {
+      const { userId } = req.params;
+      const { memoryIds } = req.body;
+      const adminId = req.user.id;
+
+      if (!memoryIds || !Array.isArray(memoryIds) || memoryIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'memoryIds must be a non-empty array'
+        });
+      }
+
+      const result = await adminService.batchDeleteMemories(userId, memoryIds, adminId);
+
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (error) {
+      logger.error('[AdminController] batchDeleteMemories error:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Delete a questionnaire answer
+   */
+  async deleteAnswer(req, res) {
+    try {
+      const { userId, answerId } = req.params;
+      const adminId = req.user.id;
+
+      const result = await adminService.deleteAnswer(userId, answerId, adminId);
+
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (error) {
+      logger.error('[AdminController] deleteAnswer error:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  // ======== Recycle Bin ========
+
+  /**
+   * Get recycle bin items
+   */
+  async getRecycleBin(req, res) {
+    try {
+      const { page, limit, itemType, userId, status, search, startDate, endDate } = req.query;
+
+      const result = await adminService.getRecycleBin({
+        page,
+        limit,
+        itemType,
+        userId,
+        status,
+        search,
+        startDate,
+        endDate
+      });
+
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (error) {
+      logger.error('[AdminController] getRecycleBin error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Get recycle bin item by ID
+   */
+  async getRecycleBinItem(req, res) {
+    try {
+      const { id } = req.params;
+      const item = await adminService.getRecycleBinItem(id);
+
+      if (!item) {
+        return res.status(404).json({
+          success: false,
+          error: 'Item not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        item
+      });
+    } catch (error) {
+      logger.error('[AdminController] getRecycleBinItem error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Restore item from recycle bin
+   */
+  async restoreRecycleBinItem(req, res) {
+    try {
+      const { id } = req.params;
+      const adminId = req.user.id;
+
+      const result = await adminService.restoreRecycleBinItem(id, adminId);
+
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (error) {
+      logger.error('[AdminController] restoreRecycleBinItem error:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Permanently delete item from recycle bin
+   */
+  async purgeRecycleBinItem(req, res) {
+    try {
+      const { id } = req.params;
+      const adminId = req.user.id;
+
+      const result = await adminService.purgeRecycleBinItem(id, adminId);
+
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (error) {
+      logger.error('[AdminController] purgeRecycleBinItem error:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Batch restore items
+   */
+  async batchRestoreRecycleBin(req, res) {
+    try {
+      const { ids } = req.body;
+      const adminId = req.user.id;
+
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'ids must be a non-empty array'
+        });
+      }
+
+      const result = await adminService.batchRestoreRecycleBin(ids, adminId);
+
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (error) {
+      logger.error('[AdminController] batchRestoreRecycleBin error:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Batch permanently delete items
+   */
+  async batchPurgeRecycleBin(req, res) {
+    try {
+      const { ids } = req.body;
+      const adminId = req.user.id;
+
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'ids must be a non-empty array'
+        });
+      }
+
+      const result = await adminService.batchPurgeRecycleBin(ids, adminId);
+
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (error) {
+      logger.error('[AdminController] batchPurgeRecycleBin error:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Get recycle bin statistics
+   */
+  async getRecycleBinStats(req, res) {
+    try {
+      const stats = await adminService.getRecycleBinStats();
+
+      res.json({
+        success: true,
+        stats
+      });
+    } catch (error) {
+      logger.error('[AdminController] getRecycleBinStats error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  // ======== Activity Logs ========
+
+  /**
+   * Get activity logs
+   */
+  async getActivityLogs(req, res) {
+    try {
+      const { page, limit, category, operation, actorId, targetId, success, startDate, endDate, search } = req.query;
+
+      const result = await adminService.getActivityLogs({
+        page,
+        limit,
+        category,
+        operation,
+        actorId,
+        targetId,
+        success,
+        startDate,
+        endDate,
+        search
+      });
+
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (error) {
+      logger.error('[AdminController] getActivityLogs error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Get activity log statistics
+   */
+  async getActivityLogStats(req, res) {
+    try {
+      const { startDate, endDate } = req.query;
+
+      const stats = await adminService.getActivityLogStats({ startDate, endDate });
+
+      res.json({
+        success: true,
+        stats
+      });
+    } catch (error) {
+      logger.error('[AdminController] getActivityLogStats error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Export activity logs
+   */
+  async exportActivityLogs(req, res) {
+    try {
+      const { format = 'json', category, operation, actorId, startDate, endDate, search } = req.query;
+
+      const result = await adminService.exportActivityLogs({
+        category,
+        operation,
+        actorId,
+        startDate,
+        endDate,
+        search
+      }, format);
+
+      if (format === 'csv') {
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="activity_logs.csv"');
+        res.send(result.data);
+      } else {
+        res.json({
+          success: true,
+          data: result.data
+        });
+      }
+    } catch (error) {
+      logger.error('[AdminController] exportActivityLogs error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Get Ziwei chart for a user
+   */
+  async getZiweiChart(req, res) {
+    try {
+      const { id } = req.params;
+      const { targetDate } = req.query;
+
+      const result = await adminService.getZiweiChart(id, { targetDate });
+
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (error) {
+      logger.error('[AdminController] getZiweiChart error:', error);
+      res.status(400).json({
         success: false,
         error: error.message
       });

@@ -14,7 +14,7 @@ const getAdminToken = (): string | undefined => {
 };
 
 // Admin-specific API request function that uses admin_token
-async function adminApiRequest<T = any>(
+export async function adminApiRequest<T = any>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -199,6 +199,41 @@ export async function validateInviteCode(code: string): Promise<{
 // User Management API
 // ============================================
 
+export interface UserProfile {
+  gender?: string;
+  birthDate?: string;
+  birthHour?: string;
+  birthCalendar?: string;
+  birthPlace?: {
+    provinceCode?: string;
+    provinceName?: string;
+    cityCode?: string;
+    cityName?: string;
+  };
+  residence?: {
+    provinceCode?: string;
+    provinceName?: string;
+    cityCode?: string;
+    cityName?: string;
+  };
+  nationality?: string;
+  ethnicity?: string;
+  occupation?: string;
+  education?: string;
+  maritalStatus?: string;
+  children?: {
+    sons?: number;
+    daughters?: number;
+  };
+  height?: string;
+  appearanceFeatures?: string;
+}
+
+export interface ProfileCompletion {
+  isComplete: boolean;
+  missingFields: string[];
+}
+
 export interface AdminUser {
   _id: string;
   id?: string;
@@ -219,6 +254,9 @@ export interface AdminUser {
   companionChat?: {
     roleCard?: any;
   };
+  profile?: UserProfile;
+  profileCompletion?: ProfileCompletion;
+  hasPassword?: boolean;
 }
 
 export interface UserListResponse {
@@ -230,6 +268,7 @@ export interface UserListResponse {
     total: number;
     totalPages: number;
   };
+  activeUserCount?: number;
   error?: string;
 }
 
@@ -301,6 +340,20 @@ export async function toggleUserStatus(userId: string, isActive: boolean): Promi
   return adminApiRequest(`/admin/users/${userId}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ isActive }),
+  });
+}
+
+/**
+ * Reset user password (admin action)
+ */
+export async function resetUserPassword(userId: string, newPassword: string): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+}> {
+  return adminApiRequest(`/admin/users/${userId}/reset-password`, {
+    method: 'POST',
+    body: JSON.stringify({ newPassword }),
   });
 }
 
@@ -464,7 +517,7 @@ export interface UserMemorySummary {
 export interface UserMemory {
   _id: string;
   userId: string;
-  category: 'self' | 'family' | 'friend' | 'conversation';
+  category: 'self' | 'family' | 'friend' | 'rolecard' | 'xiaoshudong';
   content: string;
   sourceType: 'answer' | 'manual' | 'imported' | 'conversation';
   sourceId?: string;
@@ -483,6 +536,19 @@ export interface UserMemory {
   keyTopics?: string[];
   facts?: string[];
   messageCount?: number;
+}
+
+export interface Partner {
+  id: string;
+  name: string;
+  memoryCount: number;
+  category: string;
+}
+
+export interface UserMemoryData {
+  memories: UserMemory[];
+  vectorIndex: VectorIndexStatus;
+  partners: Partner[];
 }
 
 export interface VectorIndexStatus {
@@ -526,9 +592,10 @@ export async function getUserMemoryData(userId: string): Promise<{
   success: boolean;
   memories?: UserMemory[];
   vectorIndex?: VectorIndexStatus;
+  partners?: Partner[];
   error?: string;
 }> {
-  return adminApiRequest<{ memories: UserMemory[]; vectorIndex: VectorIndexStatus }>(`/admin/memories/${userId}`) as any;
+  return adminApiRequest<UserMemoryData>(`/admin/memories/${userId}`) as any;
 }
 
 export async function getVectorIndexStatus(userId: string): Promise<{
@@ -577,6 +644,7 @@ export interface DashboardStats {
   totalMemories: number;
   questionnaireCompletionRate: number;
   totalConversations: number;
+  pendingDeleteItems?: number;
 }
 
 export interface SystemStatus {
@@ -600,7 +668,12 @@ export interface SystemStatus {
     status: 'ready' | 'building' | 'error' | 'unknown';
     totalIndexes: number;
   };
-  checkMethod?: 'http' | 'docker';
+  ziweiModel?: {
+    registered: boolean;
+    name: string;
+    size?: number;
+  };
+  checkMethod?: 'http' | 'docker' | 'api';
 }
 
 export interface RecentActivity {
@@ -836,4 +909,539 @@ export async function getAllPermissions(): Promise<{
   error?: string;
 }> {
   return adminApiRequest('/admin/permissions');
+}
+
+// ============================================
+// Ziwei Books (Fortune-telling Knowledge Base) API
+// ============================================
+
+export interface ZiweiBookChunk {
+  id: string;
+  content: string;
+  source: string;
+  chunk_id: number;
+}
+
+export interface ZiweiBooksResult {
+  success: boolean;
+  chunks?: ZiweiBookChunk[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  stats?: {
+    totalChunks: number;
+    sources: string[];
+  };
+  error?: string;
+}
+
+export interface ZiweiBookSource {
+  name: string;
+  count: number;
+}
+
+export interface ZiweiBooksSourcesResult {
+  success: boolean;
+  sources?: ZiweiBookSource[];
+  totalChunks?: number;
+  error?: string;
+}
+
+export async function getZiweiBooks(filters?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  source?: string;
+}): Promise<ZiweiBooksResult> {
+  const params = new URLSearchParams();
+  if (filters?.page) params.append('page', String(filters.page));
+  if (filters?.limit) params.append('limit', String(filters.limit));
+  if (filters?.search) params.append('search', filters.search);
+  if (filters?.source) params.append('source', filters.source);
+
+  const query = params.toString() ? `?${params.toString()}` : '';
+  return adminApiRequest(`/admin/ziwei-books${query}`);
+}
+
+export async function getZiweiBooksSources(): Promise<ZiweiBooksSourcesResult> {
+  return adminApiRequest('/admin/ziwei-books/sources');
+}
+
+// ============================================
+// XiaoShuDong Statistics API
+// ============================================
+
+export interface XiaoshudongStats {
+  totalConversations: number;
+  totalUsers: number;
+  activeSessions: number;
+  dailyStats: Array<{
+    date: string;
+    count: number;
+  }>;
+  phaseDistribution: {
+    listening: number;
+    analysis: number;
+    transition: number;
+  };
+  avgTurnCount: number;
+  period: {
+    start: string;
+    end: string;
+  };
+}
+
+export interface XiaoshudongStatsFilters {
+  startDate?: string;
+  endDate?: string;
+  userId?: string;
+}
+
+export async function getXiaoshudongStats(
+  filters?: XiaoshudongStatsFilters
+): Promise<{
+  success: boolean;
+  stats?: XiaoshudongStats;
+  error?: string;
+}> {
+  const params = new URLSearchParams();
+  if (filters?.startDate) params.append('startDate', filters.startDate);
+  if (filters?.endDate) params.append('endDate', filters.endDate);
+  if (filters?.userId) params.append('userId', filters.userId);
+
+  const query = params.toString() ? `?${params.toString()}` : '';
+  return adminApiRequest(`/admin/xiaoshudong/stats${query}`);
+}
+
+export interface XiaoshudongConversation {
+  _id: string;
+  userId: string;
+  sourceType: string;
+  conversationPhase?: string;
+  messageCount?: number;
+  summary?: string;
+  keyTopics?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface XiaoshudongConversationsResult {
+  success: boolean;
+  conversations?: XiaoshudongConversation[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+  error?: string;
+}
+
+export async function getUserXiaoshudongConversations(
+  userId: string,
+  page = 1,
+  limit = 20
+): Promise<XiaoshudongConversationsResult> {
+  const params = new URLSearchParams();
+  params.append('page', String(page));
+  params.append('limit', String(limit));
+
+  return adminApiRequest(`/admin/xiaoshudong/conversations/${userId}?${params.toString()}`);
+}
+
+// ============================================
+// Memory Deletion API
+// ============================================
+
+export interface DeleteMemoryResult {
+  success: boolean;
+  recycleBinId?: string;
+  partnerRecycleBinId?: string;
+  error?: string;
+}
+
+export interface BatchDeleteResult {
+  success: boolean;
+  succeeded?: number;
+  failed?: number;
+  errors?: Array<{ memoryId: string; error: string }>;
+  recycleBinIds?: string[];
+  error?: string;
+}
+
+/**
+ * Delete a single conversation memory (soft delete)
+ */
+export async function deleteMemory(
+  userId: string,
+  memoryId: string
+): Promise<DeleteMemoryResult> {
+  return adminApiRequest(`/admin/memories/${userId}/memories/${memoryId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Batch delete conversation memories
+ */
+export async function batchDeleteMemories(
+  userId: string,
+  memoryIds: string[]
+): Promise<BatchDeleteResult> {
+  return adminApiRequest(`/admin/memories/${userId}/memories/batch-delete`, {
+    method: 'POST',
+    body: JSON.stringify({ memoryIds }),
+  });
+}
+
+/**
+ * Delete a questionnaire answer (soft delete)
+ */
+export async function deleteAnswer(
+  userId: string,
+  answerId: string
+): Promise<DeleteMemoryResult> {
+  return adminApiRequest(`/admin/memories/${userId}/answers/${answerId}`, {
+    method: 'DELETE',
+  });
+}
+
+// ============================================
+// Recycle Bin API
+// ============================================
+
+export interface RecycleBinItem {
+  _id: string;
+  itemType: 'questionnaire_answer' | 'conversation_memory';
+  originalId: string;
+  userId: {
+    _id: string;
+    name: string;
+    email: string;
+    uniqueCode: string;
+  };
+  targetUserId?: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  partnerId?: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  deletedBy: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  deletedAt: string;
+  expiresAt: string;
+  status: 'pending_purge' | 'restored' | 'purged';
+  snapshot?: any;
+  filePaths?: string[];
+  relatedEntries?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecycleBinFilters {
+  page?: number;
+  limit?: number;
+  itemType?: string;
+  userId?: string;
+  status?: string;
+  search?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface RecycleBinListResult {
+  success: boolean;
+  items?: RecycleBinItem[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  error?: string;
+}
+
+export interface RecycleBinStats {
+  total: number;
+  pendingPurge: number;
+  restored: number;
+  purged: number;
+  byType: {
+    questionnaire_answer: number;
+    conversation_memory: number;
+  };
+  expiringSoon?: number;
+}
+
+/**
+ * Get recycle bin items
+ */
+export async function getRecycleBin(
+  filters: RecycleBinFilters = {}
+): Promise<RecycleBinListResult> {
+  const params = new URLSearchParams();
+  if (filters.page) params.append('page', String(filters.page));
+  if (filters.limit) params.append('limit', String(filters.limit));
+  if (filters.itemType) params.append('itemType', filters.itemType);
+  if (filters.userId) params.append('userId', filters.userId);
+  if (filters.status) params.append('status', filters.status);
+  if (filters.search) params.append('search', filters.search);
+  if (filters.startDate) params.append('startDate', filters.startDate);
+  if (filters.endDate) params.append('endDate', filters.endDate);
+
+  return adminApiRequest(`/admin/recycle-bin?${params.toString()}`);
+}
+
+/**
+ * Get recycle bin item by ID
+ */
+export async function getRecycleBinItem(id: string): Promise<{
+  success: boolean;
+  item?: RecycleBinItem;
+  error?: string;
+}> {
+  return adminApiRequest(`/admin/recycle-bin/${id}`);
+}
+
+/**
+ * Restore item from recycle bin
+ */
+export async function restoreRecycleBinItem(id: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  return adminApiRequest(`/admin/recycle-bin/${id}/restore`, {
+    method: 'POST',
+  });
+}
+
+/**
+ * Permanently delete item from recycle bin
+ */
+export async function purgeRecycleBinItem(id: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  return adminApiRequest(`/admin/recycle-bin/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Batch restore items from recycle bin
+ */
+export async function batchRestoreRecycleBin(ids: string[]): Promise<{
+  success: boolean;
+  succeeded?: number;
+  failed?: number;
+  errors?: Array<{ id: string; error: string }>;
+  error?: string;
+}> {
+  return adminApiRequest('/admin/recycle-bin/batch-restore', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  });
+}
+
+/**
+ * Batch permanently delete items from recycle bin
+ */
+export async function batchPurgeRecycleBin(ids: string[]): Promise<{
+  success: boolean;
+  succeeded?: number;
+  failed?: number;
+  errors?: Array<{ id: string; error: string }>;
+  error?: string;
+}> {
+  return adminApiRequest('/admin/recycle-bin/batch-purge', {
+    method: 'DELETE',
+    body: JSON.stringify({ ids }),
+  });
+}
+
+/**
+ * Get recycle bin statistics
+ */
+export async function getRecycleBinStats(): Promise<{
+  success: boolean;
+  stats?: RecycleBinStats;
+  error?: string;
+}> {
+  return adminApiRequest('/admin/recycle-bin/stats');
+}
+
+// ============================================
+// Activity Logs API
+// ============================================
+
+export interface ActivityLogItem {
+  _id: string;
+  operation: string;
+  category: 'user' | 'memory' | 'questionnaire' | 'system' | 'role';
+  actorId?: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  actorName?: string;
+  targetType?: string;
+  targetId?: string;
+  targetName?: string;
+  description?: string;
+  details?: any;
+  ipAddress?: string;
+  success: boolean;
+  errorMessage?: string;
+  createdAt: string;
+}
+
+export interface ActivityLogFilters {
+  page?: number;
+  limit?: number;
+  category?: string;
+  operation?: string;
+  actorId?: string;
+  targetId?: string;
+  success?: string;
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+}
+
+export interface ActivityLogListResult {
+  success: boolean;
+  logs?: ActivityLogItem[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  error?: string;
+}
+
+export interface ActivityLogStats {
+  total: number;
+  byCategory: Record<string, number>;
+  byOperation: Record<string, number>;
+  bySuccess: {
+    succeeded: number;
+    failed: number;
+  };
+}
+
+/**
+ * Get activity logs
+ */
+export async function getActivityLogs(
+  filters: ActivityLogFilters = {}
+): Promise<ActivityLogListResult> {
+  const params = new URLSearchParams();
+  if (filters.page) params.append('page', String(filters.page));
+  if (filters.limit) params.append('limit', String(filters.limit));
+  if (filters.category) params.append('category', filters.category);
+  if (filters.operation) params.append('operation', filters.operation);
+  if (filters.actorId) params.append('actorId', filters.actorId);
+  if (filters.targetId) params.append('targetId', filters.targetId);
+  if (filters.success) params.append('success', filters.success);
+  if (filters.startDate) params.append('startDate', filters.startDate);
+  if (filters.endDate) params.append('endDate', filters.endDate);
+  if (filters.search) params.append('search', filters.search);
+
+  return adminApiRequest(`/admin/activity-logs?${params.toString()}`);
+}
+
+/**
+ * Get activity log statistics
+ */
+export async function getActivityLogStats(filters: {
+  startDate?: string;
+  endDate?: string;
+} = {}): Promise<{
+  success: boolean;
+  stats?: ActivityLogStats;
+  error?: string;
+}> {
+  const params = new URLSearchParams();
+  if (filters.startDate) params.append('startDate', filters.startDate);
+  if (filters.endDate) params.append('endDate', filters.endDate);
+
+  const query = params.toString() ? `?${params.toString()}` : '';
+  return adminApiRequest(`/admin/activity-logs/stats${query}`);
+}
+
+/**
+ * Export activity logs
+ */
+export async function exportActivityLogs(
+  filters: ActivityLogFilters = {},
+  format: 'json' | 'csv' = 'json'
+): Promise<{
+  success: boolean;
+  data?: any;
+  error?: string;
+}> {
+  const params = new URLSearchParams();
+  params.append('format', format);
+  if (filters.category) params.append('category', filters.category);
+  if (filters.operation) params.append('operation', filters.operation);
+  if (filters.actorId) params.append('actorId', filters.actorId);
+  if (filters.startDate) params.append('startDate', filters.startDate);
+  if (filters.endDate) params.append('endDate', filters.endDate);
+  if (filters.search) params.append('search', filters.search);
+
+  return adminApiRequest(`/admin/activity-logs/export?${params.toString()}`);
+}
+
+// ============================================
+// Ziwei Chart API
+// ============================================
+
+export interface ZiweiChartPalace {
+  name: string;
+  heavenlyStem: string;
+  earthlyBranch: string;
+  majorStars: Array<{ name: string; brightness: string }>;
+  minorStars: Array<{ name: string }>;
+}
+
+export interface ZiweiChartHoroscope {
+  decadal: { range: [number, number]; heavenlyStem: string; earthlyBranch: string };
+  yearly: { heavenlyStem: string; earthlyBranch: string };
+}
+
+export interface ZiweiChart {
+  solarDate: string;
+  lunarDate: string;
+  chineseDate: string;
+  zodiac: string;
+  sign: string;
+  soul: string;
+  body: string;
+  fiveElementsClass: string;
+  palaces: ZiweiChartPalace[];
+  horoscope: ZiweiChartHoroscope;
+}
+
+export interface ZiweiChartData {
+  success: boolean;
+  chart?: ZiweiChart;
+  error?: string;
+}
+
+/**
+ * Get Ziwei astrology chart for a user
+ */
+export async function getZiweiChart(userId: string): Promise<ZiweiChartData> {
+  return adminApiRequest(`/admin/users/${userId}/ziwei-chart`);
 }

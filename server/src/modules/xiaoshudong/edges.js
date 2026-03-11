@@ -1,27 +1,28 @@
 /**
- * Edge definitions for XiaoShuDong workflow v2.0
+ * Edge definitions for XiaoShuDong workflow v2.1
  * 智能渐进式对话流程
  *
  * 流程设计：
- * Phase 1 - Listening:
- *   conversation_manager → listening_response → output
+ * Phase 1 - Listening (v2.1 优化):
+ *   conversation_manager → output (一次LLM调用，直接输出)
  *
  * Phase 2 - Analysis:
  *   conversation_manager → conversation_compressor → chart_retriever →
  *   rag_retriever → fortune_generator → psychologist_response → output
  *
  * @author AFS Team
- * @version 2.0.0
+ * @version 2.1.0
  */
 
 /**
  * 节点流程定义
+ * v2.1: 倾听阶段 conversation_manager 直接输出
  */
 export const edges = {
-  // 入口：对话管理
+  // 入口：对话管理 -> 条件路由（倾听直接输出，分析进入压缩）
   'conversation_manager': 'conditional_route',
 
-  // 倾听分支
+  // 倾听分支 - v2.1 deprecated（conversation_manager 已生成回复直接输出）
   'listening_response': 'output',
 
   // 分析分支 v2.0
@@ -81,10 +82,9 @@ export function getNextNode(currentNode, state) {
 
 /**
  * 对话管理后的路由逻辑
+ * v2.1: 倾听阶段直接输出（conversationManager 已生成回复）
  */
 function routeAfterConversationManager(state) {
-  const phase = state.conversationPhase?.current || 'listening';
-
   // 如果用户明确要求跳过倾听，直接进入分析
   if (state.metadata?.skipListening) {
     return 'conversation_compressor';
@@ -95,21 +95,8 @@ function routeAfterConversationManager(state) {
     return 'conversation_compressor';
   }
 
-  // 根据对话阶段决定路由
-  switch (phase) {
-    case 'listening':
-      // 继续倾听阶段
-      return 'listening_response';
-
-    case 'transition':
-    case 'analysis':
-      // 进入分析阶段 - 先压缩对话
-      return 'conversation_compressor';
-
-    default:
-      // 默认继续倾听
-      return 'listening_response';
-  }
+  // 倾听阶段直接输出（不再经过 listening_response）
+  return 'output';
 }
 
 /**

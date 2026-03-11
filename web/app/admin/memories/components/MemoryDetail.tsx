@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react';
-import { ArrowLeft, Database, Download, RotateCcw, FileText, Calendar, Tag, AlertCircle, Filter, Search, X, ChevronDown, ChevronUp, MessageCircle, User, Bot, Sparkles } from 'lucide-react';
+import { ArrowLeft, Database, Download, RotateCcw, FileText, Calendar, Tag, AlertCircle, Filter, Search, X, ChevronDown, ChevronUp, MessageCircle, User, Bot, Sparkles, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +14,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { getUserMemoryData, rebuildVectorIndex, exportUserMemories, type UserMemory, type VectorIndexStatus, type AdminUser } from '@/lib/admin-api';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { getUserMemoryData, rebuildVectorIndex, exportUserMemories, deleteMemory, batchDeleteMemories, type UserMemory, type VectorIndexStatus, type AdminUser, type Partner } from '@/lib/admin-api';
 import { usePermissionStore } from '@/stores/permission';
 
 interface MemoryFilters {
@@ -22,6 +31,7 @@ interface MemoryFilters {
   sourceType: string;
   indexed: string;
   search: string;
+  partnerId: string;
 }
 
 interface MemoryDetailProps {
@@ -34,6 +44,7 @@ interface MemoryDetailProps {
 export function MemoryDetail({ userId, user, onBack, onRefresh }: MemoryDetailProps) {
   const { can } = usePermissionStore();
   const [memories, setMemories] = useState<UserMemory[]>([]);
+  const [partners, setPartners] = useState<Partner[]>([]);
   const [vectorStatus, setVectorStatus] = useState<VectorIndexStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRebuilding, setIsRebuilding] = useState(false);
@@ -41,11 +52,21 @@ export function MemoryDetail({ userId, user, onBack, onRefresh }: MemoryDetailPr
   const [error, setError] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(true);
 
+  // Delete functionality state
+  const [selectedMemories, setSelectedMemories] = useState<Set<string>>(new Set());
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    memoryIds: string[];
+    partnerInfo?: { id: string; name: string } | null;
+  }>({ open: false, memoryIds: [] });
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const [filters, setFilters] = useState<MemoryFilters>({
     category: 'all',
     sourceType: 'all',
     indexed: 'all',
     search: '',
+    partnerId: 'all',
   });
 
   useEffect(() => {
@@ -60,6 +81,7 @@ export function MemoryDetail({ userId, user, onBack, onRefresh }: MemoryDetailPr
       if (result.success) {
         setMemories(result.memories || []);
         setVectorStatus(result.vectorIndex || null);
+        setPartners(result.partners || []);
       } else {
         setError(result.error || 'Failed to load memory data');
       }
@@ -75,7 +97,11 @@ export function MemoryDetail({ userId, user, onBack, onRefresh }: MemoryDetailPr
     let filtered = [...memories];
 
     if (filters.category !== 'all') {
-      filtered = filtered.filter((m) => m.category === filters.category);
+      if (filters.category === 'qa') {
+        filtered = filtered.filter((m) => ['self', 'family', 'friend'].includes(m.category));
+      } else {
+        filtered = filtered.filter((m) => m.category === filters.category);
+      }
     }
 
     if (filters.sourceType !== 'all') {
@@ -92,6 +118,10 @@ export function MemoryDetail({ userId, user, onBack, onRefresh }: MemoryDetailPr
         // For other types, assume they're indexed if vector status exists
         return vectorStatus?.exists === isIndexed;
       });
+    }
+
+    if (filters.partnerId !== 'all' && filters.category === 'rolecard') {
+      filtered = filtered.filter((m) => m.partnerId === filters.partnerId);
     }
 
     if (filters.search) {
@@ -111,10 +141,9 @@ export function MemoryDetail({ userId, user, onBack, onRefresh }: MemoryDetailPr
     total: memories.length,
     filtered: filteredMemories.length,
     byCategory: {
-      self: memories.filter((m) => m.category === 'self').length,
-      family: memories.filter((m) => m.category === 'family').length,
-      friend: memories.filter((m) => m.category === 'friend').length,
-      conversation: memories.filter((m) => m.category === 'conversation').length,
+      qa: memories.filter((m) => ['self', 'family', 'friend'].includes(m.category)).length,
+      rolecard: memories.filter((m) => m.category === 'rolecard').length,
+      xiaoshudong: memories.filter((m) => m.category === 'xiaoshudong').length,
     },
     bySourceType: {
       answer: memories.filter((m) => m.sourceType === 'answer').length,
@@ -132,10 +161,11 @@ export function MemoryDetail({ userId, user, onBack, onRefresh }: MemoryDetailPr
       sourceType: 'all',
       indexed: 'all',
       search: '',
+      partnerId: 'all',
     });
   };
 
-  const hasActiveFilters = filters.category !== 'all' || filters.sourceType !== 'all' || filters.indexed !== 'all' || filters.search !== '';
+  const hasActiveFilters = filters.category !== 'all' || filters.sourceType !== 'all' || filters.indexed !== 'all' || filters.search !== '' || filters.partnerId !== 'all';
 
   const handleRebuildIndex = async () => {
     if (!can('memory:manage')) {
@@ -193,12 +223,87 @@ export function MemoryDetail({ userId, user, onBack, onRefresh }: MemoryDetailPr
     }
   };
 
+  // Delete functionality
+  const toggleMemorySelection = (memoryId: string) => {
+    const newSet = new Set(selectedMemories);
+    if (newSet.has(memoryId)) {
+      newSet.delete(memoryId);
+    } else {
+      newSet.add(memoryId);
+    }
+    setSelectedMemories(newSet);
+  };
+
+  const toggleSelectAllMemories = () => {
+    if (selectedMemories.size === filteredMemories.length) {
+      setSelectedMemories(new Set());
+    } else {
+      setSelectedMemories(new Set(filteredMemories.map(m => m._id)));
+    }
+  };
+
+  const openDeleteDialog = (memoryIds: string[]) => {
+    // Get partner info for conversation memories
+    const firstMemory = memories.find(m => memoryIds.includes(m._id) && m.partnerId);
+    const partnerInfo = firstMemory?.partnerId ? {
+      id: firstMemory.partnerId,
+      name: partners.find(p => p.id === firstMemory.partnerId)?.name || '未知用户'
+    } : null;
+
+    setDeleteDialog({
+      open: true,
+      memoryIds,
+      partnerInfo
+    });
+  };
+
+  const handleDelete = async () => {
+    if (!can('memory:manage')) {
+      alert('您没有权限执行此操作');
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      if (deleteDialog.memoryIds.length === 1) {
+        const result = await deleteMemory(userId, deleteDialog.memoryIds[0]);
+        if (result.success) {
+          setDeleteDialog({ open: false, memoryIds: [] });
+          loadMemoryData();
+          setSelectedMemories(new Set());
+          alert('记忆已删除，可在回收站恢复');
+        } else {
+          alert(`删除失败: ${result.error}`);
+        }
+      } else {
+        const result = await batchDeleteMemories(userId, deleteDialog.memoryIds);
+        if (result.success) {
+          setDeleteDialog({ open: false, memoryIds: [] });
+          loadMemoryData();
+          setSelectedMemories(new Set());
+          if (result.failed && result.failed > 0) {
+            alert(`部分删除失败: ${result.failed} 项`);
+          } else {
+            alert(`已删除 ${result.succeeded} 条记忆，可在回收站恢复`);
+          }
+        } else {
+          alert(`批量删除失败: ${result.error}`);
+        }
+      }
+    } catch (err) {
+      alert(`删除失败: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const getCategoryLabel = (category: string) => {
     switch (category) {
-      case 'self': return '自我';
-      case 'family': return '家庭';
-      case 'friend': return '朋友';
-      case 'conversation': return '对话';
+      case 'self': return '自我问卷';
+      case 'family': return '家人问卷';
+      case 'friend': return '朋友问卷';
+      case 'rolecard': return '角色卡对话';
+      case 'xiaoshudong': return '小树洞';
       default: return category;
     }
   };
@@ -208,7 +313,8 @@ export function MemoryDetail({ userId, user, onBack, onRefresh }: MemoryDetailPr
       case 'self': return 'default';
       case 'family': return 'secondary';
       case 'friend': return 'outline';
-      case 'conversation': return 'default';
+      case 'rolecard': return 'default';
+      case 'xiaoshudong': return 'destructive';
       default: return 'outline';
     }
   };
@@ -251,7 +357,17 @@ export function MemoryDetail({ userId, user, onBack, onRefresh }: MemoryDetailPr
             <p className="text-sm text-gray-500">{user?.email}</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {selectedMemories.size > 0 && (
+            <Button
+              variant="destructive"
+              onClick={() => openDeleteDialog(Array.from(selectedMemories))}
+              disabled={isDeleting}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              删除选中 ({selectedMemories.size})
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={handleExport}
@@ -322,7 +438,7 @@ export function MemoryDetail({ userId, user, onBack, onRefresh }: MemoryDetailPr
       </Card>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
         <Card>
           <CardContent className="pt-4">
             <p className="text-xs text-gray-500">总记忆数</p>
@@ -331,26 +447,20 @@ export function MemoryDetail({ userId, user, onBack, onRefresh }: MemoryDetailPr
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-xs text-gray-500">自我</p>
-            <p className="text-2xl font-bold text-blue-600">{stats.byCategory.self}</p>
+            <p className="text-xs text-gray-500">问卷记忆</p>
+            <p className="text-2xl font-bold text-blue-600">{stats.byCategory.qa}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-xs text-gray-500">家庭</p>
-            <p className="text-2xl font-bold text-purple-600">{stats.byCategory.family}</p>
+            <p className="text-xs text-gray-500">角色卡对话</p>
+            <p className="text-2xl font-bold text-purple-600">{stats.byCategory.rolecard}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-xs text-gray-500">朋友</p>
-            <p className="text-2xl font-bold text-green-600">{stats.byCategory.friend}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-xs text-gray-500">对话</p>
-            <p className="text-2xl font-bold text-orange-600">{stats.byCategory.conversation}</p>
+            <p className="text-xs text-gray-500">小树洞对话</p>
+            <p className="text-2xl font-bold text-green-600">{stats.byCategory.xiaoshudong}</p>
           </CardContent>
         </Card>
         <Card>
@@ -406,17 +516,16 @@ export function MemoryDetail({ userId, user, onBack, onRefresh }: MemoryDetailPr
                 <Label>类别</Label>
                 <Select
                   value={filters.category}
-                  onValueChange={(value) => setFilters({ ...filters, category: value })}
+                  onValueChange={(value) => setFilters({ ...filters, category: value, partnerId: 'all' })}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">全部类别</SelectItem>
-                    <SelectItem value="self">自我</SelectItem>
-                    <SelectItem value="family">家庭</SelectItem>
-                    <SelectItem value="friend">朋友</SelectItem>
-                    <SelectItem value="conversation">对话</SelectItem>
+                    <SelectItem value="all">全部</SelectItem>
+                    <SelectItem value="qa">问卷记忆</SelectItem>
+                    <SelectItem value="rolecard">角色卡对话</SelectItem>
+                    <SelectItem value="xiaoshudong">小树洞对话</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -457,6 +566,31 @@ export function MemoryDetail({ userId, user, onBack, onRefresh }: MemoryDetailPr
                 </Select>
               </div>
             </div>
+
+            {/* 对话对象二级筛选 */}
+            {filters.category === 'rolecard' && (
+              <div className="mt-4 space-y-2">
+                <Label>对话对象</Label>
+                <Select
+                  value={filters.partnerId}
+                  onValueChange={(value) => setFilters({ ...filters, partnerId: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">全部对话</SelectItem>
+                    {partners
+                      .filter(p => p.category === 'rolecard')
+                      .map(p => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name} ({p.memoryCount}条)
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </CardContent>
         )}
       </Card>
@@ -487,44 +621,78 @@ export function MemoryDetail({ userId, user, onBack, onRefresh }: MemoryDetailPr
               )}
             </div>
           ) : (
-            <div className="space-y-4">
-              {filteredMemories.map((memory) => (
-                <Card key={memory._id} className={`border-l-4 ${
-                  memory.sourceType === 'conversation' ? 'border-l-orange-500' :
-                  memory.category === 'self' ? 'border-l-blue-500' :
-                  memory.category === 'family' ? 'border-l-purple-500' :
-                  memory.category === 'friend' ? 'border-l-green-500' :
-                  'border-l-gray-500'
-                }`}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-4 mb-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant={getCategoryBadgeVariant(memory.category)}>
-                          {getCategoryLabel(memory.category)}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          {getSourceTypeLabel(memory.sourceType)}
-                        </Badge>
-                        {memory.sourceType === 'conversation' && (
-                          <Badge
-                            variant={memory.indexed ? "default" : "secondary"}
-                            className="text-xs"
-                          >
-                            {memory.indexed ? '已索引' : '待索引'}
-                          </Badge>
-                        )}
-                        {memory.messageCount && memory.messageCount > 0 && (
-                          <Badge variant="outline" className="text-xs flex items-center gap-1">
-                            <MessageCircle className="w-3 h-3" />
-                            {memory.messageCount} 条消息
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
-                        <Calendar className="w-3 h-3" />
-                        {new Date(memory.createdAt).toLocaleDateString('zh-CN')}
-                      </div>
-                    </div>
+            <>
+              {/* Select All */}
+              <div className="flex items-center gap-2 pb-4 border-b">
+                <Checkbox
+                  id="select-all"
+                  checked={selectedMemories.size === filteredMemories.length && filteredMemories.length > 0}
+                  onCheckedChange={toggleSelectAllMemories}
+                />
+                <label htmlFor="select-all" className="text-sm text-gray-600 cursor-pointer">
+                  全选 ({filteredMemories.length} 条)
+                </label>
+              </div>
+
+              <div className="space-y-4 mt-4">
+                {filteredMemories.map((memory) => (
+                  <Card key={memory._id} className={`border-l-4 ${
+                    memory.sourceType === 'conversation' ? 'border-l-orange-500' :
+                    memory.category === 'self' ? 'border-l-blue-500' :
+                    memory.category === 'family' ? 'border-l-purple-500' :
+                    memory.category === 'friend' ? 'border-l-green-500' :
+                    memory.category === 'rolecard' ? 'border-l-purple-500' :
+                    memory.category === 'xiaoshudong' ? 'border-l-green-500' :
+                    'border-l-gray-500'
+                  } ${selectedMemories.has(memory._id) ? 'bg-orange-50' : ''}`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          checked={selectedMemories.has(memory._id)}
+                          onCheckedChange={() => toggleMemorySelection(memory._id)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-4 mb-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge variant={getCategoryBadgeVariant(memory.category)}>
+                                {getCategoryLabel(memory.category)}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {getSourceTypeLabel(memory.sourceType)}
+                              </Badge>
+                              {memory.sourceType === 'conversation' && (
+                                <Badge
+                                  variant={memory.indexed ? "default" : "secondary"}
+                                  className="text-xs"
+                                >
+                                  {memory.indexed ? '已索引' : '待索引'}
+                                </Badge>
+                              )}
+                              {memory.messageCount && memory.messageCount > 0 && (
+                                <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                  <MessageCircle className="w-3 h-3" />
+                                  {memory.messageCount} 条消息
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1 text-xs text-gray-500">
+                                <Calendar className="w-3 h-3" />
+                                {new Date(memory.createdAt).toLocaleDateString('zh-CN')}
+                              </div>
+                              {can('memory:manage') && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => openDeleteDialog([memory._id])}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
 
                     {/* Conversation messages in chat format */}
                     {memory.sourceType === 'conversation' && memory.rawMessages && memory.rawMessages.length > 0 ? (
@@ -557,13 +725,59 @@ export function MemoryDetail({ userId, user, onBack, onRefresh }: MemoryDetailPr
                         对话对象ID: {memory.partnerId}
                       </div>
                     )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ open, memoryIds: [] })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              确认删除
+            </DialogTitle>
+            <DialogDescription>
+              此操作将删除选中的记忆，删除后可在回收站恢复（30天内）。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+              <p className="text-sm">
+                <span className="font-medium">删除数量:</span> {deleteDialog.memoryIds.length} 条记忆
+              </p>
+              {deleteDialog.partnerInfo && (
+                <div className="bg-orange-50 border border-orange-200 rounded p-2 text-sm text-orange-700">
+                  <AlertCircle className="w-4 h-4 inline mr-1" />
+                  会话记忆删除时，对方用户 ({deleteDialog.partnerInfo.name}) 的记忆也将被同步删除
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialog({ open: false, memoryIds: [] })}
+            >
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? '删除中...' : '确认删除'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

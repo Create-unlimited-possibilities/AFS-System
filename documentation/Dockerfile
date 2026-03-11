@@ -23,15 +23,18 @@ COPY . .
 RUN npm run build
 
 # ============================================
-# Production Stage (nginx)
+# Production Stage (using node + serve)
+# Avoids nginx image pull issues in China
 # ============================================
-FROM nginx:alpine AS production
+FROM node:20-alpine AS production
 
-# Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
+
+# Install serve globally for static file hosting
+RUN npm install -g serve
 
 # Copy built static files from builder
-COPY --from=builder /app/build /usr/share/nginx/html
+COPY --from=builder /app/build /app/build
 
 # Expose port
 EXPOSE 80
@@ -40,5 +43,5 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost:80/ || exit 1
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Start serve
+CMD ["serve", "-s", "build", "-l", "80"]

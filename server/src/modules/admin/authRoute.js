@@ -12,6 +12,7 @@ import User from '../user/model.js';
 import Role from '../roles/models/role.js';
 import InviteCode from './models/inviteCode.js';
 import logger from '../../core/utils/logger.js';
+import activityLogService from './services/activityLogService.js';
 
 console.log('=== ADMIN AUTH ROUTE LOADED ===');
 logger.info('=== ADMIN AUTH ROUTE LOADED ===');
@@ -27,7 +28,11 @@ const ADMIN_INVITE_CODE = process.env.ADMIN_INVITE_CODE || 'AFS-Admin-2024-Secur
  * @access  Public
  */
 router.post('/login', async (req, res) => {
-  logger.info('[AdminAuth] Login attempt:', { email: req.body?.email });
+  const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
+  const userAgent = req.get('user-agent') || 'unknown';
+  const email = req.body?.email;
+
+  logger.info('[AdminAuth] Login attempt:', { email });
   try {
     const { email, password } = req.body;
 
@@ -50,6 +55,19 @@ router.post('/login', async (req, res) => {
 
     if (!user) {
       logger.warn('[AdminAuth] User not found:', email);
+
+      // Log failed login attempt
+      await activityLogService.log({
+        operation: 'admin_login_failed',
+        category: 'role',
+        actorName: email,
+        description: `管理员登录失败: 用户不存在`,
+        details: { email, reason: 'user_not_found' },
+        ipAddress,
+        userAgent,
+        success: false
+      }).catch(() => {});
+
       return res.status(401).json({
         success: false,
         error: '邮箱或密码错误'
@@ -58,6 +76,19 @@ router.post('/login', async (req, res) => {
 
     // Check if user is active
     if (!user.isActive) {
+      // Log failed login attempt
+      await activityLogService.log({
+        operation: 'admin_login_failed',
+        category: 'role',
+        actorId: user._id,
+        actorName: user.name || user.email,
+        description: `管理员登录失败: 账号已被禁用`,
+        details: { email, reason: 'account_disabled' },
+        ipAddress,
+        userAgent,
+        success: false
+      }).catch(() => {});
+
       return res.status(401).json({
         success: false,
         error: '账号已被禁用'
@@ -68,6 +99,20 @@ router.post('/login', async (req, res) => {
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       logger.warn('[AdminAuth] Password mismatch for:', email);
+
+      // Log failed login attempt
+      await activityLogService.log({
+        operation: 'admin_login_failed',
+        category: 'role',
+        actorId: user._id,
+        actorName: user.name || user.email,
+        description: `管理员登录失败: 密码错误`,
+        details: { email, reason: 'invalid_password' },
+        ipAddress,
+        userAgent,
+        success: false
+      }).catch(() => {});
+
       return res.status(401).json({
         success: false,
         error: '邮箱或密码错误'
@@ -77,6 +122,20 @@ router.post('/login', async (req, res) => {
     // Check if user has admin role
     if (!user.role || !user.role.isAdmin) {
       logger.warn('[AdminAuth] Non-admin user tried to login:', email);
+
+      // Log failed login attempt
+      await activityLogService.log({
+        operation: 'admin_login_failed',
+        category: 'role',
+        actorId: user._id,
+        actorName: user.name || user.email,
+        description: `管理员登录失败: 没有管理员权限`,
+        details: { email, reason: 'not_admin' },
+        ipAddress,
+        userAgent,
+        success: false
+      }).catch(() => {});
+
       return res.status(403).json({
         success: false,
         error: '没有管理员权限'
@@ -95,6 +154,19 @@ router.post('/login', async (req, res) => {
     await user.save();
 
     logger.info(`[AdminAuth] Admin login successful: ${email}`);
+
+    // Log successful login
+    await activityLogService.log({
+      operation: 'admin_login',
+      category: 'role',
+      actorId: user._id,
+      actorName: user.name || user.email,
+      description: `管理员登录成功: ${user.name || user.email}`,
+      details: { email, roleName: user.role?.name },
+      ipAddress,
+      userAgent,
+      success: true
+    }).catch(() => {});
 
     res.json({
       success: true,
@@ -136,6 +208,7 @@ router.post('/register', async (req, res) => {
 
     // Validate invite code
     let isValidCode = false;
+    let usedInviteCodeId = null;
 
     // Check against env variable first
     if (inviteCode === ADMIN_INVITE_CODE) {
@@ -152,6 +225,7 @@ router.post('/register', async (req, res) => {
 
       if (dbInviteCode && dbInviteCode.useCount < dbInviteCode.maxUses) {
         isValidCode = true;
+        usedInviteCodeId = dbInviteCode._id;
         // Increment usage count
         dbInviteCode.useCount += 1;
         await dbInviteCode.save();
@@ -208,6 +282,22 @@ router.post('/register', async (req, res) => {
     );
 
     logger.info(`[AdminAuth] Admin registration successful: ${email}`);
+
+    // Log invite code usage (if it was a database invite code)
+    if (usedInviteCodeId) {
+      await activityLogService.log({
+        operation: 'invite_code_used',
+        category: 'user',
+        actorId: user._id,
+        actorName: user.name || user.email,
+        targetType: 'invite_code',
+        targetId: String(usedInviteCodeId),
+        targetName: inviteCode,
+        description: `注册时使用邀请码: ${inviteCode}`,
+        details: { registeredEmail: email, registeredName: name },
+        success: true
+      }).catch(() => {});
+    }
 
     res.status(201).json({
       success: true,
@@ -272,6 +362,43 @@ router.get('/validate-invite/:code', async (req, res) => {
     res.status(500).json({
       success: false,
       error: '验证失败'
+    });
+  }
+});
+
+/**
+ * @route   POST /api/admin/auth/logout
+ * @desc    Admin logout
+ * @access  Private (requires auth middleware)
+ */
+router.post('/logout', async (req, res) => {
+  try {
+    // Get user info from token (if auth middleware is used)
+    const userId = req.user?.id;
+    const userName = req.user?.name || req.user?.email;
+
+    // Log logout
+    if (userId) {
+      await activityLogService.log({
+        operation: 'admin_logout',
+        category: 'role',
+        actorId: userId,
+        actorName: userName,
+        description: `管理员登出: ${userName}`,
+        details: {},
+        success: true
+      }).catch(() => {});
+    }
+
+    res.json({
+      success: true,
+      message: '登出成功'
+    });
+  } catch (error) {
+    logger.error('[AdminAuth] Logout error:', error);
+    res.status(500).json({
+      success: false,
+      error: '登出失败'
     });
   }
 });

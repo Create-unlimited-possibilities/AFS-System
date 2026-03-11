@@ -83,6 +83,10 @@ modelserver/models/blobs/
 modelserver/models/blobs/**/*
 ./modelserver/models/blobs/
 
+# Ziwei GGUF 模型文件（微调模型，不上传到GitHub）
+*.gguf
+modelserver/models/gguf/
+
 # 演示数据临时目录
 /demo-data-temp/
 verify-temp/

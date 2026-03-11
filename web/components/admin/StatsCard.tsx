@@ -15,6 +15,7 @@ interface StatsCardProps {
   };
   className?: string;
   iconClassName?: string;
+  color?: string; // For gradient background support
 }
 
 export function StatsCard({
@@ -25,14 +26,18 @@ export function StatsCard({
   trend,
   className,
   iconClassName,
+  color,
 }: StatsCardProps) {
+  // Use color for gradient background if provided, otherwise fall back to iconClassName
+  const iconBgClass = color || iconClassName;
+
   return (
     <Card className={className}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium text-gray-600">
           {title}
         </CardTitle>
-        <div className={cn('p-2 rounded-lg', iconClassName)}>
+        <div className={cn('p-2 rounded-lg text-white', iconBgClass)}>
           <Icon className="w-4 h-4" />
         </div>
       </CardHeader>

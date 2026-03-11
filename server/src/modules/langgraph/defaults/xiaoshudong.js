@@ -8,14 +8,23 @@ export const xiaoshudongDefault = {
       nodeId: 'conversation_manager',
       nodeName: '对话管理',
       nodeType: 'start',
-      promptType: 'none',
-      staticPrompt: '',
+      promptType: 'static',
+      staticPrompt: `你是一位温暖、专业的心理咨询师（小树洞）。
+
+你的任务是：
+1. 评估对话状态，判断用户是否准备好进入深度分析
+2. 生成一个温暖、简洁的回复
+
+回复要求：
+- 2-4句话，温暖平实
+- 先共情，再引导
+- 不要使用命理词汇`,
       dynamicSources: [
-        { name: '对话状态', description: '当前对话阶段和轮次' },
+        { name: '完整对话历史', description: '当前会话的所有历史消息' },
         { name: '用户意图', description: '识别的用户意图' }
       ],
-      llmEnabled: false,
-      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.5, maxTokens: 100 },
+      llmEnabled: true,
+      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.5, maxTokens: 500 },
       position: { x: 300, y: 50 }
     },
     {
@@ -38,7 +47,9 @@ export const xiaoshudongDefault = {
       dynamicSources: [],
       llmEnabled: true,
       llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.7, maxTokens: 200 },
-      position: { x: 150, y: 150 }
+      position: { x: 150, y: 150 },
+      deprecated: true, // v2.1: 不再使用，conversation_manager 已合并此功能
+      deprecationNote: 'v2.1: conversation_manager 节点已合并评估和回复功能'
     },
     {
       nodeId: 'conversation_compressor',
@@ -137,8 +148,9 @@ export const xiaoshudongDefault = {
       position: { x: 300, y: 490 }
     }
   ],
+  // v2.1: 倾听阶段 conversation_manager 直接输出到 output
   edges: [
-    { source: 'conversation_manager', target: 'listening_response', conditionType: 'conditional', label: '倾听阶段' },
+    { source: 'conversation_manager', target: 'output', conditionType: 'conditional', label: '倾听阶段' },
     { source: 'conversation_manager', target: 'conversation_compressor', conditionType: 'conditional', label: '分析阶段' },
     { source: 'conversation_compressor', target: 'chart_retriever', conditionType: 'always', label: '' },
     { source: 'chart_retriever', target: 'rag_retriever', conditionType: 'always', label: '' },

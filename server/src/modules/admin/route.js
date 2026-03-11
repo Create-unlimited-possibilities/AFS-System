@@ -317,12 +317,28 @@ router.put('/users/:id', (req, res) => adminController.updateUser(req, res));
 router.delete('/users/:id', (req, res) => adminController.deleteUser(req, res));
 
 /**
+ * @route   POST /api/admin/users/:id/reset-password
+ * @desc    Reset user password (admin action)
+ * @access  Admin
+ * @body    newPassword - New password to set
+ */
+router.post('/users/:id/reset-password', (req, res) => adminController.resetUserPassword(req, res));
+
+/**
  * @route   PATCH /api/admin/users/:id/status
  * @desc    Toggle user active status
  * @access  Admin
  * @body    isActive - Boolean status to set
  */
 router.patch('/users/:id/status', (req, res) => adminController.updateUser(req, res));
+
+/**
+ * @route   GET /api/admin/users/:id/ziwei-chart
+ * @desc    Get Ziwei (Purple Star) chart for a user
+ * @access  Admin
+ * @query   targetDate - Target date for horoscope (YYYY-MM-DD, default: today)
+ */
+router.get('/users/:id/ziwei-chart', (req, res) => adminController.getZiweiChart(req, res));
 
 // ======== Questionnaire Management ========
 /**
@@ -469,6 +485,8 @@ router.get('/memories/stats', (req, res) => adminController.getMemoryStats(req, 
  * @route   GET /api/admin/memories/:userId
  * @desc    Get user's memory data with vector index status
  * @access  Admin
+ * @query   partnerId - Filter by conversation partner ID (optional)
+ * @query   category - Filter by memory category: rolecard, xiaoshudong (optional)
  */
 router.get('/memories/:userId', (req, res) => adminController.getUserMemories(req, res));
 
@@ -669,5 +687,221 @@ router.delete('/roles/:id', (req, res) => adminController.deleteRole(req, res));
  * @access  Admin
  */
 router.get('/permissions', (req, res) => adminController.getAllPermissions(req, res));
+
+// ======== Ziwei Books (Fortune-telling Knowledge Base) ========
+/**
+ * @route   GET /api/admin/ziwei-books
+ * @desc    Get ziwei books content with pagination and search
+ * @access  Admin
+ * @query   page - Page number (default: 1)
+ * @query   limit - Items per page (default: 20)
+ * @query   search - Search query
+ * @query   source - Filter by source book
+ */
+router.get('/ziwei-books', (req, res) => adminController.getZiweiBooks(req, res));
+
+/**
+ * @route   GET /api/admin/ziwei-books/sources
+ * @desc    Get list of ziwei book sources
+ * @access  Admin
+ */
+router.get('/ziwei-books/sources', (req, res) => adminController.getZiweiBooksSources(req, res));
+
+// ======== XiaoShuDong (小树洞) Statistics ========
+/**
+ * @route   GET /api/admin/xiaoshudong/stats
+ * @desc    Get XiaoShuDong usage statistics
+ * @access  Admin
+ * @query   startDate - Start date filter (ISO string)
+ * @query   endDate - End date filter (ISO string)
+ * @query   userId - Filter by specific user
+ */
+router.get('/xiaoshudong/stats', (req, res) => adminController.getXiaoshudongStats(req, res));
+
+/**
+ * @route   GET /api/admin/xiaoshudong/conversations/:userId
+ * @desc    Get XiaoShuDong conversations for a user
+ * @access  Admin
+ * @query   page - Page number (default: 1)
+ * @query   limit - Items per page (default: 20)
+ */
+router.get('/xiaoshudong/conversations/:id', (req, res) => adminController.getUserXiaoshudongConversations(req, res));
+
+// ======== Model Management ========
+/**
+ * @route   GET /api/admin/models/status
+ * @desc    Get model management status overview
+ * @access  Admin
+ */
+router.get('/models/status', (req, res) => adminController.getModelManagementStatus(req, res));
+
+/**
+ * @route   GET /api/admin/models/ollama
+ * @desc    List all registered Ollama models
+ * @access  Admin
+ */
+router.get('/models/ollama', (req, res) => adminController.listOllamaModels(req, res));
+
+/**
+ * @route   GET /api/admin/models/ollama/:name
+ * @desc    Get detailed info for a specific Ollama model
+ * @access  Admin
+ */
+router.get('/models/ollama/:name', (req, res) => adminController.getModelInfo(req, res));
+
+/**
+ * @route   GET /api/admin/models/gguf-files
+ * @desc    List available GGUF model files
+ * @access  Admin
+ */
+router.get('/models/gguf-files', (req, res) => adminController.listGgufFiles(req, res));
+
+/**
+ * @route   GET /api/admin/models/modelfiles
+ * @desc    List available Modelfile files
+ * @access  Admin
+ */
+router.get('/models/modelfiles', (req, res) => adminController.listModelfiles(req, res));
+
+/**
+ * @route   GET /api/admin/models/modelfiles/:filename
+ * @desc    Read Modelfile content
+ * @access  Admin
+ */
+router.get('/models/modelfiles/:filename', (req, res) => adminController.readModelfile(req, res));
+
+/**
+ * @route   PUT /api/admin/models/modelfiles/:filename
+ * @desc    Save Modelfile content
+ * @access  Admin
+ * @body    content - Modelfile content
+ */
+router.put('/models/modelfiles/:filename', (req, res) => adminController.saveModelfile(req, res));
+
+/**
+ * @route   POST /api/admin/models/create
+ * @desc    Create a new Ollama model from Modelfile
+ * @access  Admin
+ * @body    modelName - Name for the new model
+ * @body    modelfileName - Name of the Modelfile to use
+ */
+router.post('/models/create', (req, res) => adminController.createModel(req, res));
+
+/**
+ * @route   DELETE /api/admin/models/:name
+ * @desc    Delete an Ollama model
+ * @access  Admin
+ */
+router.delete('/models/:name', (req, res) => adminController.deleteModel(req, res));
+
+// ======== Memory Deletion ========
+/**
+ * @route   DELETE /api/admin/memories/:userId/memories/:memoryId
+ * @desc    Soft delete a single conversation memory (bidirectional sync)
+ * @access  Admin
+ */
+router.delete('/memories/:userId/memories/:memoryId', (req, res) => adminController.deleteMemory(req, res));
+
+/**
+ * @route   POST /api/admin/memories/:userId/memories/batch-delete
+ * @desc    Batch soft delete conversation memories
+ * @access  Admin
+ * @body    memoryIds - Array of memory IDs to delete
+ */
+router.post('/memories/:userId/memories/batch-delete', (req, res) => adminController.batchDeleteMemories(req, res));
+
+/**
+ * @route   DELETE /api/admin/memories/:userId/answers/:answerId
+ * @desc    Soft delete a questionnaire answer
+ * @access  Admin
+ */
+router.delete('/memories/:userId/answers/:answerId', (req, res) => adminController.deleteAnswer(req, res));
+
+// ======== Recycle Bin ========
+/**
+ * @route   GET /api/admin/recycle-bin
+ * @desc    Get recycle bin items with filters
+ * @access  Admin
+ * @query   page - Page number
+ * @query   limit - Items per page
+ * @query   itemType - Filter by item type
+ * @query   userId - Filter by user ID
+ * @query   status - Filter by status
+ */
+router.get('/recycle-bin', (req, res) => adminController.getRecycleBin(req, res));
+
+/**
+ * @route   GET /api/admin/recycle-bin/stats
+ * @desc    Get recycle bin statistics
+ * @access  Admin
+ */
+router.get('/recycle-bin/stats', (req, res) => adminController.getRecycleBinStats(req, res));
+
+/**
+ * @route   GET /api/admin/recycle-bin/:id
+ * @desc    Get recycle bin item by ID
+ * @access  Admin
+ */
+router.get('/recycle-bin/:id', (req, res) => adminController.getRecycleBinItem(req, res));
+
+/**
+ * @route   POST /api/admin/recycle-bin/:id/restore
+ * @desc    Restore item from recycle bin
+ * @access  Admin
+ */
+router.post('/recycle-bin/:id/restore', (req, res) => adminController.restoreRecycleBinItem(req, res));
+
+/**
+ * @route   DELETE /api/admin/recycle-bin/:id
+ * @desc    Permanently delete item from recycle bin
+ * @access  Admin
+ */
+router.delete('/recycle-bin/:id', (req, res) => adminController.purgeRecycleBinItem(req, res));
+
+/**
+ * @route   POST /api/admin/recycle-bin/batch-restore
+ * @desc    Batch restore items from recycle bin
+ * @access  Admin
+ * @body    ids - Array of item IDs to restore
+ */
+router.post('/recycle-bin/batch-restore', (req, res) => adminController.batchRestoreRecycleBin(req, res));
+
+/**
+ * @route   DELETE /api/admin/recycle-bin/batch-purge
+ * @desc    Batch permanently delete items from recycle bin
+ * @access  Admin
+ * @body    ids - Array of item IDs to purge
+ */
+router.delete('/recycle-bin/batch-purge', (req, res) => adminController.batchPurgeRecycleBin(req, res));
+
+// ======== Activity Logs ========
+/**
+ * @route   GET /api/admin/activity-logs
+ * @desc    Get activity logs with filters
+ * @access  Admin
+ * @query   page - Page number
+ * @query   limit - Items per page
+ * @query   category - Filter by category
+ * @query   operation - Filter by operation
+ * @query   actorId - Filter by actor ID
+ * @query   startDate - Start date filter
+ * @query   endDate - End date filter
+ */
+router.get('/activity-logs', (req, res) => adminController.getActivityLogs(req, res));
+
+/**
+ * @route   GET /api/admin/activity-logs/stats
+ * @desc    Get activity log statistics
+ * @access  Admin
+ */
+router.get('/activity-logs/stats', (req, res) => adminController.getActivityLogStats(req, res));
+
+/**
+ * @route   GET /api/admin/activity-logs/export
+ * @desc    Export activity logs
+ * @access  Admin
+ * @query   format - Export format (json or csv)
+ */
+router.get('/activity-logs/export', (req, res) => adminController.exportActivityLogs(req, res));
 
 export default router;

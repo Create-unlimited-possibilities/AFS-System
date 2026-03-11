@@ -3,6 +3,7 @@
 import { Plus } from 'lucide-react'
 import { SearchBar } from './SearchBar'
 import { UserListItem } from './UserListItem'
+import { XiaoShuDongEntry } from './XiaoShuDongEntry'
 
 interface Contact {
   targetUserId: string
@@ -52,19 +53,38 @@ export function UserList({
 
       {/* List */}
       <div className="flex-1 overflow-y-auto">
-        {contacts.length === 0 ? (
+        {/* XiaoShuDong Entry - Pinned at top */}
+        <XiaoShuDongEntry
+          isSelected={selectedId === 'xiaoshudong'}
+          onClick={() => onSelect({
+            targetUserId: 'xiaoshudong',
+            targetUserName: '小树洞',
+            targetUniqueCode: 'XSD001',
+            relationType: 'stranger',
+            specificRelation: 'ai_companion',
+            sessionId: null,
+            sentimentScore: 0,
+            lastMessage: null,
+            lastMessageAt: null
+          })}
+        />
+
+        {/* Regular contacts - only show if no search query */}
+        {searchQuery === '' && contacts.length === 0 ? (
           <div className="p-4 text-center text-gray-400 text-sm">
             还没有对话，点击右上角添加好友
           </div>
         ) : (
-          contacts.map((contact) => (
-            <UserListItem
-              key={contact.targetUserId}
-              contact={contact}
-              isSelected={selectedId === contact.targetUserId}
-              onClick={() => onSelect(contact)}
-            />
-          ))
+          contacts
+            .filter(c => !searchQuery || c.targetUserName.includes(searchQuery) || c.targetUniqueCode.includes(searchQuery))
+            .map((contact) => (
+              <UserListItem
+                key={contact.targetUserId}
+                contact={contact}
+                isSelected={selectedId === contact.targetUserId}
+                onClick={() => onSelect(contact)}
+              />
+            ))
         )}
       </div>
     </div>

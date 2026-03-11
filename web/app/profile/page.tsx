@@ -14,10 +14,40 @@ import { User as UserIcon, Loader2, Save, ArrowLeft, CheckCircle } from 'lucide-
 import CloudPattern from '@/components/decorations/CloudPattern'
 import ProvinceCitySelector from '@/components/ProvinceCitySelector'
 
+// Shichen (时辰) names display mapping
+// Maps birth hour (0-23) to the corresponding 时辰 name
+const SHICHEN_NAMES: Record<number, string> = {
+  0: '早子时 (00:00-01:00)',
+  1: '丑时 (01:00-03:00)',
+  2: '丑时 (01:00-03:00)',
+  3: '寅时 (03:00-05:00)',
+  4: '寅时 (03:00-05:00)',
+  5: '卯时 (05:00-07:00)',
+  6: '卯时 (05:00-07:00)',
+  7: '辰时 (07:00-09:00)',
+  8: '辰时 (07:00-09:00)',
+  9: '巳时 (09:00-11:00)',
+  10: '巳时 (09:00-11:00)',
+  11: '午时 (11:00-13:00)',
+  12: '午时 (11:00-13:00)',
+  13: '未时 (13:00-15:00)',
+  14: '未时 (13:00-15:00)',
+  15: '申时 (15:00-17:00)',
+  16: '申时 (15:00-17:00)',
+  17: '酉时 (17:00-19:00)',
+  18: '酉时 (17:00-19:00)',
+  19: '戌时 (19:00-21:00)',
+  20: '戌时 (19:00-21:00)',
+  21: '亥时 (21:00-23:00)',
+  22: '亥时 (21:00-23:00)',
+  23: '晚子时 (23:00-00:00)',
+}
+
 interface ProfileData {
   gender?: string
   birthDate?: string
   birthHour?: number
+  birthCalendar?: 'solar' | 'lunar'
   birthPlace?: {
     provinceCode: string
     provinceName: string
@@ -49,6 +79,10 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [profile, setProfile] = useState<ProfileData>({})
+  const [isLocked, setIsLocked] = useState(false)  // 是否锁定（已保存）
+  const [isEditing, setIsEditing] = useState(true)  // 是否在编辑模式
+  const [hasChanges, setHasChanges] = useState(false)  // 是否有修改
+  const [originalProfile, setOriginalProfile] = useState<ProfileData>({})  // 原始数据
 
   useEffect(() => {
     console.log('[Profile] useEffect 触发:', { hasHydrated, user: user?.email })
@@ -73,6 +107,16 @@ export default function ProfilePage() {
           ...profileData,
           birthDate: profileData.birthDate ? new Date(profileData.birthDate).toISOString().split('T')[0] : undefined
         })
+        setOriginalProfile({
+          ...profileData,
+          birthDate: profileData.birthDate ? new Date(profileData.birthDate).toISOString().split('T')[0] : undefined
+        })
+
+        // 如果有必填字段已填写，认为是已保存状态
+        if (profileData.gender && profileData.birthDate && profileData.birthPlace?.cityCode) {
+          setIsLocked(true)
+          setIsEditing(false)
+        }
       } else {
         console.log('[Profile] 条件不满足:', { success: res.success, profile: (res as any).profile })
       }
@@ -107,6 +151,10 @@ export default function ProfilePage() {
       const res = await api.put<{ success: boolean; message: string }>('/users/profile', profile)
       if (res.success) {
         setSaved(true)
+        setIsLocked(true)
+        setIsEditing(false)
+        setOriginalProfile({...profile})  // 保存原始数据
+        setHasChanges(false)
         setTimeout(() => setSaved(false), 2000)
       }
     } catch (error) {
@@ -118,7 +166,23 @@ export default function ProfilePage() {
   }
 
   const updateProfile = (field: keyof ProfileData, value: any) => {
-    setProfile(prev => ({ ...prev, [field]: value }))
+    setProfile(prev => {
+      const newProfile = { ...prev, [field]: value }
+      // 检测是否有修改
+      setHasChanges(JSON.stringify(newProfile) !== JSON.stringify(originalProfile))
+      return newProfile
+    })
+  }
+
+  const handleEdit = () => {
+    setIsEditing(true)
+    setHasChanges(false)
+  }
+
+  const handleCancelEdit = () => {
+    setProfile({...originalProfile})  // 恢复原始数据
+    setIsEditing(false)
+    setHasChanges(false)
   }
 
   if (loading) {
@@ -192,14 +256,15 @@ export default function ProfilePage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* 性别和出生日期 */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="gender">性别 <span className="text-red-500">*</span></Label>
                     <Select
                       value={profile.gender || ''}
                       onValueChange={(value) => updateProfile('gender', value)}
+                      disabled={!isEditing}
                     >
-                      <SelectTrigger id="gender">
+                      <SelectTrigger id="gender" className={!isEditing ? 'bg-gray-50 text-gray-500' : ''}>
                         <SelectValue placeholder="请选择性别" />
                       </SelectTrigger>
                       <SelectContent>
@@ -210,12 +275,30 @@ export default function ProfilePage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="birthCalendar">历法类型</Label>
+                    <Select
+                      value={profile.birthCalendar || 'solar'}
+                      onValueChange={(value: 'solar' | 'lunar') => updateProfile('birthCalendar', value)}
+                      disabled={!isEditing}
+                    >
+                      <SelectTrigger id="birthCalendar" className={!isEditing ? 'bg-gray-50 text-gray-500' : ''}>
+                        <SelectValue placeholder="请选择历法" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="solar">阳历</SelectItem>
+                        <SelectItem value="lunar">农历</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="birthDate">出生日期 <span className="text-red-500">*</span></Label>
                     <Input
                       id="birthDate"
                       type="date"
                       value={profile.birthDate || ''}
                       onChange={(e) => updateProfile('birthDate', e.target.value)}
+                      disabled={!isEditing}
+                      className={!isEditing ? 'bg-gray-50 text-gray-500' : ''}
                     />
                   </div>
                   <div className="space-y-2">
@@ -223,9 +306,10 @@ export default function ProfilePage() {
                     <Select
                       value={profile.birthHour?.toString() || ''}
                       onValueChange={(value) => updateProfile('birthHour', value ? parseInt(value) : undefined)}
+                      disabled={!isEditing}
                     >
-                      <SelectTrigger id="birthHour">
-                        <SelectValue placeholder="请选择时辰（选填）" />
+                      <SelectTrigger id="birthHour" className={!isEditing ? 'bg-gray-50 text-gray-500' : ''}>
+                        <SelectValue placeholder={profile.birthHour !== undefined ? SHICHEN_NAMES[profile.birthHour] || `${profile.birthHour}:00` : "请选择时辰（选填）"} />
                       </SelectTrigger>
                       <SelectContent>
                         {Array.from({ length: 24 }, (_, i) => (
@@ -235,6 +319,11 @@ export default function ProfilePage() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {profile.birthHour !== undefined && (
+                      <p className="text-xs text-purple-600">
+                        {SHICHEN_NAMES[profile.birthHour] || `${profile.birthHour}:00`}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -245,6 +334,7 @@ export default function ProfilePage() {
                     value={profile.birthPlace}
                     onChange={(value) => updateProfile('birthPlace', value)}
                     required
+                    disabled={!isEditing}
                   />
                 </div>
 
@@ -255,6 +345,7 @@ export default function ProfilePage() {
                     value={profile.residence}
                     onChange={(value) => updateProfile('residence', value)}
                     required
+                    disabled={!isEditing}
                   />
                 </div>
               </CardContent>
@@ -276,6 +367,8 @@ export default function ProfilePage() {
                       value={profile.nationality || ''}
                       onChange={(e) => updateProfile('nationality', e.target.value)}
                       placeholder="例如：中国"
+                      disabled={!isEditing}
+                      className={!isEditing ? 'bg-gray-50 text-gray-500' : ''}
                     />
                   </div>
                   <div className="space-y-2">
@@ -285,6 +378,8 @@ export default function ProfilePage() {
                       value={profile.ethnicity || ''}
                       onChange={(e) => updateProfile('ethnicity', e.target.value)}
                       placeholder="例如：汉族"
+                      disabled={!isEditing}
+                      className={!isEditing ? 'bg-gray-50 text-gray-500' : ''}
                     />
                   </div>
                   <div className="space-y-2">
@@ -294,6 +389,8 @@ export default function ProfilePage() {
                       value={profile.occupation || ''}
                       onChange={(e) => updateProfile('occupation', e.target.value)}
                       placeholder="例如：退休教师"
+                      disabled={!isEditing}
+                      className={!isEditing ? 'bg-gray-50 text-gray-500' : ''}
                     />
                   </div>
                   <div className="space-y-2">
@@ -303,6 +400,8 @@ export default function ProfilePage() {
                       value={profile.education || ''}
                       onChange={(e) => updateProfile('education', e.target.value)}
                       placeholder="小学、初中、高中、大专、大学..."
+                      disabled={!isEditing}
+                      className={!isEditing ? 'bg-gray-50 text-gray-500' : ''}
                     />
                   </div>
                 </div>
@@ -314,8 +413,9 @@ export default function ProfilePage() {
                     <Select
                       value={profile.maritalStatus || ''}
                       onValueChange={(value) => updateProfile('maritalStatus', value)}
+                      disabled={!isEditing}
                     >
-                      <SelectTrigger id="maritalStatus">
+                      <SelectTrigger id="maritalStatus" className={!isEditing ? 'bg-gray-50 text-gray-500' : ''}>
                         <SelectValue placeholder="请选择婚姻状况" />
                       </SelectTrigger>
                       <SelectContent>
@@ -339,6 +439,8 @@ export default function ProfilePage() {
                         daughters: profile.children?.daughters ?? 0
                       })}
                       placeholder="0"
+                      disabled={!isEditing}
+                      className={!isEditing ? 'bg-gray-50 text-gray-500' : ''}
                     />
                   </div>
                   <div className="space-y-2">
@@ -354,6 +456,8 @@ export default function ProfilePage() {
                         sons: profile.children?.sons ?? 0
                       })}
                       placeholder="0"
+                      disabled={!isEditing}
+                      className={!isEditing ? 'bg-gray-50 text-gray-500' : ''}
                     />
                   </div>
                 </div>
@@ -370,6 +474,8 @@ export default function ProfilePage() {
                       value={profile.height ?? ''}
                       onChange={(e) => updateProfile('height', e.target.value ? parseInt(e.target.value) : undefined)}
                       placeholder="例如：170"
+                      disabled={!isEditing}
+                      className={!isEditing ? 'bg-gray-50 text-gray-500' : ''}
                     />
                   </div>
                 </div>
@@ -383,6 +489,8 @@ export default function ProfilePage() {
                     onChange={(e) => updateProfile('appearanceFeatures', e.target.value)}
                     placeholder="例如：身材中等，头发花白，戴眼镜，面容和蔼..."
                     rows={3}
+                    disabled={!isEditing}
+                    className={!isEditing ? 'bg-gray-50 text-gray-500' : ''}
                   />
                   <p className="text-xs text-gray-500">描述您的外貌特征、体型、穿着风格等</p>
                 </div>
@@ -391,12 +499,21 @@ export default function ProfilePage() {
 
             {/* 保存按钮 */}
             <div className="flex justify-end gap-4">
-              <Link href="/rolecard">
-                <Button variant="outline">取消</Button>
-              </Link>
+              {/* 修改档案按钮 - 只有锁定后才可用 */}
+              {isLocked && (
+                <Button
+                  variant="outline"
+                  onClick={isEditing ? handleCancelEdit : handleEdit}
+                  className="gap-2"
+                >
+                  {isEditing ? '取消修改' : '修改档案'}
+                </Button>
+              )}
+
+              {/* 保存档案按钮 */}
               <Button
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || (isLocked && !hasChanges)}
                 className="gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg"
               >
                 {saving ? (

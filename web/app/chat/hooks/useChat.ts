@@ -1,5 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 
+// Check if user profile has complete birth info
+const checkBirthInfoComplete = (profile: UserProfile | null): boolean => {
+  if (!profile) return true // Assume complete if no data
+  return !!(
+    profile.birthDate &&
+    profile.birthHour !== undefined &&
+    profile.birthCalendar
+  )
+}
+
 interface Contact {
   targetUserId: string
   targetUserName: string
@@ -23,6 +33,12 @@ interface Message {
   error?: string    // 错误信息
 }
 
+interface UserProfile {
+  birthDate?: string
+  birthHour?: number
+  birthCalendar?: 'solar' | 'lunar'
+}
+
 export function useChat() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
@@ -30,6 +46,8 @@ export function useChat() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [hasCompleteBirthInfo, setHasCompleteBirthInfo] = useState(true)
 
   // 加载联系人列表
   const loadContacts = useCallback(async () => {
@@ -41,6 +59,25 @@ export function useChat() {
     const data = await res.json()
     if (data.success) {
       setContacts(data.contacts)
+    }
+  }, [])
+
+  // Load user profile to check birth info
+  const loadUserProfile = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/users/profile`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      const data = await res.json()
+      if (data.success && data.profile) {
+        const profileData = data.profile.profile || data.profile
+        setUserProfile(profileData)
+        setHasCompleteBirthInfo(checkBirthInfoComplete(profileData))
+      }
+    } catch (err) {
+      console.error('Failed to load user profile:', err)
     }
   }, [])
 
@@ -79,6 +116,42 @@ export function useChat() {
   // 选择联系人
   const selectContact = useCallback(async (contact: Contact) => {
     setSelectedContact(contact)
+
+    // Check if this is XiaoShuDong
+    const isXiaoShuDong = contact.targetUserId === 'xiaoshudong'
+
+    if (isXiaoShuDong) {
+      // Load user profile to check birth info status
+      await loadUserProfile()
+
+      // For XiaoShuDong, load conversation history from special endpoint
+      setMessages([])
+      setIsLoading(true)
+
+      try {
+        const token = localStorage.getItem('token')
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/xiaoshudong/history`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        const data = await res.json()
+        if (data.success && data.messages) {
+          setMessages(data.messages.map((msg: any) => ({
+            id: msg._id || msg.timestamp || `xsd_${Date.now()}`,
+            role: msg.role,
+            content: msg.content,
+            timestamp: new Date(msg.timestamp || msg.createdAt)
+          })))
+        }
+      } catch (err) {
+        console.error('加载小树洞历史失败:', err)
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
+
+    // Regular contact handling
     setMessages([])
     setIsLoading(true)
 
@@ -101,11 +174,14 @@ export function useChat() {
     } finally {
       setIsLoading(false)
     }
-  }, [preloadSession, loadMessages])
+  }, [preloadSession, loadMessages, loadUserProfile])
 
   // 发送消息
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || !selectedContact) return
+
+    // Check if this is XiaoShuDong
+    const isXiaoShuDong = selectedContact.targetUserId === 'xiaoshudong'
 
     // 乐观更新
     const tempId = `temp_${Date.now()}`
@@ -120,42 +196,61 @@ export function useChat() {
     setIsLoading(true)
 
     try {
-      // 确保有会话
-      let sid = sessionId
-      if (!sid) {
+      let data: any
+
+      if (isXiaoShuDong) {
+        // Send to XiaoShuDong API
         const token = localStorage.getItem('token')
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/chat/sessions/by-code`,
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/xiaoshudong/message`,
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`
             },
-            body: JSON.stringify({ targetUniqueCode: selectedContact.targetUniqueCode })
+            body: JSON.stringify({ message: content })
           }
         )
-        const data = await res.json()
-        if (data.success) {
-          sid = data.session.sessionId
-          setSessionId(sid)
+        data = await res.json()
+      } else {
+        // 确保有会话
+        let sid = sessionId
+        if (!sid) {
+          const token = localStorage.getItem('token')
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/chat/sessions/by-code`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({ targetUniqueCode: selectedContact.targetUniqueCode })
+            }
+          )
+          const sessionData = await res.json()
+          if (sessionData.success) {
+            sid = sessionData.session.sessionId
+            setSessionId(sid)
+          }
         }
-      }
 
-      // 发送消息
-      const token = localStorage.getItem('token')
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/chat/sessions/${sid}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({ message: content })
-        }
-      )
-      const data = await res.json()
+        // 发送消息
+        const token = localStorage.getItem('token')
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/chat/sessions/${sid}/messages`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ message: content })
+          }
+        )
+        data = await res.json()
+      }
 
       if (data.success) {
         // 移除临时消息，添加真实用户消息
@@ -169,37 +264,47 @@ export function useChat() {
           }]
         })
 
-        // 使用后端返回的分割后的句子（如果有）
-        const sentences = data.sentences || [data.message || data.response]
+        // Use backend response for AI reply
+        const response = data.response || data.message
 
-        // 逐句添加AI消息，每句间隔1-2秒
-        let currentIndex = 0
+        if (isXiaoShuDong && data.sentences && data.sentences.length > 0) {
+          // 逐句显示 AI 回复 (小树洞)
+          const sentences = data.sentences
+          let currentIndex = 0
 
-        const addNextSentence = () => {
-          if (currentIndex >= sentences.length) {
-            return
+          const addNextSentence = () => {
+            if (currentIndex >= sentences.length) return
+
+            setMessages(prev => [...prev, {
+              id: `ai_${Date.now()}_${currentIndex}`,
+              role: 'assistant' as const,
+              content: sentences[currentIndex],
+              timestamp: new Date()
+            }])
+
+            currentIndex++
+
+            if (currentIndex < sentences.length) {
+              const delay = 1000 + Math.random() * 1000  // 1-2秒间隔
+              setTimeout(addNextSentence, delay)
+            }
           }
 
+          const initialDelay = 1000 + Math.random() * 1000
+          setTimeout(addNextSentence, initialDelay)
+        } else {
+          // 普通 AI 角色卡对话 - 直接显示完整回复
           setMessages(prev => [...prev, {
-            id: `ai_${Date.now()}_${currentIndex}`,
+            id: `ai_${Date.now()}`,
             role: 'assistant' as const,
-            content: sentences[currentIndex],
+            content: response,
             timestamp: new Date()
           }])
-
-          currentIndex++
-
-          if (currentIndex < sentences.length) {
-            const delay = 1000 + Math.random() * 1000
-            setTimeout(addNextSentence, delay)
-          }
         }
 
-        // 第一句延迟1-2秒后显示
-        const initialDelay = 1000 + Math.random() * 1000
-        setTimeout(addNextSentence, initialDelay)
-
-        await loadContacts()
+        if (!isXiaoShuDong) {
+          await loadContacts()
+        }
       } else {
         // 消息发送失败 - 标记用户消息为失败，不保存到历史
         console.error('消息发送失败:', data.error)
@@ -261,6 +366,7 @@ export function useChat() {
     selectContact,
     sendMessage,
     endSession,
-    setSelectedContact
+    setSelectedContact,
+    hasCompleteBirthInfo
   }
 }

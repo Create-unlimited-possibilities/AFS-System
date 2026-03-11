@@ -1,14 +1,62 @@
 import User from './model.js';
 import bcrypt from 'bcryptjs';
 import DualStorage from '../../core/storage/dual.js';
+import ziweiChartService from '../ziwei/services/ziweiChartService.js';
 
 // 创建 DualStorage 实例
 const dualStorage = new DualStorage();
 
 class UserService {
+  /**
+   * Check if user profile is complete for ziwei chart generation
+   * @param {Object} profile - User profile object
+   * @returns {boolean} True if profile has all required fields
+   */
+  isProfileCompleteForZiwei(profile) {
+    return !!(
+      profile &&
+      profile.gender &&
+      profile.birthDate &&
+      profile.birthHour !== undefined &&
+      profile.birthHour !== null
+    );
+  }
+
+  /**
+   * Trigger ziwei chart generation for a user
+   * @param {string} userId - User ID
+   * @param {Object} profile - User profile with birth data
+   * @returns {Promise<void>}
+   */
+  async triggerZiweiGeneration(userId, profile) {
+    try {
+      // Check if chart already exists
+      const hasExistingChart = await ziweiChartService.hasChart(userId);
+      if (hasExistingChart) {
+        console.log(`[UserService] Ziwei chart already exists for user ${userId}, skipping generation`);
+        return;
+      }
+
+      // Determine calendar type: 'solar' -> true, 'lunar' -> false
+      const isSolar = profile.birthCalendar !== 'lunar';
+
+      console.log(`[UserService] Auto-generating ziwei chart for user ${userId} (${isSolar ? '阳历' : '阴历'})`);
+      await ziweiChartService.generateChart(userId, {
+        gender: profile.gender,
+        birthDate: profile.birthDate,
+        birthHour: profile.birthHour,
+        isSolar
+      });
+      console.log(`[UserService] Ziwei chart auto-generated for user ${userId}`);
+    } catch (error) {
+      console.error('[UserService] Failed to auto-generate ziwei chart:', error);
+      // Chart generation failure doesn't affect main flow
+    }
+  }
+
   async getAllUsers(filters = {}) {
     const { page = 1, limit = 10, search, role, isActive } = filters;
-    
+
     const query = {};
     if (search) {
       query.$or = [
@@ -183,6 +231,11 @@ class UserService {
     } catch (error) {
       console.error('[UserService] 同步档案到文件系统失败:', error);
       // 文件系统存储失败不影响主流程
+    }
+
+    // Auto-generate ziwei chart when user completes birth data
+    if (this.isProfileCompleteForZiwei(user.profile)) {
+      await this.triggerZiweiGeneration(userId, user.profile);
     }
 
     return user;

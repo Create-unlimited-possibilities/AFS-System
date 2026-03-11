@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Send, Loader2, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Send, Loader2, AlertCircle, Lightbulb } from 'lucide-react'
+import Link from 'next/link'
 
 interface Contact {
+  targetUserId: string
   targetUserName: string
   targetUniqueCode: string
 }
@@ -14,9 +16,9 @@ interface Message {
   content: string
   timestamp: Date
   pending?: boolean
-  streaming?: boolean  // 正在流式输出中
-  failed?: boolean     // 发送失败
-  error?: string       // 错误信息
+  streaming?: boolean
+  failed?: boolean
+  error?: string
 }
 
 interface ChatPanelProps {
@@ -26,18 +28,22 @@ interface ChatPanelProps {
   onSend: (message: string) => void
   onBack?: () => void
   isMobile?: boolean
+  hasCompleteBirthInfo?: boolean
 }
 
 /**
- * 格式化消息内容，将括号内的动作/状态描述用特殊样式显示
- * 例如：(微笑着说)你好啊 → <span class="action">(微笑着说)</span>你好啊
+ * Format message content, styling parenthetical actions/descriptions
+ * Example: (微笑着说)你好啊
  */
 function formatMessageContent(content: string) {
-  // 匹配中文括号和英文括号
+  // Guard against undefined/null content
+  if (!content || typeof content !== 'string') {
+    return <span></span>
+  }
+
   const parts = content.split(/([（(][^）)]*[）)])/g)
 
   return parts.map((part, index) => {
-    // 检查是否是括号内容
     if (/^[（(][^）)]*[）)]$/.test(part)) {
       return (
         <span key={index} className="text-gray-400 italic text-xs">
@@ -55,7 +61,8 @@ export function ChatPanel({
   isLoading,
   onSend,
   onBack,
-  isMobile
+  isMobile,
+  hasCompleteBirthInfo = true
 }: ChatPanelProps) {
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -70,11 +77,35 @@ export function ChatPanel({
     setInput('')
   }
 
-  // 未选择用户
+  // Check if this is XiaoShuDong
+  const isXiaoShuDong = contact?.targetUserId === 'xiaoshudong'
+
+  // Get username from localStorage for welcome message
+  const getUsername = () => {
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('user')
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr)
+          return user.username || '朋友'
+        } catch {
+          return '朋友'
+        }
+      }
+    }
+    return '朋友'
+  }
+
+  // Generate welcome message for XiaoShuDong
+  const getWelcomeMessage = () => {
+    return `HI，${getUsername()}，今天有什么心事要和我分享吗？`
+  }
+
+  // No contact selected
   if (!contact) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-50">
-        <p className="text-gray-400">请选择左侧用户开始对话</p>
+        <p className="text-gray-400">Please select a contact to start chatting</p>
       </div>
     )
   }
@@ -82,28 +113,65 @@ export function ChatPanel({
   return (
     <div className="flex-1 w-full md:w-auto flex flex-col bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center shrink-0">
+      <header className={`px-4 py-3 flex items-center shrink-0 ${
+        isXiaoShuDong
+          ? 'bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-200'
+          : 'bg-white border-b border-gray-200'
+      }`}>
         {isMobile && onBack && (
           <button onClick={onBack} className="mr-3 p-1">
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </button>
         )}
         <div>
-          <h1 className="font-bold text-gray-900">{contact.targetUserName}</h1>
-          <p className="text-xs text-gray-500">#{contact.targetUniqueCode}</p>
+          <h1 className={`font-bold ${isXiaoShuDong ? 'text-purple-900' : 'text-gray-900'}`}>
+            {contact.targetUserName}
+          </h1>
+          <p className={`text-xs ${isXiaoShuDong ? 'text-purple-600' : 'text-gray-500'}`}>
+            #{contact.targetUniqueCode}
+          </p>
         </div>
       </header>
 
+      {/* Birth Info Reminder for XiaoShuDong */}
+      {isXiaoShuDong && !hasCompleteBirthInfo && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center gap-2 shrink-0">
+          <Lightbulb className="w-4 h-4 text-amber-500 flex-shrink-0" />
+          <p className="text-xs text-amber-700 flex-1">
+            Complete your birth info for personalized advice
+          </p>
+          <Link
+            href="/profile"
+            className="text-xs bg-amber-100 hover:bg-amber-200 text-amber-700 px-2 py-1 rounded-full transition-colors"
+          >
+            Complete
+          </Link>
+        </div>
+      )}
+
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className={`flex-1 overflow-y-auto p-4 space-y-3 ${
+        isXiaoShuDong ? 'bg-gradient-to-b from-purple-50/30 to-pink-50/30' : ''
+      }`}>
+        {/* XiaoShuDong welcome message */}
+        {isXiaoShuDong && messages.length === 0 && (
+          <div className="flex justify-start">
+            <div className="bg-gradient-to-br from-purple-100 to-pink-100 border border-purple-200 rounded-2xl px-4 py-3 max-w-[80%]">
+              <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                {getWelcomeMessage()}
+              </p>
+            </div>
+          </div>
+        )}
+
         {messages.map((msg) => (
           <div
             key={msg.id}
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-1`}
           >
-            {/* 失败警告图标 - 用户消息左侧 */}
+            {/* Failed warning icon - user message left */}
             {msg.role === 'user' && msg.failed && (
-              <div className="flex-shrink-0 mb-1" title={msg.error || '发送失败'}>
+              <div className="flex-shrink-0 mb-1" title={msg.error || 'Send failed'}>
                 <AlertCircle className="w-5 h-5 text-red-500" />
               </div>
             )}
@@ -112,7 +180,7 @@ export function ChatPanel({
               className={`max-w-[75%] rounded-2xl px-4 py-2 ${
                 msg.role === 'user'
                   ? msg.failed
-                    ? 'bg-gray-300 text-gray-600'  // 失败消息灰色显示
+                    ? 'bg-gray-300 text-gray-600'
                     : 'bg-gradient-to-r from-orange-500 to-orange-600 text-black'
                   : 'bg-white border border-gray-200 text-black'
               }`}
@@ -120,13 +188,13 @@ export function ChatPanel({
               <p className="text-sm whitespace-pre-wrap">{formatMessageContent(msg.content)}</p>
               <span className="text-xs text-gray-500 mt-1 block">
                 {msg.timestamp.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-                {msg.failed && <span className="text-red-500 ml-1">· 发送失败</span>}
+                {msg.failed && <span className="text-red-500 ml-1">· Failed</span>}
               </span>
             </div>
 
-            {/* 失败警告图标 - 助手消息右侧（一般不会出现，但保留） */}
+            {/* Failed warning icon - assistant message right */}
             {msg.role === 'assistant' && msg.failed && (
-              <div className="flex-shrink-0 mb-1" title={msg.error || '发送失败'}>
+              <div className="flex-shrink-0 mb-1" title={msg.error || 'Send failed'}>
                 <AlertCircle className="w-5 h-5 text-red-500" />
               </div>
             )}
@@ -135,9 +203,19 @@ export function ChatPanel({
 
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-white border border-gray-200 rounded-2xl px-4 py-2 flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
-              <span className="text-sm text-gray-500">正在输入中...</span>
+            <div className={`rounded-2xl px-4 py-2 flex items-center gap-2 ${
+              isXiaoShuDong
+                ? 'bg-purple-100 border border-purple-200'
+                : 'bg-white border border-gray-200'
+            }`}>
+              <Loader2 className={`w-4 h-4 animate-spin ${
+                isXiaoShuDong ? 'text-purple-500' : 'text-orange-500'
+              }`} />
+              <span className={`text-sm ${
+                isXiaoShuDong ? 'text-purple-700' : 'text-gray-500'
+              }`}>
+                {isXiaoShuDong ? '正在思考...' : '正在输入中...'}
+              </span>
             </div>
           </div>
         )}
@@ -150,7 +228,7 @@ export function ChatPanel({
         <div className="flex items-center gap-2">
           <input
             type="text"
-            placeholder="输入消息..."
+            placeholder="Type a message..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => {

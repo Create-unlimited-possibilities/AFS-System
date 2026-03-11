@@ -26,17 +26,19 @@ export default function UsersPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filters, setFilters] = useState<UserFilters>({
     page: 1,
-    limit: 10,
+    limit: 20,
     sortBy: 'createdAt',
     sortOrder: 'desc',
   });
 
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 20,
     total: 0,
     totalPages: 0,
   });
+
+  const [activeUserCount, setActiveUserCount] = useState(0);
 
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
@@ -63,6 +65,12 @@ export default function UsersPage() {
         setUsers(result.users);
         if (result.pagination) {
           setPagination(result.pagination);
+        }
+        // Use the activeUserCount from API if available, otherwise count from current page
+        if (result.activeUserCount !== undefined) {
+          setActiveUserCount(result.activeUserCount);
+        } else {
+          setActiveUserCount(result.users.filter(u => u.isActive).length);
         }
       }
     } catch (error) {
@@ -324,7 +332,7 @@ export default function UsersPage() {
           <CardHeader className="pb-2">
             <CardDescription>激活用户</CardDescription>
             <CardTitle className="text-3xl text-green-600">
-              {users.filter(u => u.isActive).length}
+              {activeUserCount}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -332,7 +340,7 @@ export default function UsersPage() {
           <CardHeader className="pb-2">
             <CardDescription>禁用用户</CardDescription>
             <CardTitle className="text-3xl text-red-600">
-              {users.filter(u => !u.isActive).length}
+              {pagination.total - activeUserCount}
             </CardTitle>
           </CardHeader>
         </Card>

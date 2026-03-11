@@ -16,6 +16,8 @@ import {
   XCircle,
   Clock,
   UserPlus,
+  Sparkles,
+  Trash2,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -111,6 +113,15 @@ export default function AdminDashboardPage() {
       href: '/admin/conversations',
       permission: 'conversation:view',
     },
+    {
+      title: '回收站',
+      value: dashboardStats?.pendingDeleteItems || 0,
+      description: '待删除项目数',
+      icon: Trash2,
+      color: 'from-red-500 to-red-600',
+      href: '/admin/recycle-bin',
+      permission: 'recyclebin:view',
+    },
   ];
 
   const quickActions = [
@@ -183,7 +194,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {filteredStats.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -219,7 +230,7 @@ export default function AdminDashboardPage() {
           <CardDescription>各服务组件运行状态</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             {/* MongoDB */}
             <div className="flex items-center justify-between p-3 rounded-lg border">
               <div className="flex items-center gap-2">
@@ -290,7 +301,30 @@ export default function AdminDashboardPage() {
                 <Badge variant="destructive">错误</Badge>
               )}
             </div>
+
+            {/* Ziwei Model (命理模型) */}
+            <div className="flex items-center justify-between p-3 rounded-lg border">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-pink-500" />
+                <span className="font-medium">命理模型</span>
+              </div>
+              {isCheckingStatus ? (
+                <Badge className="bg-yellow-100 text-yellow-700">检查中...</Badge>
+              ) : systemStatus?.ziweiModel?.registered ? (
+                <Badge className="bg-green-100 text-green-700">
+                  已注册
+                </Badge>
+              ) : (
+                <Badge variant="destructive">未注册</Badge>
+              )}
+            </div>
           </div>
+
+          {systemStatus?.ziweiModel?.registered && systemStatus?.ziweiModel?.size && (
+            <div className="mt-4 text-sm text-gray-500">
+              命理模型大小: {(systemStatus.ziweiModel.size / (1024 ** 3)).toFixed(2)} GB
+            </div>
+          )}
 
           {systemStatus?.vectorStore && (
             <div className="mt-4 text-sm text-gray-500">
@@ -326,13 +360,21 @@ export default function AdminDashboardPage() {
       </Card>
 
       {/* Recent Activity */}
-      {recentActivities.length > 0 && (
-        <Card>
-          <CardHeader>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
             <CardTitle>最近活动</CardTitle>
             <CardDescription>系统中的最新操作记录</CardDescription>
-          </CardHeader>
-          <CardContent>
+          </div>
+          <Link href="/admin/activity-logs">
+            <Button variant="ghost" size="sm" className="text-orange-600 hover:text-orange-700">
+              查看全部
+              <ArrowRight className="ml-1 w-4 h-4" />
+            </Button>
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {recentActivities.length > 0 ? (
             <div className="space-y-3">
               {recentActivities.map((activity) => (
                 <div
@@ -353,9 +395,11 @@ export default function AdminDashboardPage() {
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <p className="text-sm text-gray-500 text-center py-4">暂无活动记录</p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* System Info */}
       <Card>
