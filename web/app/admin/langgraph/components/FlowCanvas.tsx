@@ -1,7 +1,7 @@
 // web/app/admin/langgraph/components/FlowCanvas.tsx
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo, memo } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -22,7 +22,7 @@ interface FlowCanvasProps {
   onNodeClick: (node: LangGraphNode) => void;
 }
 
-// Branch color configuration - each branch has distinct color
+// Branch color configuration
 const BRANCH_COLORS: Record<string, { color: string; label: string }> = {
   '普通聊天': { color: '#22c55e', label: '普通聊天' },
   '倾诉模式': { color: '#8b5cf6', label: '倾诉模式' },
@@ -33,16 +33,15 @@ const BRANCH_COLORS: Record<string, { color: string; label: string }> = {
   '进入分析': { color: '#f97316', label: '进入分析' },
 };
 
-// Get branch color from edge label
 function getBranchColor(label: string): string {
   if (label && BRANCH_COLORS[label]) {
     return BRANCH_COLORS[label].color;
   }
-  return '#6b7280'; // Gray for unlabeled
+  return '#6b7280';
 }
 
-// Custom node component
-function CustomNode({ data, selected }: { data: any; selected: boolean }) {
+// Custom node component - memoized to prevent re-renders
+const CustomNode = memo(function CustomNode({ data, selected }: { data: any; selected: boolean }) {
   const hasStaticPrompt = data.promptType === 'static';
   const hasDynamicPrompt = data.promptType === 'dynamic';
   const hasLLMConfig = data.llmEnabled;
@@ -76,19 +75,20 @@ function CustomNode({ data, selected }: { data: any; selected: boolean }) {
       </div>
     </div>
   );
-}
+});
 
-// Define nodeTypes outside component to prevent recreation
+// Define nodeTypes outside component - STABLE REFERENCE
 const nodeTypes: NodeTypes = {
   custom: CustomNode,
 };
 
-// Dynamic Branch Legend - shows branches from actual edges
-function BranchLegend({ edges }: { edges: LangGraphEdge[] }) {
-  // Extract unique branch labels from edges
-  const branchLabels = [...new Set(edges.map(e => e.label).filter(Boolean))];
+// Dynamic Branch Legend
+const BranchLegend = memo(function BranchLegend({ edges }: { edges: LangGraphEdge[] }) {
+  const branchLabels = useMemo(() =>
+    [...new Set(edges.map(e => e.label).filter(Boolean))],
+    [edges]
+  );
 
-  // Only show main branches that exist in this flow
   const mainBranchPriority = ['普通聊天', '倾诉模式', '算命预测'];
   const displayedBranches = mainBranchPriority.filter(b => branchLabels.includes(b));
 
@@ -113,8 +113,8 @@ function BranchLegend({ edges }: { edges: LangGraphEdge[] }) {
         })}
         <div className="border-t border-gray-200 mt-2 pt-2">
           <div className="flex items-center gap-2">
-            <svg width="24" height="4" className="text-gray-400">
-              <line x1="0" y1="2" x2="24" y2="2" stroke="currentColor" strokeWidth="2" strokeDasharray="4 3" />
+            <svg width="24" height="4">
+              <line x1="0" y1="2" x2="24" y2="2" stroke="#9ca3af" strokeWidth="2" strokeDasharray="4 3" />
             </svg>
             <span className="text-xs text-gray-500">条件分支</span>
           </div>
@@ -126,29 +126,16 @@ function BranchLegend({ edges }: { edges: LangGraphEdge[] }) {
       </div>
     </div>
   );
-}
+});
 
 export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCanvasProps) {
-  const [flowNodes, setFlowNodes] = useState<Node[]>([]);
-  const [flowEdges, setFlowEdges] = useState<Edge[]>([]);
   const [highlightedBranch, setHighlightedBranch] = useState<string | null>(null);
 
-  // Debug logging
-  useEffect(() => {
-    console.log('[FlowCanvas] Props - nodes:', nodes?.length, 'edges:', edges?.length);
-    if (edges?.length > 0) {
-      console.log('[FlowCanvas] Edge samples:', edges.slice(0, 3));
-    }
-  }, [nodes, edges]);
-
-  // Update nodes when props change
-  useEffect(() => {
-    if (!nodes || nodes.length === 0) {
-      setFlowNodes([]);
-      return;
-    }
-
-    const converted: Node[] = nodes.map((node) => ({
+  // Convert nodes to ReactFlow format - memoized
+  const flowNodes: Node[] = useMemo(() => {
+    if (!nodes || nodes.length === 0) return [];
+    console.log('[FlowCanvas] Converting nodes:', nodes.length);
+    return nodes.map((node) => ({
       id: node.nodeId,
       type: 'custom',
       position: { x: node.position?.x || 0, y: node.position?.y || 0 },
@@ -159,22 +146,15 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
         llmEnabled: node.llmEnabled,
       },
     }));
-    console.log('[FlowCanvas] Converted nodes:', converted.length);
-    setFlowNodes(converted);
   }, [nodes]);
 
-  // Update edges with branch-specific styling
-  useEffect(() => {
-    if (!edges || edges.length === 0) {
-      setFlowEdges([]);
-      return;
-    }
-
-    // Filter out edges with invalid source/target
+  // Convert edges to ReactFlow format - memoized
+  const flowEdges: Edge[] = useMemo(() => {
+    if (!edges || edges.length === 0) return [];
     const validEdges = edges.filter(edge => edge.source && edge.target);
-    console.log('[FlowCanvas] Valid edges:', validEdges.length, 'of', edges.length);
+    console.log('[FlowCanvas] Converting edges:', validEdges.length, 'of', edges.length);
 
-    const converted: Edge[] = validEdges.map((edge, index) => {
+    return validEdges.map((edge, index) => {
       const isConditional = edge.conditionType === 'conditional';
       const branchColor = edge.label ? getBranchColor(edge.label) : '#6b7280';
       const isHighlighted = highlightedBranch === edge.label;
@@ -192,7 +172,6 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
         labelBgStyle: { fill: '#fff', fillOpacity: 0.95 },
         labelBgPadding: [6, 3] as [number, number],
         labelBgBorderRadius: 4,
-        // Animate highlighted conditional edges
         animated: isConditional && isHighlighted,
         markerEnd: {
           type: MarkerType.ArrowClosed,
@@ -201,23 +180,22 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
         style: {
           stroke: branchColor,
           strokeWidth: isHighlighted ? 3.5 : 2.5,
-          // Dashed line for conditional edges (proper format)
           strokeDasharray: isConditional ? '5 5' : 'none',
           opacity: highlightedBranch && !isHighlighted && edge.label ? 0.3 : 1,
         },
       };
     });
-
-    console.log('[FlowCanvas] Converted edges:', converted.length);
-    setFlowEdges(converted);
   }, [edges, highlightedBranch]);
 
-  // Auto-cycle through branches to highlight them
+  // Auto-cycle through branches
   useEffect(() => {
-    if (!edges || edges.length === 0) return;
+    if (!edges || edges.length === 0) {
+      setHighlightedBranch(null);
+      return;
+    }
 
     const branches = [...new Set(edges.map(e => e.label).filter(Boolean))];
-    console.log('[FlowCanvas] Branches found:', branches);
+    console.log('[FlowCanvas] Branches:', branches);
 
     if (branches.length <= 1) {
       setHighlightedBranch(null);
@@ -230,7 +208,7 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
     const interval = setInterval(() => {
       currentIndex = (currentIndex + 1) % branches.length;
       setHighlightedBranch(branches[currentIndex]);
-    }, 2500); // Switch every 2.5 seconds
+    }, 2500);
 
     return () => clearInterval(interval);
   }, [edges]);
@@ -245,7 +223,6 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
     [nodes, onNodeClick]
   );
 
-  // Show placeholder if no nodes
   if (!nodes || nodes.length === 0) {
     return (
       <div className="w-full h-full flex items-center justify-center text-gray-400">
