@@ -392,6 +392,16 @@ router.delete('/questionnaires/:id', (req, res) => adminController.deleteQuestio
 router.get('/questions', (req, res) => adminController.getQuestions(req, res));
 
 /**
+ * @route   GET /api/admin/questions/export
+ * @desc    Export questions with optional filters
+ * @access  Admin
+ * @query   role - Filter by role (elder, family, friend)
+ * @query   layer - Filter by layer (basic, emotional)
+ * @query   format - Export format (json, docx)
+ */
+router.get('/questions/export', (req, res) => adminController.exportQuestions(req, res));
+
+/**
  * @route   GET /api/admin/questions/:id
  * @desc    Get question by ID
  * @access  Admin
@@ -443,14 +453,6 @@ router.patch('/questions/:id/status', (req, res) => adminController.toggleQuesti
  */
 router.post('/questions/batch-import', (req, res) => adminController.batchImportQuestions(req, res));
 
-/**
- * @route   GET /api/admin/questions/export
- * @desc    Export questions with optional filters
- * @access  Admin
- * @query   role - Filter by role (elder, family, friend)
- * @query   layer - Filter by layer (basic, emotional)
- */
-router.get('/questions/export', (req, res) => adminController.exportQuestions(req, res));
 
 // ======== Memory Management ========
 /**
@@ -903,5 +905,111 @@ router.get('/activity-logs/stats', (req, res) => adminController.getActivityLogS
  * @query   format - Export format (json or csv)
  */
 router.get('/activity-logs/export', (req, res) => adminController.exportActivityLogs(req, res));
+
+// ============================================
+// Role Card LLM Configuration Routes
+// ============================================
+
+/**
+ * @route   GET /api/admin/rolecard/config
+ * @desc    Get role card generation LLM configuration
+ * @access  Admin
+ */
+router.get('/rolecard/config', async (req, res) => {
+  try {
+    const RoleCardLLMConfig = (await import('../rolecard/configModel.js')).default;
+    const config = await RoleCardLLMConfig.getOrCreateDefault();
+
+    res.json({
+      success: true,
+      config: {
+        coreExtraction: config.coreExtraction,
+        coreCompression: config.coreCompression,
+        relationExtraction: config.relationExtraction,
+        relationCompression: config.relationCompression,
+        trustAnalysis: config.trustAnalysis,
+        updatedAt: config.updatedAt
+      }
+    });
+  } catch (error) {
+    logger.error('[AdminRoute] 获取角色卡LLM配置失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route   PUT /api/admin/rolecard/config
+ * @desc    Update role card generation LLM configuration
+ * @access  Admin
+ */
+router.put('/rolecard/config', async (req, res) => {
+  try {
+    const RoleCardLLMConfig = (await import('../rolecard/configModel.js')).default;
+    const updates = req.body;
+
+    const config = await RoleCardLLMConfig.getOrCreateDefault();
+
+    const allowedFields = [
+      'coreExtraction', 'coreCompression',
+      'relationExtraction', 'relationCompression', 'trustAnalysis'
+    ];
+
+    for (const field of allowedFields) {
+      if (updates[field]) {
+        config[field] = { ...config[field].toObject(), ...updates[field] };
+      }
+    }
+
+    config.updatedAt = new Date();
+    await config.save();
+
+    logger.info('[AdminRoute] 角色卡LLM配置已更新');
+
+    res.json({ success: true, message: '配置已保存', config });
+  } catch (error) {
+    logger.error('[AdminRoute] 更新角色卡LLM配置失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/admin/rolecard/config/models
+ * @desc    Get available models for role card generation
+ * @access  Admin
+ */
+router.get('/rolecard/config/models', async (req, res) => {
+  try {
+    const axios = (await import('axios')).default;
+    const { llmConfig } = await import('../../core/llm/config.js');
+
+    let ollamaModels = [];
+    try {
+      const ollamaConfig = llmConfig.getOllamaConfig();
+      const response = await axios.get(`${ollamaConfig.baseUrl}/api/tags`, { timeout: 5000 });
+      ollamaModels = (response.data.models || []).map((m) => ({
+        name: m.name,
+        size: m.size
+      }));
+    } catch (error) {
+      logger.warn('[AdminRoute] 获取Ollama模型失败:', error);
+    }
+
+    const apiModels = {
+      deepseek: [
+        { name: 'deepseek-chat', description: 'DeepSeek Chat (通用对话)' },
+        { name: 'deepseek-reasoner', description: 'DeepSeek Reasoner (推理增强)' }
+      ],
+      openai: [
+        { name: 'gpt-4o', description: 'GPT-4o' },
+        { name: 'gpt-4o-mini', description: 'GPT-4o Mini' }
+      ]
+    };
+
+    res.json({ success: true, models: { ollama: ollamaModels, api: apiModels } });
+  } catch (error) {
+    logger.error('[AdminRoute] 获取模型列表失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 export default router;
