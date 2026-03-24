@@ -28,7 +28,7 @@ export default function LangGraphPage() {
     resetFlowConfig,
   } = useLangGraph();
 
-  const [activeFlowId, setActiveFlowId] = useState<string>('xiaoshudong');
+  const [activeFlowId, setActiveFlowId] = useState<string>('rolecard');
   const [selectedNode, setSelectedNode] = useState<LangGraphNode | null>(null);
 
   useEffect(() => {

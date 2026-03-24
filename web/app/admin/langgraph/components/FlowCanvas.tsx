@@ -1,7 +1,7 @@
 // web/app/admin/langgraph/components/FlowCanvas.tsx
 'use client';
 
-import { useCallback, useEffect, useState, useMemo, memo } from 'react';
+import { useCallback, useMemo, memo } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -129,8 +129,6 @@ const BranchLegend = memo(function BranchLegend({ edges }: { edges: LangGraphEdg
 });
 
 export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCanvasProps) {
-  const [highlightedBranch, setHighlightedBranch] = useState<string | null>(null);
-
   // Convert nodes to ReactFlow format - memoized
   const flowNodes: Node[] = useMemo(() => {
     if (!nodes || nodes.length === 0) return [];
@@ -149,6 +147,8 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
   }, [nodes]);
 
   // Convert edges to ReactFlow format - memoized
+  // NOTE: highlightedBranch is intentionally NOT in dependencies to prevent edge recreation
+  // Highlight state is handled via CSS classes instead
   const flowEdges: Edge[] = useMemo(() => {
     if (!edges || edges.length === 0) return [];
     const validEdges = edges.filter(edge => edge.source && edge.target);
@@ -157,7 +157,6 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
     return validEdges.map((edge, index) => {
       const isConditional = edge.conditionType === 'conditional';
       const branchColor = edge.label ? getBranchColor(edge.label) : '#6b7280';
-      const isHighlighted = highlightedBranch === edge.label;
 
       return {
         id: `edge-${index}`,
@@ -172,45 +171,20 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
         labelBgStyle: { fill: '#fff', fillOpacity: 0.95 },
         labelBgPadding: [6, 3] as [number, number],
         labelBgBorderRadius: 4,
-        animated: isConditional && isHighlighted,
+        animated: isConditional, // Simplified - always animate conditional edges
         markerEnd: {
           type: MarkerType.ArrowClosed,
           color: branchColor,
         },
         style: {
           stroke: branchColor,
-          strokeWidth: isHighlighted ? 3.5 : 2.5,
+          strokeWidth: 2.5,
           strokeDasharray: isConditional ? '5 5' : 'none',
-          opacity: highlightedBranch && !isHighlighted && edge.label ? 0.3 : 1,
         },
+        // Store branch label as data for potential CSS styling
+        data: { branchLabel: edge.label, isConditional },
       };
     });
-  }, [edges, highlightedBranch]);
-
-  // Auto-cycle through branches
-  useEffect(() => {
-    if (!edges || edges.length === 0) {
-      setHighlightedBranch(null);
-      return;
-    }
-
-    const branches = [...new Set(edges.map(e => e.label).filter(Boolean))];
-    console.log('[FlowCanvas] Branches:', branches);
-
-    if (branches.length <= 1) {
-      setHighlightedBranch(null);
-      return;
-    }
-
-    let currentIndex = 0;
-    setHighlightedBranch(branches[0]);
-
-    const interval = setInterval(() => {
-      currentIndex = (currentIndex + 1) % branches.length;
-      setHighlightedBranch(branches[currentIndex]);
-    }, 2500);
-
-    return () => clearInterval(interval);
   }, [edges]);
 
   const onNodeClickHandler = useCallback(
@@ -221,6 +195,19 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
       }
     },
     [nodes, onNodeClick]
+  );
+
+  // Memoize MiniMap nodeColor to prevent React Flow warning
+  const minimapNodeColor = useCallback(
+    (node: Node) => {
+      if (node.id === selectedNodeId) return '#f97316';
+      const nodeData = nodes.find(n => n.nodeId === node.id);
+      if (nodeData && (nodeData.promptType !== 'none' || nodeData.llmEnabled)) {
+        return '#22c55e';
+      }
+      return '#9ca3af';
+    },
+    [nodes, selectedNodeId]
   );
 
   if (!nodes || nodes.length === 0) {
@@ -250,14 +237,7 @@ export function FlowCanvas({ nodes, edges, selectedNodeId, onNodeClick }: FlowCa
         <Background color="#e5e7eb" gap={16} />
         <Controls />
         <MiniMap
-          nodeColor={(node) => {
-            if (node.id === selectedNodeId) return '#f97316';
-            const nodeData = nodes.find(n => n.nodeId === node.id);
-            if (nodeData && (nodeData.promptType !== 'none' || nodeData.llmEnabled)) {
-              return '#22c55e';
-            }
-            return '#9ca3af';
-          }}
+          nodeColor={minimapNodeColor}
           maskColor="rgba(0, 0, 0, 0.1)"
         />
       </ReactFlow>
