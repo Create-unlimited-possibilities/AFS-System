@@ -208,6 +208,9 @@ export const rolecardDefault = {
     { source: 'listening_phase', target: 'output_formatter', conditionType: 'conditional', label: '继续倾听' },
     { source: 'chart_rag_retriever', target: 'fortune_generator', conditionType: 'always', label: '' },
     { source: 'fortune_generator', target: 'role_translator', conditionType: 'always', label: '' },
-    { source: 'role_translator', target: 'output_formatter', conditionType: 'always', label: '' }
+    { source: 'role_translator', target: 'output_formatter', conditionType: 'always', label: '' },
+
+    // 算命预测分支（直接进入分析，无倾听阶段）
+    { source: 'token_monitor', target: 'chart_rag_retriever', conditionType: 'conditional', label: '算命预测' }
   ]
 };
