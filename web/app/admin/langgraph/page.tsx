@@ -58,6 +58,7 @@ export default function LangGraphPage() {
     staticPrompt?: string;
     editableSection?: string;
     llmConfig?: any;
+    hideFortuneTerms?: boolean;
   }) => {
     if (!selectedNode) return;
 

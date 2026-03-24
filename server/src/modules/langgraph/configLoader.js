@@ -109,6 +109,46 @@ class LangGraphConfigLoader {
   }
 
   /**
+   * Get flow settings for a flow
+   * @param {string} flowId - Flow ID
+   * @returns {Object} Flow settings with resolved values
+   */
+  getFlowSettings(flowId) {
+    const config = this.configs[flowId];
+    if (!config || !config.flowSettings) {
+      return {};
+    }
+
+    // Convert Map to Object and resolve values
+    const settings = {};
+    const flowSettings = config.flowSettings;
+
+    // Handle both Map and plain object
+    if (flowSettings instanceof Map) {
+      for (const [key, setting] of flowSettings) {
+        settings[key] = setting.value !== undefined ? setting.value : setting.default;
+      }
+    } else {
+      for (const [key, setting] of Object.entries(flowSettings)) {
+        settings[key] = setting.value !== undefined ? setting.value : setting.default;
+      }
+    }
+
+    return settings;
+  }
+
+  /**
+   * Get a specific flow setting value
+   * @param {string} flowId - Flow ID
+   * @param {string} settingKey - Setting key
+   * @returns {any} Setting value or undefined
+   */
+  getFlowSetting(flowId, settingKey) {
+    const settings = this.getFlowSettings(flowId);
+    return settings[settingKey];
+  }
+
+  /**
    * Reload config from database (after update)
    */
   async reloadConfig(flowId) {

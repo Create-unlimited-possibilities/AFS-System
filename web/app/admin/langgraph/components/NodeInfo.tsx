@@ -3,6 +3,8 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Info, Database, Cpu, X } from 'lucide-react';
 import type { LangGraphNode, AvailableModels } from '../hooks/useLangGraph';
 import { ModelSelector } from './ModelSelector';
@@ -12,16 +14,18 @@ import { Button } from '@/components/ui/button';
 interface NodeInfoProps {
   node: LangGraphNode;
   models: AvailableModels | null;
-  onSave: (updates: { llmConfig?: any }) => void;
+  onSave: (updates: { llmConfig?: any; hideFortuneTerms?: boolean }) => void;
   onClose: () => void;
 }
 
 export function NodeInfo({ node, models, onSave, onClose }: NodeInfoProps) {
   const [llmConfig, setLlmConfig] = useState(node.llmConfig);
+  const [hideFortuneTerms, setHideFortuneTerms] = useState(node.hideFortuneTerms !== false);
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     setLlmConfig(node.llmConfig);
+    setHideFortuneTerms(node.hideFortuneTerms !== false);
     setHasChanges(false);
   }, [node]);
 
@@ -30,8 +34,20 @@ export function NodeInfo({ node, models, onSave, onClose }: NodeInfoProps) {
     setHasChanges(true);
   };
 
+  const handleHideFortuneTermsChange = (checked: boolean) => {
+    setHideFortuneTerms(checked);
+    setHasChanges(true);
+  };
+
   const handleSave = () => {
-    onSave({ llmConfig });
+    const updates: any = {};
+    if (node.llmEnabled) {
+      updates.llmConfig = llmConfig;
+    }
+    if (node.nodeId === 'role_translator') {
+      updates.hideFortuneTerms = hideFortuneTerms;
+    }
+    onSave(updates);
   };
 
   return (
@@ -92,6 +108,26 @@ export function NodeInfo({ node, models, onSave, onClose }: NodeInfoProps) {
         </div>
       )}
 
+      {/* Role Translator Config */}
+      {node.nodeId === 'role_translator' && (
+        <div className="space-y-3">
+          <div className="text-sm font-semibold text-gray-700">命理术语显示设置</div>
+          <div className="flex items-center space-x-3">
+            <Switch
+              id="hideFortuneTerms"
+              checked={hideFortuneTerms}
+              onCheckedChange={handleHideFortuneTermsChange}
+            />
+            <Label htmlFor="hideFortuneTerms" className="cursor-pointer">
+              {hideFortuneTerms ? '隐藏命理术语' : '显示命理术语'}
+            </Label>
+          </div>
+          <p className="text-xs text-gray-500">
+            开启后以纯角色口吻输出，关闭后会显示命理分析内容
+          </p>
+        </div>
+      )}
+
       {/* LLM Config (if enabled) */}
       {node.llmEnabled && (
         <div>
@@ -116,7 +152,7 @@ export function NodeInfo({ node, models, onSave, onClose }: NodeInfoProps) {
       </div>
 
       {/* Action Buttons */}
-      {node.llmEnabled && (
+      {node.llmEnabled || node.nodeId === 'role_translator' ? (
         <div className="flex gap-2 pt-4 border-t">
           <Button
             variant="outline"
@@ -131,12 +167,10 @@ export function NodeInfo({ node, models, onSave, onClose }: NodeInfoProps) {
             disabled={!hasChanges}
             className="flex-1 bg-orange-500 hover:bg-orange-600"
           >
-            保存模型配置
+            保存配置
           </Button>
         </div>
-      )}
-
-      {!node.llmEnabled && (
+      ) : (
         <div className="flex pt-4 border-t">
           <Button
             variant="outline"

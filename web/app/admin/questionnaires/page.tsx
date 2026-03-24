@@ -10,8 +10,6 @@ import {
   deleteQuestion,
   reorderQuestion,
   toggleQuestionStatus,
-  batchImportQuestions,
-  exportQuestions,
   type AdminQuestion,
   type QuestionFormData,
   type QuestionFilters,
@@ -20,11 +18,12 @@ import {
 } from '@/lib/admin-api';
 import { QuestionForm } from './components/QuestionForm';
 import { QuestionList } from './components/QuestionList';
+import { ExportDialog } from '@/components/admin/ExportDialog';
+import { ImportDialog } from '@/components/admin/ImportDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -32,13 +31,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   Plus,
   Filter,
@@ -68,17 +60,11 @@ export default function QuestionnairesPage() {
   const [editingQuestion, setEditingQuestion] = useState<AdminQuestion | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [showImportDialog, setShowImportDialog] = useState(false);
-  const [importData, setImportData] = useState('');
-  const [isImporting, setIsImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{
-    imported: number;
-    failed: number;
-    errors: Array<{ question: string; error: string }>;
-  } | null>(null);
-
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  const [exportOpen, setExportOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     if (!can('questionnaire:view')) {
@@ -218,56 +204,6 @@ export default function QuestionnairesPage() {
     }
   };
 
-  const handleExport = async () => {
-    try {
-      const result = await exportQuestions(filters);
-      if (result.success && result.questions) {
-        const dataStr = JSON.stringify(result.questions, null, 2);
-        const blob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `questions-${Date.now()}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        setSuccessMessage('问题已导出');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      }
-    } catch (error) {
-      setErrorMessage('导出失败');
-    }
-  };
-
-  const handleImport = async () => {
-    setIsImporting(true);
-    setImportResult(null);
-    try {
-      const data = JSON.parse(importData);
-      if (!Array.isArray(data)) {
-        setErrorMessage('导入数据格式错误：必须是数组');
-        return;
-      }
-
-      const result = await batchImportQuestions(data);
-      if (result.success) {
-        setImportResult({
-          imported: result.imported || 0,
-          failed: result.failed || 0,
-          errors: result.errors || [],
-        });
-        if (result.imported && result.imported > 0) {
-          await loadQuestions();
-        }
-      } else {
-        setErrorMessage(result.error || '导入失败');
-      }
-    } catch (error) {
-      setErrorMessage('JSON 格式错误');
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
   if (!can('questionnaire:view')) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -293,12 +229,12 @@ export default function QuestionnairesPage() {
           >
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </Button>
-          <Button variant="outline" onClick={handleExport}>
+          <Button variant="outline" onClick={() => setExportOpen(true)}>
             <Download className="w-4 h-4 mr-2" />
             导出
           </Button>
           {can('questionnaire:create') && (
-            <Button variant="outline" onClick={() => setShowImportDialog(true)}>
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
               <Upload className="w-4 h-4 mr-2" />
               导入
             </Button>
@@ -485,63 +421,15 @@ export default function QuestionnairesPage() {
         </CardContent>
       </Card>
 
+      {/* Export Dialog */}
+      <ExportDialog open={exportOpen} onOpenChange={setExportOpen} />
+
       {/* Import Dialog */}
-      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>批量导入问题</DialogTitle>
-            <DialogDescription>
-              粘贴JSON格式的问题数据，每个问题包含role、layer、question等字段
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>JSON 数据</Label>
-              <Textarea
-                value={importData}
-                onChange={(e) => setImportData(e.target.value)}
-                placeholder='[{"role":"elder","layer":"basic","question":"您叫什么名字？","type":"textarea","active":true}]'
-                rows={10}
-                className="font-mono text-sm"
-              />
-            </div>
-
-            {importResult && (
-              <div className={`p-4 rounded-lg ${
-                importResult.imported > 0 ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'
-              }`}>
-                <p className="font-medium">
-                  导入完成：{importResult.imported} 个成功，{importResult.failed} 个失败
-                </p>
-                {importResult.errors.length > 0 && (
-                  <div className="mt-2 text-sm">
-                    <p className="font-medium">错误详情：</p>
-                    <ul className="list-disc list-inside">
-                      {importResult.errors.map((err, i) => (
-                        <li key={i}>{err.question}: {err.error}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setShowImportDialog(false)}>
-              取消
-            </Button>
-            <Button
-              onClick={handleImport}
-              disabled={isImporting || !importData.trim()}
-              className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700"
-            >
-              {isImporting ? '导入中...' : '导入'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onSuccess={loadQuestions}
+      />
     </div>
   );
 }

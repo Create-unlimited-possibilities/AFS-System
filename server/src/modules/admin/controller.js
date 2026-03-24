@@ -283,14 +283,27 @@ class AdminController {
 
   async exportQuestions(req, res) {
     try {
-      const { role, layer } = req.query;
+      const { role, layer, format } = req.query;
 
-      const questions = await adminService.exportQuestions({ role, layer });
+      if (format === 'docx') {
+        // Export as Word document
+        const buffer = await adminService.exportQuestionsAsDocx({ role, layer });
 
-      res.json({
-        success: true,
-        questions
-      });
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+        const filename = `questionnaire_export_${timestamp}.docx`;
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+      } else {
+        // Export as JSON (default)
+        const questions = await adminService.exportQuestions({ role, layer });
+
+        res.json({
+          success: true,
+          questions
+        });
+      }
     } catch (error) {
       logger.error('[AdminController] exportQuestions error:', error);
       res.status(500).json({

@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react';
 import { PromptEditor } from './PromptEditor';
 import { ModelSelector } from './ModelSelector';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Save, X, AlertTriangle } from 'lucide-react';
 import type { LangGraphNode, AvailableModels, LLMConfig } from '../hooks/useLangGraph';
 
@@ -15,6 +17,7 @@ interface NodeEditorProps {
     staticPrompt?: string;
     editableSection?: string;
     llmConfig?: Partial<LLMConfig>;
+    hideFortuneTerms?: boolean;
   }) => void;
   onCancel: () => void;
 }
@@ -24,6 +27,7 @@ export function NodeEditor({ node, models, onSave, onCancel }: NodeEditorProps) 
     node.promptType === 'static' ? node.staticPrompt : node.editableSection
   );
   const [llmConfig, setLlmConfig] = useState<LLMConfig>(node.llmConfig);
+  const [hideFortuneTerms, setHideFortuneTerms] = useState(node.hideFortuneTerms !== false);
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
@@ -31,6 +35,7 @@ export function NodeEditor({ node, models, onSave, onCancel }: NodeEditorProps) 
       node.promptType === 'static' ? node.staticPrompt : node.editableSection
     );
     setLlmConfig(node.llmConfig);
+    setHideFortuneTerms(node.hideFortuneTerms !== false);
     setHasChanges(false);
   }, [node]);
 
@@ -41,6 +46,11 @@ export function NodeEditor({ node, models, onSave, onCancel }: NodeEditorProps) 
 
   const handleLLMConfigChange = (updates: Partial<LLMConfig>) => {
     setLlmConfig((prev) => ({ ...prev, ...updates }));
+    setHasChanges(true);
+  };
+
+  const handleHideFortuneTermsChange = (checked: boolean) => {
+    setHideFortuneTerms(checked);
     setHasChanges(true);
   };
 
@@ -55,6 +65,10 @@ export function NodeEditor({ node, models, onSave, onCancel }: NodeEditorProps) 
 
     if (node.llmEnabled) {
       updates.llmConfig = llmConfig;
+    }
+
+    if (node.nodeId === 'role_translator') {
+      updates.hideFortuneTerms = hideFortuneTerms;
     }
 
     onSave(updates);
@@ -91,6 +105,26 @@ export function NodeEditor({ node, models, onSave, onCancel }: NodeEditorProps) 
             models={models}
             onChange={handleLLMConfigChange}
           />
+        </div>
+      )}
+
+      {/* Role Translator Config */}
+      {node.nodeId === 'role_translator' && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-gray-700">命理术语显示设置</h3>
+          <div className="flex items-center space-x-3">
+            <Switch
+              id="hideFortuneTerms"
+              checked={hideFortuneTerms}
+              onCheckedChange={handleHideFortuneTermsChange}
+            />
+            <Label htmlFor="hideFortuneTerms" className="cursor-pointer">
+              {hideFortuneTerms ? '隐藏命理术语' : '显示命理术语'}
+            </Label>
+          </div>
+          <p className="text-xs text-gray-500">
+            开启后以纯角色口吻输出，关闭后会显示命理分析内容
+          </p>
         </div>
       )}
 

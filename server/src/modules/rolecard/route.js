@@ -4,6 +4,23 @@ import { protect } from '../auth/middleware.js';
 
 const router = express.Router();
 
+// ==================== LLM 配置管理 ====================
+// 获取 LLM 配置
+router.get('/config', protect, (req, res) => {
+  rolecardController.getLLMConfig(req, res);
+});
+
+// 更新 LLM 配置
+router.put('/config', protect, (req, res) => {
+  rolecardController.updateLLMConfig(req, res);
+});
+
+// 获取可用模型列表
+router.get('/config/models', protect, (req, res) => {
+  rolecardController.getAvailableModels(req, res);
+});
+
+// ==================== 角色卡生成 ====================
 // 普通生成（无进度）
 router.post('/generate', protect, (req, res) => {
   rolecardController.generateRoleCard(req, res);

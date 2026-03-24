@@ -7,11 +7,44 @@ import {
 } from './prompts/coreExtractionV2.js';
 import Answer from '../../qa/models/answer.js';
 import Question from '../../qa/models/question.js';
-import MultiLLMClient from '../../../core/llm/multi.js';
+import LLMClient from '../../../core/llm/client.js';
 import { llmConfig } from '../../../core/llm/config.js';
 import DualStorage from '../../../core/storage/dual.js';
 import User from '../../user/model.js';
 import { profileLogger } from '../../../core/utils/logger.js';
+
+/**
+ * 根据配置创建 LLM 客户端
+ * @param {Object} config - 操作配置 { source, model, apiProvider, temperature, maxTokens }
+ * @returns {LLMClient} LLM 客户端实例
+ */
+function createLLMClientFromConfig(config) {
+  const backend = config.source === 'api'
+    ? (config.apiProvider || 'deepseek')
+    : 'ollama';
+
+  return new LLMClient(config.model, {
+    backend,
+    temperature: config.temperature || 0.3,
+    maxRetries: 3,
+    timeout: 60000
+  });
+}
+
+/**
+ * 获取 LLM 配置
+ * @returns {Promise<Object>} LLM 配置对象
+ */
+async function getLLMConfig() {
+  try {
+    const RoleCardLLMConfig = (await import('../configModel.js')).default;
+    const config = await RoleCardLLMConfig.getOrCreateDefault();
+    return config;
+  } catch (error) {
+    profileLogger.warn('获取LLM配置失败，使用默认配置', { error: error.message });
+    return null;
+  }
+}
 
 /**
  * A 套题完成度检查
@@ -56,8 +89,10 @@ async function validateASetCompletion(userId) {
  */
 class CoreLayerGenerator {
   constructor() {
-    this.llmClient = new MultiLLMClient();
     this.dualStorage = new DualStorage();
+    // LLM 客户端将在 generate 时根据配置初始化
+    this.extractionClient = null;
+    this.compressionClient = null;
     // 用于收集每个字段的片段
     this.fieldFragments = {};
     // 初始化字段片段容器
@@ -66,6 +101,35 @@ class CoreLayerGenerator {
         this.fieldFragments[key] = [];
       }
     });
+  }
+
+  /**
+   * 初始化 LLM 客户端
+   * @private
+   */
+  async _initializeLLMClients() {
+    const config = await getLLMConfig();
+
+    if (config) {
+      this.extractionClient = createLLMClientFromConfig(config.coreExtraction);
+      this.compressionClient = createLLMClientFromConfig(config.coreCompression);
+      profileLogger.info('使用数据库配置初始化LLM客户端', {
+        extractionModel: config.coreExtraction.model,
+        compressionModel: config.coreCompression.model
+      });
+    } else {
+      // 回退到默认配置
+      const defaultConfig = llmConfig.getOllamaConfig();
+      this.extractionClient = new LLMClient(defaultConfig.model, {
+        backend: 'ollama',
+        baseUrl: defaultConfig.baseUrl,
+        temperature: 0.3
+      });
+      this.compressionClient = this.extractionClient;
+      profileLogger.info('使用默认配置初始化LLM客户端', {
+        model: defaultConfig.model
+      });
+    }
   }
 
   /**
@@ -78,6 +142,9 @@ class CoreLayerGenerator {
     profileLogger.info('开始生成核心层', { userId });
 
     try {
+      // 0. 初始化 LLM 客户端
+      await this._initializeLLMClients();
+
       // 1. 获取用户个人档案（用于 basicIdentity）
       const user = await User.findById(userId);
       if (!user) {
@@ -224,7 +291,7 @@ class CoreLayerGenerator {
         temperature: 0.3,
         maxTokens: 1000,
         responseFormat: 'json'
-      });
+      }, 3, 'extraction');
 
       if (extracted && extracted.extractedFields) {
         // 将提取的内容添加到对应字段的片段列表
@@ -283,7 +350,7 @@ class CoreLayerGenerator {
           temperature: 0.3,
           maxTokens: CORE_LAYER_FIELDS[fieldName].tokenTarget + 100,
           responseFormat: 'json'
-        });
+        }, 3, 'compression');
 
         compressedFields[fieldName] = {
           // 结构化数据（如果压缩结果包含 keyPoints）
@@ -402,12 +469,19 @@ class CoreLayerGenerator {
    * @param {string} prompt - 提示词
    * @param {Object} options - LLM 调用选项
    * @param {number} maxRetries - 最大重试次数
+   * @param {string} clientType - 客户端类型 'extraction' 或 'compression'
    * @returns {Promise<Object|null>} 解析后的 JSON 对象或 null
    */
-  async callLLMWithRetry(prompt, options, maxRetries = 3) {
+  async callLLMWithRetry(prompt, options, maxRetries = 3, clientType = 'extraction') {
+    const client = clientType === 'compression' ? this.compressionClient : this.extractionClient;
+
+    if (!client) {
+      throw new Error(`LLM 客户端未初始化: ${clientType}`);
+    }
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const response = await this.llmClient.generate(prompt, options);
+        const response = await client.generate(prompt, options);
         const parsed = this.parseJsonResponse(response);
 
         if (parsed) {

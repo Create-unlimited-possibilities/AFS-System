@@ -17,28 +17,40 @@ export async function outputFormatterNode(state) {
   try {
     logger.info('[OutputFormatter] 格式化输出');
 
-    const { generatedResponse, interlocutor, metadata, retrievedMemories } = state;
+    // 优先级: translatedResponse (命理分析) > listeningResponse (倾诉模式) > generatedResponse (普通聊天)
+    const message = state.translatedResponse ||
+                    state.listeningResponse ||
+                    state.generatedResponse ||
+                    '';
+
+    // 确定响应来源，用于调试和日志
+    const responseSource = state.translatedResponse ? 'fortune' :
+                           state.listeningResponse ? 'listening' :
+                           state.generatedResponse ? 'chat' : 'none';
+
+    const { interlocutor, metadata, retrievedMemories } = state;
 
     const formattedOutput = {
       success: true,
-      message: generatedResponse,
+      message: message,
       metadata: {
-        relationType: interlocutor.relationType,
-        sentimentScore: interlocutor.sentimentScore,
+        relationType: interlocutor?.relationType || 'stranger',
+        sentimentScore: interlocutor?.sentimentScore || 50,
         retrievedMemoriesCount: retrievedMemories?.length || 0,
-        modelUsed: metadata.modelUsed || '',
-        ragUsed: metadata.inputProcessor?.ragUsed || false,
-        memoryUpdated: metadata.memoryUpdated || false,
+        modelUsed: metadata?.modelUsed || '',
+        ragUsed: metadata?.inputProcessor?.ragUsed || false,
+        memoryUpdated: metadata?.memoryUpdated || false,
+        responseSource: responseSource,
         timestamp: new Date()
       }
     };
 
-    if (state.errors.length > 0) {
+    if (state.errors && state.errors.length > 0) {
       formattedOutput.success = false;
       formattedOutput.errors = state.errors.map(e => e.message);
     }
 
-    logger.info('[OutputFormatter] 输出格式化完成');
+    logger.info(`[OutputFormatter] 输出格式化完成 - 来源: ${responseSource}, 长度: ${message.length}`);
 
     return formattedOutput;
   } catch (error) {

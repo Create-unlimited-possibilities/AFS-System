@@ -11,6 +11,7 @@ import {
   FileQuestion,
   Database,
   Settings,
+  Settings2,
   Ticket,
   Variable,
   Shield as ShieldIcon,
@@ -83,6 +84,12 @@ const navItems: NavItem[] = [
     title: 'LangGraph 管理',
     href: '/admin/langgraph',
     icon: GitBranch,
+    permission: 'langgraph:edit',
+  },
+  {
+    title: '角色卡生成',
+    href: '/admin/rolecard-config',
+    icon: Settings2,
     permission: 'langgraph:edit',
   },
   {

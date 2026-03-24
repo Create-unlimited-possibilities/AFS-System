@@ -32,6 +32,7 @@ export interface LangGraphNode {
   llmEnabled: boolean;
   llmConfig: LLMConfig;
   position: { x: number; y: number };
+  hideFortuneTerms?: boolean;
 }
 
 export interface LangGraphEdge {
@@ -108,6 +109,7 @@ export function useLangGraph() {
       staticPrompt?: string;
       editableSection?: string;
       llmConfig?: Partial<LLMConfig>;
+      hideFortuneTerms?: boolean;
     }
   ) => {
     setIsLoading(true);

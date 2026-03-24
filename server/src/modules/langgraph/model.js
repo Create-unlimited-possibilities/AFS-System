@@ -58,6 +58,10 @@ const nodeSchema = new mongoose.Schema({
   position: {
     x: { type: Number, default: 0 },
     y: { type: Number, default: 0 }
+  },
+  hideFortuneTerms: {
+    type: Boolean,
+    default: true
   }
 }, { _id: false });
 
@@ -72,6 +76,17 @@ const edgeSchema = new mongoose.Schema({
   }
 }, { _id: false });
 
+const flowSettingSchema = new mongoose.Schema({
+  type: {
+    type: String,
+    enum: ['boolean', 'number', 'string'],
+    default: 'boolean'
+  },
+  default: { type: mongoose.Schema.Types.Mixed, default: true },
+  description: { type: String, default: '' },
+  value: { type: mongoose.Schema.Types.Mixed }  // 当前值，如果未设置则使用 default
+}, { _id: false });
+
 const langGraphConfigSchema = new mongoose.Schema({
   flowId: {
     type: String,
@@ -81,6 +96,11 @@ const langGraphConfigSchema = new mongoose.Schema({
   },
   flowName: { type: String, required: true },
   description: { type: String, default: '' },
+  flowSettings: {
+    type: Map,
+    of: flowSettingSchema,
+    default: {}
+  },
   nodes: [nodeSchema],
   edges: [edgeSchema],
   updatedBy: {

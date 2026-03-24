@@ -3,7 +3,7 @@
  * Used for LangGraph conversation flow management
  *
  * @author AFS Team
- * @version 2.1.0
+ * @version 3.0.0 - Added venting mode support
  */
 
 class ConversationState {
@@ -35,6 +35,58 @@ class ConversationState {
     this.currentInput = initialData.currentInput || '';
     this.generatedResponse = initialData.generatedResponse || '';
 
+    // ==================== Venting Mode Fields (v3.0) ====================
+    // Conversation mode: 'chat' | 'venting' | 'analysis'
+    this.conversationMode = initialData.conversationMode || 'chat';
+
+    // Listening phase state
+    this.listeningPhase = initialData.listeningPhase || {
+      turnCount: 0,
+      emotionalIntensity: 'low',  // 'low' | 'medium' | 'high'
+      coreConcern: '',
+      emotionalState: '',
+      informationGathered: {},
+      readyForAnalysis: false
+    };
+
+    // Fortune analysis phase state
+    this.fortunePhase = initialData.fortunePhase || {
+      chartRetrieved: false,
+      ragRetrieved: false,
+      fortuneGenerated: false,
+      internalAnalysis: ''
+    };
+
+    // Conversation assessment from listening phase
+    this.conversationAssessment = initialData.conversationAssessment || {
+      readyForAnalysis: false,
+      confidence: 0,
+      coreConcern: '',
+      emotionalState: ''
+    };
+
+    // Intent classification result
+    this.intentClassification = initialData.intentClassification || null;
+
+    // Listening response (direct output in listening mode)
+    this.listeningResponse = initialData.listeningResponse || '';
+    this.listeningAssessment = initialData.listeningAssessment || null;
+
+    // Fortune analysis data
+    this.natalChart = initialData.natalChart || null;
+    this.horoscope = initialData.horoscope || null;
+    this.ragContext = initialData.ragContext || '';
+    this.formattedChartText = initialData.formattedChartText || '';
+    this.relevantPalaces = initialData.relevantPalaces || [];
+    this.fortuneResponse = initialData.fortuneResponse || '';
+    this.translatedResponse = initialData.translatedResponse || '';
+
+    // Role translator config
+    this.hideFortuneTerms = initialData.hideFortuneTerms !== undefined
+      ? initialData.hideFortuneTerms
+      : true;
+    // ==================== End Venting Mode Fields ====================
+
     // Initialize metadata with token-based prompt fields
     this.metadata = {
       // Session status: 'active', 'fatigue_prompt', 'indexing'
@@ -52,6 +104,11 @@ class ConversationState {
       terminationReason: null,
       // Token info
       tokenInfo: null,
+      // Venting mode metadata
+      intent: null,              // 'chatting' | 'venting'
+      endIntent: false,
+      emotionalIntensity: 'low',
+      readyForAnalysis: false,
       // Other metadata
       ...initialData.metadata
     };
@@ -78,6 +135,23 @@ class ConversationState {
       systemPrompt: this.systemPrompt,
       currentInput: this.currentInput,
       generatedResponse: this.generatedResponse,
+      // Venting mode state
+      conversationMode: this.conversationMode,
+      listeningPhase: this.listeningPhase,
+      fortunePhase: this.fortunePhase,
+      conversationAssessment: this.conversationAssessment,
+      intentClassification: this.intentClassification,
+      listeningResponse: this.listeningResponse,
+      listeningAssessment: this.listeningAssessment,
+      natalChart: this.natalChart,
+      horoscope: this.horoscope,
+      ragContext: this.ragContext,
+      formattedChartText: this.formattedChartText,
+      relevantPalaces: this.relevantPalaces,
+      fortuneResponse: this.fortuneResponse,
+      translatedResponse: this.translatedResponse,
+      hideFortuneTerms: this.hideFortuneTerms,
+      // End venting mode state
       metadata: this.metadata,
       errors: this.errors,
       pendingMessages: this.pendingMessages

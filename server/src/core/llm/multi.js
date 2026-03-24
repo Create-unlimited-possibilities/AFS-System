@@ -36,11 +36,12 @@ class MultiLLMClient {
    */
   _initializeClients() {
     const preferred = llmConfig.getPreferredLLM();
-    
+
     // 初始化本地 Ollama 客户端
     if (llmConfig.isOllamaAvailable()) {
       const ollamaConfig = llmConfig.getOllamaConfig();
       this.localClient = new LLMClient(ollamaConfig.model, {
+        backend: 'ollama',
         baseUrl: ollamaConfig.baseUrl,
         temperature: ollamaConfig.temperature,
         maxRetries: ollamaConfig.maxRetries,
@@ -48,15 +49,20 @@ class MultiLLMClient {
       });
       logger.info(`本地 Ollama 客户端已初始化: ${ollamaConfig.model}`);
     }
-    
-    // 初始化 API 客户端（占位，后续扩展）
+
+    // 初始化 API 客户端（支持 DeepSeek）
     if (llmConfig.isApiLLMAvailable()) {
       const apiConfig = llmConfig.getApiLLMConfig();
-      // TODO: 实现真正的 API 客户端
-      // this.apiClient = new ApiLLMClient(apiConfig);
-      logger.info(`API LLM 客户端占位已创建: ${apiConfig.model}`);
+      // 使用 LLMClient 作为 API 客户端，backend 设为 'deepseek'
+      this.apiClient = new LLMClient(apiConfig.model, {
+        backend: 'deepseek',
+        temperature: apiConfig.temperature,
+        maxRetries: apiConfig.maxRetries,
+        timeout: apiConfig.timeout
+      });
+      logger.info(`API LLM 客户端已初始化: ${apiConfig.model}`);
     }
-    
+
     // 设置当前客户端
     this._setCurrentClient(preferred);
   }

@@ -1,13 +1,14 @@
 /**
- * LangGraph Orchestrator V2
- * Manages conversation flow using LangGraph implementation
+ * LangGraph Orchestrator V3
+ * AI角色卡对话升级 - 支持倾诉模式与命理分析
  *
  * @author AFS Team
- * @version 2.1.0
+ * @version 3.0.0
  */
 
 import ConversationState from './state/ConversationState.js';
 import { edges, conditionalEdges } from './edges/edges.js';
+// Existing nodes
 import { inputProcessorNode } from './nodes/inputProcessor.js';
 import { tokenMonitorNode } from './nodes/tokenMonitor.js';
 import { memoryCheckNode } from './nodes/memoryCheck.js';
@@ -16,6 +17,13 @@ import { contextBuilderNode } from './nodes/contextBuilder.js';
 import { responseGeneratorNode } from './nodes/responseGenerator.js';
 import { tokenResponseNode } from './nodes/tokenResponse.js';
 import { outputFormatterNode } from './nodes/outputFormatter.js';
+// New nodes for venting mode (v3.0)
+import { intentClassifierNode } from './nodes/intentClassifier.js';
+import { listeningPhaseNode } from './nodes/listeningPhase.js';
+import { chartRagRetrieverNode } from './nodes/chartRagRetriever.js';
+import { fortuneGeneratorNode } from './nodes/fortuneGenerator.js';
+import { roleTranslatorNode } from './nodes/roleTranslator.js';
+// Models and services
 import ChatSession from './model.js';
 import User from '../user/model.js';
 import AssistRelation from '../assist/model.js';
@@ -24,11 +32,13 @@ import { PromptAssembler } from '../rolecard/v2/index.js';
 import { MemoryStore, MemoryExtractor } from '../memory/index.js';
 import TopicChunker from '../memory/TopicChunker.js';
 import UnreadMessage from './models/UnreadMessage.js';
+import { configLoader } from '../langgraph/configLoader.js';
 import logger from '../../core/utils/logger.js';
 
 class ChatGraphOrchestrator {
   constructor() {
     this.nodes = {
+      // Existing nodes
       input_processor: inputProcessorNode,
       token_monitor: tokenMonitorNode,
       memory_check: memoryCheckNode,
@@ -36,7 +46,13 @@ class ChatGraphOrchestrator {
       context_builder: contextBuilderNode,
       response_generator: responseGeneratorNode,
       token_response: tokenResponseNode,
-      output_formatter: outputFormatterNode
+      output_formatter: outputFormatterNode,
+      // New nodes for venting mode (v3.0)
+      intent_classifier: intentClassifierNode,
+      listening_phase: listeningPhaseNode,
+      chart_rag_retriever: chartRagRetrieverNode,
+      fortune_generator: fortuneGeneratorNode,
+      role_translator: roleTranslatorNode
     };
 
     this.activeSessions = new Map();
@@ -537,7 +553,10 @@ class ChatGraphOrchestrator {
           currentCycleId: session.currentCycleId,
           preloaded: true,
           hasComplexRelationLayer: !!complexRelationLayer,
-          roleCardLoaded: !!roleCardV2
+          roleCardLoaded: !!roleCardV2,
+          // Load flow settings from config
+          fortuneTellingEnabled: configLoader.getFlowSetting('rolecard', 'fortuneTellingEnabled') ?? true,
+          ventingEnabled: configLoader.getFlowSetting('rolecard', 'ventingEnabled') ?? true
         }
       });
 
@@ -1097,7 +1116,8 @@ class ChatGraphOrchestrator {
     try {
       logger.info('[ChatGraphOrchestrator] 开始执行LangGraph');
 
-      let currentNode = 'input_processor';
+      // v3.0: 使用 intent_classifier 作为起始节点（支持倾诉模式）
+      let currentNode = 'intent_classifier';
       const executionHistory = [];
       const nodeTimings = {}; // 记录每个节点的耗时
       const totalStartTime = Date.now();

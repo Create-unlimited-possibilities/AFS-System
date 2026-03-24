@@ -1129,6 +1129,140 @@ class RoleCardController {
       res.end();
     }
   }
+
+  // ==================== LLM 配置管理 ====================
+
+  /**
+   * 获取 LLM 配置
+   */
+  async getLLMConfig(req, res) {
+    try {
+      const RoleCardLLMConfig = (await import('./configModel.js')).default;
+      const config = await RoleCardLLMConfig.getOrCreateDefault();
+
+      res.json({
+        success: true,
+        config: {
+          coreExtraction: config.coreExtraction,
+          coreCompression: config.coreCompression,
+          relationExtraction: config.relationExtraction,
+          relationCompression: config.relationCompression,
+          trustAnalysis: config.trustAnalysis,
+          updatedAt: config.updatedAt
+        }
+      });
+    } catch (error) {
+      logger.error('[RoleCardController] 获取LLM配置失败:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * 更新 LLM 配置
+   */
+  async updateLLMConfig(req, res) {
+    try {
+      const RoleCardLLMConfig = (await import('./configModel.js')).default;
+      const updates = req.body;
+
+      // 验证更新字段
+      const allowedFields = [
+        'coreExtraction', 'coreCompression',
+        'relationExtraction', 'relationCompression', 'trustAnalysis'
+      ];
+
+      const config = await RoleCardLLMConfig.getOrCreateDefault();
+
+      for (const field of allowedFields) {
+        if (updates[field]) {
+          config[field] = {
+            ...config[field].toObject(),
+            ...updates[field]
+          };
+        }
+      }
+
+      config.updatedAt = new Date();
+      await config.save();
+
+      logger.info('[RoleCardController] LLM配置已更新');
+
+      res.json({
+        success: true,
+        message: '配置已保存',
+        config: {
+          coreExtraction: config.coreExtraction,
+          coreCompression: config.coreCompression,
+          relationExtraction: config.relationExtraction,
+          relationCompression: config.relationCompression,
+          trustAnalysis: config.trustAnalysis,
+          updatedAt: config.updatedAt
+        }
+      });
+    } catch (error) {
+      logger.error('[RoleCardController] 更新LLM配置失败:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * 获取可用模型列表
+   */
+  async getAvailableModels(req, res) {
+    try {
+      // 获取 Ollama 可用模型
+      const { llmConfig } = await import('../../core/llm/config.js');
+      const axios = (await import('axios')).default;
+
+      let ollamaModels = [];
+      try {
+        const ollamaConfig = llmConfig.getOllamaConfig();
+        const response = await axios.get(`${ollamaConfig.baseUrl}/api/tags`, {
+          timeout: 5000
+        });
+        ollamaModels = (response.data.models || []).map(m => ({
+          name: m.name,
+          size: m.size,
+          modified: m.modified_at
+        }));
+      } catch (error) {
+        logger.warn('[RoleCardController] 获取Ollama模型列表失败:', error.message);
+      }
+
+      // API 模型列表（固定）
+      const apiModels = {
+        deepseek: [
+          { name: 'deepseek-chat', description: 'DeepSeek Chat (通用对话)' },
+          { name: 'deepseek-reasoner', description: 'DeepSeek Reasoner (推理增强)' }
+        ],
+        openai: [
+          { name: 'gpt-4o', description: 'GPT-4o (最新多模态)' },
+          { name: 'gpt-4o-mini', description: 'GPT-4o Mini (轻量版)' },
+          { name: 'gpt-4-turbo', description: 'GPT-4 Turbo (快速版)' }
+        ]
+      };
+
+      res.json({
+        success: true,
+        models: {
+          ollama: ollamaModels,
+          api: apiModels
+        }
+      });
+    } catch (error) {
+      logger.error('[RoleCardController] 获取可用模型失败:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
 }
 
 export default new RoleCardController();

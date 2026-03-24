@@ -11,6 +11,7 @@ import { assistantsGuidelinesPreprocessor } from '../src/services/langchain/assi
 import User from '../src/models/User.js';
 import AssistRelation from '../src/models/AssistRelation.js';
 import logger from '../src/utils/logger.js';
+import DualStorage from '../src/core/storage/dual.js';
 
 const successResponse = (data = null, message = 'Success') => ({
   success: true,
@@ -44,12 +45,17 @@ export const generateRoleCard = async (req, res) => {
       return res.status(404).json(errorResponse('用户不存在'));
     }
 
-    // 检查是否已生成过角色卡
-    if (user.companionChat.roleCard && user.companionChat.roleCard.generatedAt) {
+    // 检查是否已生成过角色卡（优先检查文件系统）
+    const dualStorage = new DualStorage();
+    const existingRoleCardV2 = await dualStorage.loadRoleCardV2(String(userId));
+    const existingRoleCardV1 = existingRoleCardV2 ? null : await dualStorage.loadRoleCard(String(userId));
+    const existingRoleCard = existingRoleCardV2 || existingRoleCardV1;
+
+    if (existingRoleCard) {
       logger.info(`[CompanionshipController] 用户 ${userId} 已有角色卡`);
       return res.status(200).json(successResponse({
         message: '角色卡已存在',
-        roleCard: user.companionChat.roleCard,
+        roleCard: existingRoleCard,
         isExisting: true
       }));
     }
@@ -96,7 +102,20 @@ export const getRoleCard = async (req, res) => {
       return res.status(404).json(errorResponse('用户不存在'));
     }
 
-    const roleCard = user.companionChat?.roleCard;
+    // 优先从文件系统加载角色卡（V2 或 V1）
+    const dualStorage = new DualStorage();
+    let roleCard = await dualStorage.loadRoleCardV2(String(userId));
+
+    // 如果没有V2，尝试加载V1
+    if (!roleCard) {
+      roleCard = await dualStorage.loadRoleCard(String(userId));
+    }
+
+    // 最后回退到 MongoDB（兼容旧数据）
+    if (!roleCard) {
+      roleCard = user.companionChat?.roleCard;
+    }
+
     if (!roleCard) {
       return res.status(404).json(errorResponse('角色卡不存在'));
     }

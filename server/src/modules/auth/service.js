@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import User from '../user/model.js';
 import Role from '../roles/models/role.js';
 import RolecardStorage from '../../core/storage/rolecard.js';
+import DualStorage from '../../core/storage/dual.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'afs-super-secret-key-2025-change-me-in-production';
 
@@ -46,56 +47,67 @@ class AuthService {
       lastLogin: user.lastLogin
     };
 
-    // 如果用户没有companionChat，从文件系统读取角色卡数据
-    if (!user.companionChat) {
-      try {
-        const rolecardStorage = new RolecardStorage();
-        const rolecard = await rolecardStorage.getLatestRolecard(user._id);
+    // 尝试从文件系统加载角色卡（优先级：V2 > V1 > 旧版RolecardStorage）
+    const dualStorage = new DualStorage();
+    const rolecardStorage = new RolecardStorage();
 
-        if (rolecard) {
-          userData.companionChat = {
-            memoryTokenCount: 0,
-            currentMode: 'mode1',
-            relationships: [],
-            roleCard: {
-              personality: rolecard.systemPrompt,
-              background: '',
-              interests: [],
-              communicationStyle: '',
-              values: [],
-              emotionalNeeds: [],
-              lifeMilestones: [],
-              preferences: [],
-              strangerInitialSentiment: '',
-              generatedAt: rolecard.generatedAt,
-              updatedAt: rolecard.generatedAt,
-              memoryTokenCount: 0
-            },
-            modelStatus: { hasCustomModel: false, trainingStatus: 'none' }
-          };
-        } else {
-          userData.companionChat = {
-            memoryTokenCount: 0,
-            currentMode: 'mode1',
-            relationships: [],
-            roleCard: {
-              personality: '',
-              background: '',
-              interests: [],
-              communicationStyle: '',
-              values: [],
-              emotionalNeeds: [],
-              lifeMilestones: [],
-              preferences: [],
-              strangerInitialSentiment: '',
-              generatedAt: null,
-              updatedAt: null
-            },
-            modelStatus: { hasCustomModel: false, trainingStatus: 'none' }
+    let roleCardFromFileSystem = null;
+    try {
+      // 1. 优先检查 DualStorage V2 (rolecard-v2.json)
+      roleCardFromFileSystem = await dualStorage.loadRoleCardV2(String(user._id));
+
+      // 2. 如果没有V2，检查 DualStorage V1 (rolecard.json)
+      if (!roleCardFromFileSystem) {
+        roleCardFromFileSystem = await dualStorage.loadRoleCard(String(user._id));
+      }
+
+      // 3. 如果DualStorage都没有，检查旧版RolecardStorage (rolecard_latest.json)
+      if (!roleCardFromFileSystem) {
+        const legacyRolecard = await rolecardStorage.getLatestRolecard(String(user._id));
+        if (legacyRolecard) {
+          roleCardFromFileSystem = {
+            personality: legacyRolecard.systemPrompt,
+            background: '',
+            interests: [],
+            communicationStyle: '',
+            values: [],
+            emotionalNeeds: [],
+            lifeMilestones: [],
+            preferences: [],
+            strangerInitialSentiment: '',
+            generatedAt: legacyRolecard.generatedAt,
+            updatedAt: legacyRolecard.generatedAt
           };
         }
-      } catch (error) {
-        console.error('[AuthService] 从文件系统读取角色卡失败:', error);
+      }
+    } catch (error) {
+      console.error('[AuthService] 从文件系统读取角色卡失败:', error);
+    }
+
+    // 如果用户没有companionChat，从文件系统读取的角色卡创建
+    if (!user.companionChat) {
+      if (roleCardFromFileSystem) {
+        userData.companionChat = {
+          memoryTokenCount: 0,
+          currentMode: 'mode1',
+          relationships: [],
+          roleCard: {
+            personality: roleCardFromFileSystem.personality || '',
+            background: roleCardFromFileSystem.background || '',
+            interests: roleCardFromFileSystem.interests || [],
+            communicationStyle: roleCardFromFileSystem.communicationStyle || '',
+            values: roleCardFromFileSystem.values || [],
+            emotionalNeeds: roleCardFromFileSystem.emotionalNeeds || [],
+            lifeMilestones: roleCardFromFileSystem.lifeMilestones || [],
+            preferences: roleCardFromFileSystem.preferences || [],
+            strangerInitialSentiment: roleCardFromFileSystem.strangerInitialSentiment || '',
+            generatedAt: roleCardFromFileSystem.generatedAt,
+            updatedAt: roleCardFromFileSystem.updatedAt,
+            memoryTokenCount: 0
+          },
+          modelStatus: { hasCustomModel: false, trainingStatus: 'none' }
+        };
+      } else {
         userData.companionChat = {
           memoryTokenCount: 0,
           currentMode: 'mode1',
@@ -119,28 +131,40 @@ class AuthService {
     } else {
       // 如果用户有companionChat，直接使用
       userData.companionChat = user.companionChat;
-    }
 
-    // 如果用户有角色但没有companionChat，添加到companionChat
-    if (user.role && !userData.companionChat?.roleCard) {
-      const rolecardStorage = new RolecardStorage();
-      const rolecard = await rolecardStorage.getLatestRolecard(user._id);
-
-      if (rolecard) {
+      // 但如果文件系统有角色卡而MongoDB没有，使用文件系统的数据
+      if (roleCardFromFileSystem && !user.companionChat.roleCard) {
         userData.companionChat.roleCard = {
-          personality: rolecard.systemPrompt,
-          background: '',
-          interests: [],
-          communicationStyle: '',
-          values: [],
-          emotionalNeeds: [],
-          lifeMilestones: [],
-          preferences: [],
-          strangerInitialSentiment: '',
-          generatedAt: rolecard.generatedAt,
-          updatedAt: rolecard.generatedAt
+          personality: roleCardFromFileSystem.personality || '',
+          background: roleCardFromFileSystem.background || '',
+          interests: roleCardFromFileSystem.interests || [],
+          communicationStyle: roleCardFromFileSystem.communicationStyle || '',
+          values: roleCardFromFileSystem.values || [],
+          emotionalNeeds: roleCardFromFileSystem.emotionalNeeds || [],
+          lifeMilestones: roleCardFromFileSystem.lifeMilestones || [],
+          preferences: roleCardFromFileSystem.preferences || [],
+          strangerInitialSentiment: roleCardFromFileSystem.strangerInitialSentiment || '',
+          generatedAt: roleCardFromFileSystem.generatedAt,
+          updatedAt: roleCardFromFileSystem.updatedAt
         };
       }
+    }
+
+    // 如果用户有角色但没有companionChat.roleCard，尝试从文件系统加载
+    if (user.role && !userData.companionChat?.roleCard && roleCardFromFileSystem) {
+      userData.companionChat.roleCard = {
+        personality: roleCardFromFileSystem.personality || '',
+        background: roleCardFromFileSystem.background || '',
+        interests: roleCardFromFileSystem.interests || [],
+        communicationStyle: roleCardFromFileSystem.communicationStyle || '',
+        values: roleCardFromFileSystem.values || [],
+        emotionalNeeds: roleCardFromFileSystem.emotionalNeeds || [],
+        lifeMilestones: roleCardFromFileSystem.lifeMilestones || [],
+        preferences: roleCardFromFileSystem.preferences || [],
+        strangerInitialSentiment: roleCardFromFileSystem.strangerInitialSentiment || '',
+        generatedAt: roleCardFromFileSystem.generatedAt,
+        updatedAt: roleCardFromFileSystem.updatedAt
+      };
     }
 
     // 如果用户有角色，添加角色信息

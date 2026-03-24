@@ -16,6 +16,21 @@ import logger from '../../core/utils/logger.js';
 import mongoose from 'mongoose';
 import ChromaDBService from '../../core/storage/chroma.js';
 import modelInfoService from '../../core/llm/modelInfoService.js';
+import DualStorage from '../../core/storage/dual.js';
+import VectorIndexService from '../../core/storage/vector.js';
+import {
+  Document,
+  Paragraph,
+  TextRun,
+  HeadingLevel,
+  AlignmentType,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  BorderStyle,
+  Packer
+} from 'docx';
 
 class AdminService {
   /**
@@ -102,14 +117,57 @@ class AdminService {
       missingFields
     };
 
+    // Verify roleCard actually exists in file system (not just in MongoDB)
+    const dualStorage = new DualStorage();
+    const actualRoleCard = await dualStorage.loadRoleCardV2(userId);
+    const hasRoleCardInFs = !!actualRoleCard;
+
+    // If MongoDB has roleCard but file system doesn't, clean up the stale data
+    if (user.companionChat?.roleCard && !hasRoleCardInFs) {
+      logger.warn(`[AdminService] 用户 ${userId} MongoDB有roleCard字段但文件系统不存在，清理脏数据`);
+      await User.updateOne(
+        { _id: userId },
+        { $unset: { 'companionChat.roleCard': '', 'companionChat.roleCardV2': '' } }
+      );
+      // Update the returned user object to reflect reality
+      if (user.companionChat) {
+        delete user.companionChat.roleCard;
+        delete user.companionChat.roleCardV2;
+      }
+    }
+
+    // If roleCard exists in file system but not in MongoDB, sync it back
+    if (hasRoleCardInFs && !user.companionChat?.roleCard) {
+      logger.info(`[AdminService] 用户 ${userId} 文件系统有roleCard但MongoDB没有，同步回MongoDB`);
+      // The actualRoleCard is already loaded, MongoDB will be updated on next roleCard generation
+    }
+
+    // Check vector index (memory library) status
+    const vectorService = new VectorIndexService();
+    const hasMemoryLibrary = await vectorService.indexExists(userId);
+
+    // Add verified status to the response
+    const verifiedStatus = {
+      hasRoleCard: hasRoleCardInFs,
+      hasMemoryLibrary: hasMemoryLibrary,
+      // Use actual roleCard data if available
+      roleCard: hasRoleCardInFs ? actualRoleCard : null
+    };
+
     return {
       ...user,
+      // Override companionChat.roleCard with verified data
+      companionChat: {
+        ...user.companionChat,
+        roleCard: verifiedStatus.roleCard || user.companionChat?.roleCard
+      },
       stats: {
         answerCount,
         sessionCount,
         relationCount
       },
-      profileCompletion
+      profileCompletion,
+      verifiedStatus
     };
   }
 
@@ -373,6 +431,272 @@ class AdminService {
     return questions;
   }
 
+  async exportQuestionsAsDocx({ role, layer }) {
+    const query = {};
+
+    if (role) query.role = role;
+    if (layer) query.layer = layer;
+
+    const questions = await Question.find(query)
+      .sort({ role: 1, layer: 1, order: 1 })
+      .lean();
+
+    // Role name mapping for display
+    const roleNames = {
+      elder: '长辈',
+      family: '家人',
+      friend: '朋友'
+    };
+
+    // Layer name mapping for display
+    const layerNames = {
+      basic: '基础层',
+      emotional: '情感层'
+    };
+
+    // Type name mapping for display
+    const typeNames = {
+      text: '文本',
+      textarea: '多行文本',
+      voice: '语音'
+    };
+
+    // Group questions by role and layer
+    const groupedQuestions = {};
+    questions.forEach(q => {
+      const roleKey = q.role;
+      const layerKey = q.layer;
+      if (!groupedQuestions[roleKey]) {
+        groupedQuestions[roleKey] = {};
+      }
+      if (!groupedQuestions[roleKey][layerKey]) {
+        groupedQuestions[roleKey][layerKey] = [];
+      }
+      groupedQuestions[roleKey][layerKey].push(q);
+    });
+
+    // Create document sections
+    const children = [];
+
+    // Title
+    children.push(
+      new Paragraph({
+        text: '问卷导出报告',
+        heading: HeadingLevel.HEADING_1,
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 400 }
+      })
+    );
+
+    // Metadata section
+    children.push(
+      new Paragraph({
+        text: '导出信息',
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 400, after: 200 }
+      })
+    );
+
+    const exportTime = new Date().toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: '导出时间：', bold: true }),
+          new TextRun(exportTime)
+        ],
+        spacing: { after: 100 }
+      })
+    );
+
+    if (role) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: '角色筛选：', bold: true }),
+            new TextRun(roleNames[role] || role)
+          ],
+          spacing: { after: 100 }
+        })
+      );
+    } else {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: '角色筛选：', bold: true }),
+            new TextRun('全部')
+          ],
+          spacing: { after: 100 }
+        })
+      );
+    }
+
+    if (layer) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: '层级筛选：', bold: true }),
+            new TextRun(layerNames[layer] || layer)
+          ],
+          spacing: { after: 100 }
+        })
+      );
+    } else {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: '层级筛选：', bold: true }),
+            new TextRun('全部')
+          ],
+          spacing: { after: 100 }
+        })
+      );
+    }
+
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: '问题总数：', bold: true }),
+          new TextRun(String(questions.length))
+        ],
+        spacing: { after: 300 }
+      })
+    );
+
+    // Questions grouped by role and layer
+    const sortedRoles = Object.keys(groupedQuestions).sort();
+    sortedRoles.forEach(roleKey => {
+      // Role heading
+      children.push(
+        new Paragraph({
+          text: roleNames[roleKey] || roleKey,
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 400, after: 200 }
+        })
+      );
+
+      const sortedLayers = Object.keys(groupedQuestions[roleKey]).sort();
+      sortedLayers.forEach(layerKey => {
+        // Layer heading
+        children.push(
+          new Paragraph({
+            text: layerNames[layerKey] || layerKey,
+            heading: HeadingLevel.HEADING_3,
+            spacing: { before: 200, after: 200 }
+          })
+        );
+
+        // Create table for this layer's questions
+        const layerQuestions = groupedQuestions[roleKey][layerKey];
+        const tableRows = [
+          // Header row
+          new TableRow({
+            children: [
+              new TableCell({
+                children: [new Paragraph({ text: '序号', alignment: AlignmentType.CENTER })],
+                width: { size: 10, type: WidthType.PERCENTAGE },
+                shading: { fill: 'E0E0E0' }
+              }),
+              new TableCell({
+                children: [new Paragraph({ text: '问题内容', alignment: AlignmentType.CENTER })],
+                width: { size: 35, type: WidthType.PERCENTAGE },
+                shading: { fill: 'E0E0E0' }
+              }),
+              new TableCell({
+                children: [new Paragraph({ text: '类型', alignment: AlignmentType.CENTER })],
+                width: { size: 10, type: WidthType.PERCENTAGE },
+                shading: { fill: 'E0E0E0' }
+              }),
+              new TableCell({
+                children: [new Paragraph({ text: '状态', alignment: AlignmentType.CENTER })],
+                width: { size: 10, type: WidthType.PERCENTAGE },
+                shading: { fill: 'E0E0E0' }
+              }),
+              new TableCell({
+                children: [new Paragraph({ text: '占位符', alignment: AlignmentType.CENTER })],
+                width: { size: 20, type: WidthType.PERCENTAGE },
+                shading: { fill: 'E0E0E0' }
+              }),
+              new TableCell({
+                children: [new Paragraph({ text: '意义说明', alignment: AlignmentType.CENTER })],
+                width: { size: 15, type: WidthType.PERCENTAGE },
+                shading: { fill: 'E0E0E0' }
+              })
+            ]
+          })
+        ];
+
+        // Data rows
+        layerQuestions.forEach(q => {
+          tableRows.push(
+            new TableRow({
+              children: [
+                new TableCell({
+                  children: [new Paragraph({ text: String(q.order), alignment: AlignmentType.CENTER })]
+                }),
+                new TableCell({
+                  children: [new Paragraph(q.question)]
+                }),
+                new TableCell({
+                  children: [new Paragraph({ text: typeNames[q.type] || q.type, alignment: AlignmentType.CENTER })]
+                }),
+                new TableCell({
+                  children: [new Paragraph({
+                    text: q.active ? '启用' : '禁用',
+                    alignment: AlignmentType.CENTER
+                  })]
+                }),
+                new TableCell({
+                  children: [new Paragraph(q.placeholder || '-')]
+                }),
+                new TableCell({
+                  children: [new Paragraph(q.significance || '-')]
+                })
+              ]
+            })
+          );
+        });
+
+        children.push(
+          new Table({
+            rows: tableRows,
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 1 },
+              bottom: { style: BorderStyle.SINGLE, size: 1 },
+              left: { style: BorderStyle.SINGLE, size: 1 },
+              right: { style: BorderStyle.SINGLE, size: 1 },
+              insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
+              insideVertical: { style: BorderStyle.SINGLE, size: 1 }
+            }
+          })
+        );
+
+        children.push(
+          new Paragraph({ text: '', spacing: { after: 300 } })
+        );
+      });
+    });
+
+    // Create document
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children
+      }]
+    });
+
+    // Return buffer using Packer
+    return await Packer.toBuffer(doc);
+  }
+
   /**
    * Memory Management
    */
@@ -433,11 +757,17 @@ class AdminService {
           logger.warn(`[AdminService] Failed to check vector index for user ${user._id}:`, error.message);
         }
 
-        // Check if roleCard is generated
-        const roleCardGenerated = !!(user.companionChat?.roleCard &&
-          (user.companionChat.roleCard.personality ||
-           user.companionChat.roleCard.background ||
-           user.companionChat.roleCard.generatedAt));
+        // Check if roleCard exists in file system (source of truth)
+        // V2 uses rolecard-v2.json, V1 uses rolecard.json
+        let roleCardGenerated = false;
+        try {
+          const dualStorage = new DualStorage();
+          const roleCardV2 = await dualStorage.loadRoleCardV2(String(user._id));
+          const roleCardV1 = roleCardV2 ? null : await dualStorage.loadRoleCard(String(user._id));
+          roleCardGenerated = !!(roleCardV2 || roleCardV1);
+        } catch (error) {
+          logger.warn(`[AdminService] Failed to check role card for user ${user._id}:`, error.message);
+        }
 
         return {
           _id: String(user._id),
