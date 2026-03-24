@@ -2,17 +2,33 @@
 export const rolecardDefault = {
   flowId: 'rolecard',
   flowName: 'AI角色卡对话',
-  description: '基于角色卡的AI伴侣对话流程',
+  description: '基于角色卡的AI伴侣对话流程 V3 - 支持倾诉模式与命理分析',
+  // 流程开关配置
+  flowSettings: {
+    fortuneTellingEnabled: {
+      type: 'boolean',
+      default: true,
+      description: '是否启用算命预测分支（用户直接要求算命时触发）'
+    },
+    ventingEnabled: {
+      type: 'boolean',
+      default: true,
+      description: '是否启用倾诉倾听分支'
+    }
+  },
   nodes: [
     {
-      nodeId: 'input_processor',
-      nodeName: '输入处理',
+      nodeId: 'intent_classifier',
+      nodeName: '意图分类',
       nodeType: 'start',
       promptType: 'none',
       staticPrompt: '',
-      dynamicSources: [{ name: '用户消息', description: '用户输入的原始消息' }],
-      llmEnabled: false,
-      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.7, maxTokens: 500 },
+      dynamicSources: [
+        { name: '用户消息', description: '用户输入的原始消息' },
+        { name: '对话历史', description: '最近对话记录用于意图判断' }
+      ],
+      llmEnabled: true,
+      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.3, maxTokens: 200 },
       position: { x: 300, y: 50 }
     },
     {
@@ -36,7 +52,7 @@ export const rolecardDefault = {
       promptType: 'none',
       staticPrompt: '',
       dynamicSources: [{ name: '消息内容', description: '分析消息是否涉及记忆' }],
-      llmEnabled: false,
+      llmEnabled: true,
       llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.3, maxTokens: 100 },
       position: { x: 300, y: 210 }
     },
@@ -86,6 +102,67 @@ export const rolecardDefault = {
       position: { x: 300, y: 450 }
     },
     {
+      nodeId: 'listening_phase',
+      nodeName: '倾听阶段',
+      nodeType: 'process',
+      promptType: 'none',
+      staticPrompt: '',
+      dynamicSources: [
+        { name: '用户消息', description: '用户倾诉的内容' },
+        { name: '倾听轮次', description: '当前倾听次数' },
+        { name: '角色卡设定', description: '角色卡的性格和关系' }
+      ],
+      llmEnabled: true,
+      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.8, maxTokens: 300 },
+      position: { x: 500, y: 290 }
+    },
+    {
+      nodeId: 'chart_rag_retriever',
+      nodeName: '命盘RAG检索',
+      nodeType: 'process',
+      promptType: 'none',
+      staticPrompt: '',
+      dynamicSources: [
+        { name: '用户命盘', description: '紫微斗数命盘数据' },
+        { name: '命理知识库', description: 'RAG检索命理相关知识' },
+        { name: '核心关注点', description: '用户倾诉的核心问题' }
+      ],
+      llmEnabled: false,
+      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.5, maxTokens: 200 },
+      position: { x: 500, y: 370 }
+    },
+    {
+      nodeId: 'fortune_generator',
+      nodeName: '命理分析',
+      nodeType: 'process',
+      promptType: 'none',
+      staticPrompt: '',
+      dynamicSources: [
+        { name: '命盘数据', description: '用户命盘详细信息' },
+        { name: 'RAG结果', description: '命理知识检索结果' },
+        { name: '用户问题', description: '倾诉的核心关注点' }
+      ],
+      llmEnabled: true,
+      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.5, maxTokens: 500 },
+      position: { x: 500, y: 450 }
+    },
+    {
+      nodeId: 'role_translator',
+      nodeName: '角色口吻转换',
+      nodeType: 'process',
+      promptType: 'none',
+      staticPrompt: '',
+      dynamicSources: [
+        { name: '命理分析', description: '内部命理分析报告' },
+        { name: '角色卡设定', description: '角色卡的性格、口吻、关系' },
+        { name: '隐藏术语', description: 'hideFortuneTerms配置' }
+      ],
+      llmEnabled: true,
+      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.8, maxTokens: 500 },
+      hideFortuneTerms: true,
+      position: { x: 500, y: 530 }
+    },
+    {
       nodeId: 'token_response',
       nodeName: 'Token响应',
       nodeType: 'condition',
@@ -97,7 +174,7 @@ export const rolecardDefault = {
       ],
       llmEnabled: false,
       llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.7, maxTokens: 500 },
-      position: { x: 300, y: 530 }
+      position: { x: 300, y: 610 }
     },
     {
       nodeId: 'output_formatter',
@@ -111,17 +188,26 @@ export const rolecardDefault = {
       ],
       llmEnabled: false,
       llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.7, maxTokens: 500 },
-      position: { x: 300, y: 610 }
+      position: { x: 300, y: 690 }
     }
   ],
   edges: [
-    { source: 'input_processor', target: 'token_monitor', conditionType: 'always', label: '' },
-    { source: 'token_monitor', target: 'memory_check', conditionType: 'always', label: '' },
+    // 普通聊天分支
+    { source: 'intent_classifier', target: 'token_monitor', conditionType: 'always', label: '' },
+    { source: 'token_monitor', target: 'memory_check', conditionType: 'conditional', label: '普通聊天' },
     { source: 'memory_check', target: 'rag_retriever', conditionType: 'conditional', label: '涉及记忆' },
     { source: 'memory_check', target: 'context_builder', conditionType: 'conditional', label: '无需检索' },
     { source: 'rag_retriever', target: 'context_builder', conditionType: 'always', label: '' },
     { source: 'context_builder', target: 'response_generator', conditionType: 'always', label: '' },
     { source: 'response_generator', target: 'token_response', conditionType: 'always', label: '' },
-    { source: 'token_response', target: 'output_formatter', conditionType: 'always', label: '' }
+    { source: 'token_response', target: 'output_formatter', conditionType: 'always', label: '' },
+
+    // 倾诉-倾听分支
+    { source: 'token_monitor', target: 'listening_phase', conditionType: 'conditional', label: '倾诉模式' },
+    { source: 'listening_phase', target: 'chart_rag_retriever', conditionType: 'conditional', label: '进入分析' },
+    { source: 'listening_phase', target: 'output_formatter', conditionType: 'conditional', label: '继续倾听' },
+    { source: 'chart_rag_retriever', target: 'fortune_generator', conditionType: 'always', label: '' },
+    { source: 'fortune_generator', target: 'role_translator', conditionType: 'always', label: '' },
+    { source: 'role_translator', target: 'output_formatter', conditionType: 'always', label: '' }
   ]
 };
