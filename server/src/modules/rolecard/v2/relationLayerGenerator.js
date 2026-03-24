@@ -13,12 +13,45 @@ import {
 } from './prompts/relationExtractionV2.js';
 import Answer from '../../qa/models/answer.js';
 import Question from '../../qa/models/question.js';
-import MultiLLMClient from '../../../core/llm/multi.js';
+import LLMClient from '../../../core/llm/client.js';
 import { llmConfig } from '../../../core/llm/config.js';
 import DualStorage from '../../../core/storage/dual.js';
 import User from '../../user/model.js';
 import AssistRelation from '../../assist/model.js';
 import { profileLogger } from '../../../core/utils/logger.js';
+
+/**
+ * 根据配置创建 LLM 客户端
+ * @param {Object} config - 操作配置 { source, model, apiProvider, temperature, maxTokens }
+ * @returns {LLMClient} LLM 客户端实例
+ */
+function createLLMClientFromConfig(config) {
+  const backend = config.source === 'api'
+    ? (config.apiProvider || 'deepseek')
+    : 'ollama';
+
+  return new LLMClient(config.model, {
+    backend,
+    temperature: config.temperature || 0.3,
+    maxRetries: 3,
+    timeout: 60000
+  });
+}
+
+/**
+ * 获取 LLM 配置
+ * @returns {Promise<Object|null>} LLM 配置对象
+ */
+async function getLLMConfig() {
+  try {
+    const RoleCardLLMConfig = (await import('../configModel.js')).default;
+    const config = await RoleCardLLMConfig.getOrCreateDefault();
+    return config;
+  } catch (error) {
+    profileLogger.warn('获取LLM配置失败，使用默认配置', { error: error.message });
+    return null;
+  }
+}
 
 /**
  * 关系层生成器 V2
@@ -28,10 +61,45 @@ import { profileLogger } from '../../../core/utils/logger.js';
  */
 class RelationLayerGenerator {
   constructor() {
-    this.llmClient = new MultiLLMClient();
     this.dualStorage = new DualStorage();
+    // LLM 客户端将在 generateOne 时根据配置初始化
+    this.extractionClient = null;
+    this.compressionClient = null;
+    this.trustAnalysisClient = null;
     // 用于收集每个字段的片段
     this.fieldFragments = {};
+  }
+
+  /**
+   * 初始化 LLM 客户端
+   * @private
+   */
+  async _initializeLLMClients() {
+    const config = await getLLMConfig();
+
+    if (config) {
+      this.extractionClient = createLLMClientFromConfig(config.relationExtraction);
+      this.compressionClient = createLLMClientFromConfig(config.relationCompression);
+      this.trustAnalysisClient = createLLMClientFromConfig(config.trustAnalysis);
+      profileLogger.info('使用数据库配置初始化关系层LLM客户端', {
+        extractionModel: config.relationExtraction.model,
+        compressionModel: config.relationCompression.model,
+        trustAnalysisModel: config.trustAnalysis.model
+      });
+    } else {
+      // 回退到默认配置
+      const defaultConfig = llmConfig.getOllamaConfig();
+      this.extractionClient = new LLMClient(defaultConfig.model, {
+        backend: 'ollama',
+        baseUrl: defaultConfig.baseUrl,
+        temperature: 0.3
+      });
+      this.compressionClient = this.extractionClient;
+      this.trustAnalysisClient = this.extractionClient;
+      profileLogger.info('使用默认配置初始化关系层LLM客户端', {
+        model: defaultConfig.model
+      });
+    }
   }
 
   /**
@@ -130,6 +198,9 @@ class RelationLayerGenerator {
       specificRelation,
       relationType
     });
+
+    // 0. 初始化 LLM 客户端
+    await this._initializeLLMClients();
 
     // 重置字段片段容器
     this.resetFieldFragments(relationType);
@@ -325,7 +396,7 @@ class RelationLayerGenerator {
         temperature: 0.3,
         maxTokens: 1000,
         responseFormat: 'json'
-      });
+      }, 3, 'extraction');
 
       if (extracted && extracted.extractedFields) {
         // 将提取的内容添加到对应字段的片段列表
@@ -382,7 +453,7 @@ class RelationLayerGenerator {
           temperature: 0.3,
           maxTokens: (field?.tokenTarget || 200) + 100,
           responseFormat: 'json'
-        });
+        }, 3, 'compression');
 
         compressedFields[fieldName] = {
           keyPoints: compressed?.keyPoints || [],
@@ -444,7 +515,7 @@ class RelationLayerGenerator {
         temperature: 0.2,
         maxTokens: 300,
         responseFormat: 'json'
-      });
+      }, 3, 'trustAnalysis');
 
       if (result && result.trustLevel) {
         // 验证返回的 trustLevel 是否有效
@@ -535,12 +606,24 @@ class RelationLayerGenerator {
    * @param {string} prompt - 提示词
    * @param {Object} options - LLM 调用选项
    * @param {number} maxRetries - 最大重试次数
+   * @param {string} clientType - 客户端类型 'extraction' | 'compression' | 'trustAnalysis'
    * @returns {Promise<Object|null>} 解析后的 JSON 对象或 null
    */
-  async callLLMWithRetry(prompt, options, maxRetries = 3) {
+  async callLLMWithRetry(prompt, options, maxRetries = 3, clientType = 'extraction') {
+    const clientMap = {
+      extraction: this.extractionClient,
+      compression: this.compressionClient,
+      trustAnalysis: this.trustAnalysisClient
+    };
+    const client = clientMap[clientType];
+
+    if (!client) {
+      throw new Error(`LLM 客户端未初始化: ${clientType}`);
+    }
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const response = await this.llmClient.generate(prompt, options);
+        const response = await client.generate(prompt, options);
         const parsed = this.parseJsonResponse(response);
 
         if (parsed) {
