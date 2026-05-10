@@ -45,7 +45,8 @@ class MultiLLMClient {
         baseUrl: ollamaConfig.baseUrl,
         temperature: ollamaConfig.temperature,
         maxRetries: ollamaConfig.maxRetries,
-        timeout: ollamaConfig.timeout
+        timeout: ollamaConfig.timeout,
+        keepAlive: ollamaConfig.keepAlive
       });
       logger.info(`本地 Ollama 客户端已初始化: ${ollamaConfig.model}`);
     }

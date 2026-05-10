@@ -19,6 +19,8 @@ const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://modelserver:11434
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'deepseek-r1:14b';
 // Ollama 健康检查超时配置（毫秒）- 默认30秒
 const OLLAMA_HEALTH_CHECK_TIMEOUT = parseInt(process.env.OLLAMA_TIMEOUT || '30000', 10);
+// Ollama keep_alive 配置 - 默认30分钟，避免每次请求重新加载模型
+const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '30m';
 
 // DeepSeek API 配置
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || '';
@@ -87,6 +89,7 @@ class LLMClient {
         temperature: this.temperature,
         maxRetries: this.maxRetries,
         timeout: this.timeout,
+        keepAlive: options.keepAlive || OLLAMA_KEEP_ALIVE,
         ...options
       });
     }
@@ -344,7 +347,8 @@ class LLMClient {
         baseUrl: this.baseUrl,
         temperature: this.temperature,
         maxRetries: this.maxRetries,
-        timeout: this.timeout
+        timeout: this.timeout,
+        keepAlive: OLLAMA_KEEP_ALIVE
       });
     }
   }

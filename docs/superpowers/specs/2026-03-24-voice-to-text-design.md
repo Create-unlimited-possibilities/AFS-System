@@ -1,7 +1,8 @@
 # 语音转文字 + 粤语翻译功能设计文档
 
 > 创建日期: 2026-03-24
-> 状态: 已确认
+> 更新日期: 2026-03-26
+> 状态: 前端组件已完成 (MOCK)，后端待实现
 
 ## 1. 功能概述
 
@@ -72,24 +73,48 @@
 
 **文件位置**: `web/components/ui/voice-recorder.tsx`
 
+**状态**: ✅ 前端组件已完成 (MOCK 实现)
+
 ```typescript
 interface VoiceRecorderProps {
-  onTranscript: (text: string) => void  // 转录文字回调（追加到文本框）
+  onTranscript?: (text: string) => void  // 转录文字回调（预留接口）
   disabled?: boolean
+  className?: string
+  size?: "sm" | "md" | "lg"
 }
 ```
 
 **功能**:
 - 麦克风按钮（点击开始/停止录音）
-- 录音状态指示器（红色圆点动画）
+- 录音状态指示器（红色脉冲动画 + 高对比度视觉效果）
 - 实时显示转录中的文字
-- WebSocket 连接到 Node.js 代理
+- WebSocket 连接到 Node.js 代理（待实现）
+
+**使用示例**:
+```tsx
+import { VoiceRecorder } from "@/components/ui/voice-recorder"
+
+// 基础用法
+<VoiceRecorder />
+
+// 带回调
+<VoiceRecorder
+  onTranscript={(text) => {
+    console.log("转录结果:", text)
+    // 将文字追加到文本框
+  }}
+  size="md"
+/>
+
+// 禁用状态
+<VoiceRecorder disabled />
+```
 
 **交互流程**:
-1. 用户点击麦克风按钮 → 开始录音
-2. 音频流通过 WebSocket 发送到转录服务
-3. 转录服务返回文字 → 追加到文本框
-4. 用户再次点击 → 停止录音
+1. 用户点击麦克风按钮 → 开始录音（红色脉冲动画）
+2. 音频流通过 WebSocket 发送到转录服务（待实现）
+3. 转录服务返回文字 → 追加到文本框（待实现）
+4. 用户再次点击 → 停止录音（动画消失）
 
 ### 3.2 翻译开关
 

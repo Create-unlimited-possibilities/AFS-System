@@ -38,6 +38,7 @@ class LLMConfig {
       ollamaBaseUrl: process.env.OLLAMA_BASE_URL || 'http://modelserver:11434',
       ollamaModel: process.env.OLLAMA_MODEL || 'qwen2.5',
       ollamaModelPath: process.env.OLLAMA_MODEL_PATH || '@model\\models\\blobs\\',
+      ollamaKeepAlive: process.env.OLLAMA_KEEP_ALIVE || '30m',
       
       // 降级策略
       fallbackStrategy: process.env.LLM_FALLBACK_STRATEGY || 'api-local',
@@ -136,7 +137,8 @@ class LLMConfig {
       modelPath: this.config.ollamaModelPath,
       timeout: this.config.timeout,
       maxRetries: this.config.maxRetries,
-      temperature: this.config.temperature
+      temperature: this.config.temperature,
+      keepAlive: this.config.ollamaKeepAlive
     };
   }
 

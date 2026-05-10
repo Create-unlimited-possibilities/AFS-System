@@ -267,8 +267,9 @@ export function useChat() {
         // Use backend response for AI reply
         const response = data.response || data.message
 
-        if (isXiaoShuDong && data.sentences && data.sentences.length > 0) {
-          // 逐句显示 AI 回复 (小树洞)
+        // Apply sentence-by-sentence display for ALL conversations that return sentences
+        if (data.sentences && data.sentences.length > 0) {
+          // 逐句显示 AI 回复 (支持小树洞和角色卡对话)
           const sentences = data.sentences
           let currentIndex = 0
 
@@ -293,7 +294,7 @@ export function useChat() {
           const initialDelay = 1000 + Math.random() * 1000
           setTimeout(addNextSentence, initialDelay)
         } else {
-          // 普通 AI 角色卡对话 - 直接显示完整回复
+          // 无句子分割时直接显示完整回复
           setMessages(prev => [...prev, {
             id: `ai_${Date.now()}`,
             role: 'assistant' as const,

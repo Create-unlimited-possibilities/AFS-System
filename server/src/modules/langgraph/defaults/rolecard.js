@@ -102,67 +102,6 @@ export const rolecardDefault = {
       position: { x: 300, y: 450 }
     },
     {
-      nodeId: 'listening_phase',
-      nodeName: '倾听阶段',
-      nodeType: 'process',
-      promptType: 'none',
-      staticPrompt: '',
-      dynamicSources: [
-        { name: '用户消息', description: '用户倾诉的内容' },
-        { name: '倾听轮次', description: '当前倾听次数' },
-        { name: '角色卡设定', description: '角色卡的性格和关系' }
-      ],
-      llmEnabled: true,
-      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.8, maxTokens: 300 },
-      position: { x: 500, y: 290 }
-    },
-    {
-      nodeId: 'chart_rag_retriever',
-      nodeName: '命盘RAG检索',
-      nodeType: 'process',
-      promptType: 'none',
-      staticPrompt: '',
-      dynamicSources: [
-        { name: '用户命盘', description: '紫微斗数命盘数据' },
-        { name: '命理知识库', description: 'RAG检索命理相关知识' },
-        { name: '核心关注点', description: '用户倾诉的核心问题' }
-      ],
-      llmEnabled: false,
-      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.5, maxTokens: 200 },
-      position: { x: 500, y: 370 }
-    },
-    {
-      nodeId: 'fortune_generator',
-      nodeName: '命理分析',
-      nodeType: 'process',
-      promptType: 'none',
-      staticPrompt: '',
-      dynamicSources: [
-        { name: '命盘数据', description: '用户命盘详细信息' },
-        { name: 'RAG结果', description: '命理知识检索结果' },
-        { name: '用户问题', description: '倾诉的核心关注点' }
-      ],
-      llmEnabled: true,
-      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.5, maxTokens: 500 },
-      position: { x: 500, y: 450 }
-    },
-    {
-      nodeId: 'role_translator',
-      nodeName: '角色口吻转换',
-      nodeType: 'process',
-      promptType: 'none',
-      staticPrompt: '',
-      dynamicSources: [
-        { name: '命理分析', description: '内部命理分析报告' },
-        { name: '角色卡设定', description: '角色卡的性格、口吻、关系' },
-        { name: '隐藏术语', description: 'hideFortuneTerms配置' }
-      ],
-      llmEnabled: true,
-      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.8, maxTokens: 500 },
-      hideFortuneTerms: true,
-      position: { x: 500, y: 530 }
-    },
-    {
       nodeId: 'token_response',
       nodeName: 'Token响应',
       nodeType: 'condition',
@@ -174,7 +113,7 @@ export const rolecardDefault = {
       ],
       llmEnabled: false,
       llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.7, maxTokens: 500 },
-      position: { x: 300, y: 610 }
+      position: { x: 300, y: 530 }
     },
     {
       nodeId: 'output_formatter',
@@ -189,10 +128,119 @@ export const rolecardDefault = {
       llmEnabled: false,
       llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.7, maxTokens: 500 },
       position: { x: 300, y: 690 }
+    },
+    // ===== 倾诉模式分支 (左侧 x=450) =====
+    {
+      nodeId: 'listening_phase',
+      nodeName: '倾听阶段',
+      nodeType: 'process',
+      promptType: 'none',
+      staticPrompt: '',
+      dynamicSources: [
+        { name: '用户消息', description: '用户倾诉的内容' },
+        { name: '倾听轮次', description: '当前倾听次数' },
+        { name: '角色卡设定', description: '角色卡的性格和关系' }
+      ],
+      llmEnabled: true,
+      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.8, maxTokens: 300 },
+      position: { x: 450, y: 290 }
+    },
+    {
+      nodeId: 'chart_rag_retriever',
+      nodeName: '命盘RAG检索',
+      nodeType: 'process',
+      promptType: 'none',
+      staticPrompt: '',
+      dynamicSources: [
+        { name: '用户命盘', description: '紫微斗数命盘数据' },
+        { name: '命理知识库', description: 'RAG检索命理相关知识' },
+        { name: '核心关注点', description: '用户倾诉的核心问题' }
+      ],
+      llmEnabled: false,
+      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.5, maxTokens: 200 },
+      position: { x: 450, y: 370 }
+    },
+    {
+      nodeId: 'fortune_generator',
+      nodeName: '命理分析',
+      nodeType: 'process',
+      promptType: 'none',
+      staticPrompt: '',
+      dynamicSources: [
+        { name: '命盘数据', description: '用户命盘详细信息' },
+        { name: 'RAG结果', description: '命理知识检索结果' },
+        { name: '用户问题', description: '倾诉的核心关注点' }
+      ],
+      llmEnabled: true,
+      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.5, maxTokens: 500 },
+      position: { x: 450, y: 450 }
+    },
+    {
+      nodeId: 'role_translator',
+      nodeName: '角色口吻转换',
+      nodeType: 'process',
+      promptType: 'none',
+      staticPrompt: '',
+      dynamicSources: [
+        { name: '命理分析', description: '内部命理分析报告' },
+        { name: '角色卡设定', description: '角色卡的性格、口吻、关系' },
+        { name: '隐藏术语', description: 'hideFortuneTerms配置' }
+      ],
+      llmEnabled: true,
+      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.8, maxTokens: 500 },
+      hideFortuneTerms: true,  // 倾诉模式：隐藏命理术语
+      position: { x: 450, y: 530 }
+    },
+    // ===== 算命预测分支 (右侧 x=600) - 独立节点 =====
+    {
+      nodeId: 'direct_fortune_rag',
+      nodeName: '算命RAG检索',
+      nodeType: 'process',
+      promptType: 'none',
+      staticPrompt: '',
+      dynamicSources: [
+        { name: '用户命盘', description: '紫微斗数命盘数据' },
+        { name: '命理知识库', description: 'RAG检索命理相关知识' },
+        { name: '算命问题', description: '用户直接提出的算命问题' }
+      ],
+      llmEnabled: false,
+      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.5, maxTokens: 200 },
+      position: { x: 600, y: 290 }
+    },
+    {
+      nodeId: 'direct_fortune_analyzer',
+      nodeName: '算命分析',
+      nodeType: 'process',
+      promptType: 'none',
+      staticPrompt: '',
+      dynamicSources: [
+        { name: '命盘数据', description: '用户命盘详细信息' },
+        { name: 'RAG结果', description: '命理知识检索结果' },
+        { name: '算命问题', description: '用户直接提出的算命问题' }
+      ],
+      llmEnabled: true,
+      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.5, maxTokens: 500 },
+      position: { x: 600, y: 370 }
+    },
+    {
+      nodeId: 'direct_fortune_translator',
+      nodeName: '算命口吻转换',
+      nodeType: 'process',
+      promptType: 'none',
+      staticPrompt: '',
+      dynamicSources: [
+        { name: '算命分析', description: '命理分析结果' },
+        { name: '角色卡设定', description: '角色卡的性格、口吻、关系' },
+        { name: '显示术语', description: 'hideFortuneTerms=false' }
+      ],
+      llmEnabled: true,
+      llmConfig: { source: 'ollama', model: 'deepseek-r1:14b', temperature: 0.8, maxTokens: 500 },
+      hideFortuneTerms: false,  // 算命预测：显示命理术语
+      position: { x: 600, y: 450 }
     }
   ],
   edges: [
-    // 普通聊天分支
+    // ===== 普通聊天分支 (中间) =====
     { source: 'intent_classifier', target: 'token_monitor', conditionType: 'always', label: '' },
     { source: 'token_monitor', target: 'memory_check', conditionType: 'conditional', label: '普通聊天' },
     { source: 'memory_check', target: 'rag_retriever', conditionType: 'conditional', label: '涉及记忆' },
@@ -202,7 +250,7 @@ export const rolecardDefault = {
     { source: 'response_generator', target: 'token_response', conditionType: 'always', label: '' },
     { source: 'token_response', target: 'output_formatter', conditionType: 'always', label: '' },
 
-    // 倾诉-倾听分支
+    // ===== 倾诉模式分支 (左侧) =====
     { source: 'token_monitor', target: 'listening_phase', conditionType: 'conditional', label: '倾诉模式' },
     { source: 'listening_phase', target: 'chart_rag_retriever', conditionType: 'conditional', label: '进入分析' },
     { source: 'listening_phase', target: 'output_formatter', conditionType: 'conditional', label: '继续倾听' },
@@ -210,7 +258,10 @@ export const rolecardDefault = {
     { source: 'fortune_generator', target: 'role_translator', conditionType: 'always', label: '' },
     { source: 'role_translator', target: 'output_formatter', conditionType: 'always', label: '' },
 
-    // 算命预测分支（直接进入分析，无倾听阶段）
-    { source: 'token_monitor', target: 'chart_rag_retriever', conditionType: 'conditional', label: '算命预测' }
+    // ===== 算命预测分支 (右侧) - 独立路径 =====
+    { source: 'token_monitor', target: 'direct_fortune_rag', conditionType: 'conditional', label: '算命预测' },
+    { source: 'direct_fortune_rag', target: 'direct_fortune_analyzer', conditionType: 'always', label: '' },
+    { source: 'direct_fortune_analyzer', target: 'direct_fortune_translator', conditionType: 'always', label: '' },
+    { source: 'direct_fortune_translator', target: 'output_formatter', conditionType: 'always', label: '' }
   ]
 };

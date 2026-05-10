@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { ArrowLeft, Send, Loader2, AlertCircle, Lightbulb } from 'lucide-react'
 import Link from 'next/link'
+import { VoiceRecorder } from '@/components/ui/voice-recorder'
 
 interface Contact {
   targetUserId: string
@@ -226,6 +227,12 @@ export function ChatPanel({
       {/* Input */}
       <div className="bg-white border-t border-gray-200 p-3 shrink-0">
         <div className="flex items-center gap-2">
+          <VoiceRecorder
+            size="sm"
+            onTranscript={(text) => {
+              setInput(prev => prev + text)
+            }}
+          />
           <input
             type="text"
             placeholder="Type a message..."

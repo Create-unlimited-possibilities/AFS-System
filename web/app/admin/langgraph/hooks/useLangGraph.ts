@@ -88,8 +88,8 @@ export function useLangGraph() {
     try {
       const result = await adminApiRequest<{ success: boolean; data: LangGraphFlowDetail }>(`/admin/langgraph/flows/${flowId}`);
       console.log('[useLangGraph] API result:', result);
-      console.log('[useLangGraph] Nodes:', result.data?.nodes?.length, result.data?.nodes?.map((n: any) => n.nodeId));
-      console.log('[useLangGraph] Edges:', result.data?.edges?.length, result.data?.edges);
+      console.log('[useLangGraph] Nodes:', result.data?.nodes?.length);
+      console.log('[useLangGraph] Edges:', result.data?.edges?.length);
       if (result.success && result.data) {
         setCurrentFlow(result.data);
       } else {

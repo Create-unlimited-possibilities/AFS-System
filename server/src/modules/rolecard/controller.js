@@ -501,8 +501,13 @@ class RoleCardController {
       // 回退到旧版角色卡
       const user = await User.findById(userId);
 
-      if (user?.companionChat?.roleCard) {
-        const roleCard = user.companionChat.roleCard;
+      // Check if roleCard has actual content (not just an empty placeholder)
+      // An empty placeholder has no personality and no generatedAt timestamp
+      const mongoRoleCard = user?.companionChat?.roleCard;
+      const hasValidRoleCard = mongoRoleCard && (mongoRoleCard.personality || mongoRoleCard.generatedAt);
+
+      if (hasValidRoleCard) {
+        const roleCard = mongoRoleCard;
         return res.json({
           success: true,
           roleCard: {

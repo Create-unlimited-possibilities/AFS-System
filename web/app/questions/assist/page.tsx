@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 import { Send, Mic, Save, MessageSquare, Sparkles, ArrowLeft, AlertCircle, CheckCircle, LogOut } from 'lucide-react'
+import { VoiceRecorder } from '@/components/ui/voice-recorder'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Modal from '@/components/ui/modal'
@@ -427,20 +428,36 @@ function AssistQuestionsContent() {
                     ))}
                   </div>
                 ) : question.questionType === 'textarea' ? (
-                  <textarea
-                    value={answers[question._id] || ''}
-                    onChange={(e) => handleAnswerChange(question._id, e.target.value)}
-                    placeholder="请输入您的回答..."
-                    className="w-full min-h-[120px] px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all duration-300 resize-none"
-                  />
+                  <div className="flex items-start gap-2">
+                    <textarea
+                      value={answers[question._id] || ''}
+                      onChange={(e) => handleAnswerChange(question._id, e.target.value)}
+                      placeholder="请输入您的回答..."
+                      className="flex-1 min-h-[120px] px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all duration-300 resize-none"
+                    />
+                    <VoiceRecorder
+                      size="md"
+                      onTranscript={(text) => {
+                        handleAnswerChange(question._id, (answers[question._id] || '') + text)
+                      }}
+                    />
+                  </div>
                 ) : (
-                  <Input
-                    type="text"
-                    value={answers[question._id] || ''}
-                    onChange={(e) => handleAnswerChange(question._id, e.target.value)}
-                    placeholder="请输入您的回答..."
-                    className="h-12 border-2 border-gray-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all duration-300"
-                  />
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="text"
+                      value={answers[question._id] || ''}
+                      onChange={(e) => handleAnswerChange(question._id, e.target.value)}
+                      placeholder="请输入您的回答..."
+                      className="flex-1 h-12 border-2 border-gray-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all duration-300"
+                    />
+                    <VoiceRecorder
+                      size="md"
+                      onTranscript={(text) => {
+                        handleAnswerChange(question._id, (answers[question._id] || '') + text)
+                      }}
+                    />
+                  </div>
                 )}
               </CardContent>
             </Card>

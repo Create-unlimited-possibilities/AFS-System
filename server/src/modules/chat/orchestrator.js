@@ -23,6 +23,10 @@ import { listeningPhaseNode } from './nodes/listeningPhase.js';
 import { chartRagRetrieverNode } from './nodes/chartRagRetriever.js';
 import { fortuneGeneratorNode } from './nodes/fortuneGenerator.js';
 import { roleTranslatorNode } from './nodes/roleTranslator.js';
+// New nodes for direct fortune telling branch (v3.1)
+import { directFortuneRagNode } from './nodes/directFortuneRag.js';
+import { directFortuneAnalyzerNode } from './nodes/directFortuneAnalyzer.js';
+import { directFortuneTranslatorNode } from './nodes/directFortuneTranslator.js';
 // Models and services
 import ChatSession from './model.js';
 import User from '../user/model.js';
@@ -52,7 +56,11 @@ class ChatGraphOrchestrator {
       listening_phase: listeningPhaseNode,
       chart_rag_retriever: chartRagRetrieverNode,
       fortune_generator: fortuneGeneratorNode,
-      role_translator: roleTranslatorNode
+      role_translator: roleTranslatorNode,
+      // New nodes for direct fortune telling branch (v3.1)
+      direct_fortune_rag: directFortuneRagNode,
+      direct_fortune_analyzer: directFortuneAnalyzerNode,
+      direct_fortune_translator: directFortuneTranslatorNode
     };
 
     this.activeSessions = new Map();

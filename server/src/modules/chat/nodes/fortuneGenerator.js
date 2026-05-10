@@ -3,15 +3,15 @@
  * Generates internal fortune-telling analysis report (not shown directly to user)
  *
  * This node:
- * 1. Uses ziwei-8b model to generate professional fortune analysis
+ * 1. Uses cloud API (with fallback to local) to generate professional fortune analysis
  * 2. Takes chart data, RAG context, and user concerns as input
  * 3. Produces internal report for role translator to transform
  *
  * @author AFS Team
- * @version 1.0.0
+ * @version 1.1.0
  */
 
-import ziweiLlm from '../../../core/ziwei/ziweiLlm.js';
+import { getLLMService } from '../../../core/llm/index.js';
 import logger from '../../../core/utils/logger.js';
 import { configLoader } from '../../langgraph/configLoader.js';
 
@@ -65,6 +65,24 @@ function buildEditableSection() {
   // Fallback
   return `# 分析指引\n\n请根据以下命盘信息和用户情况，提供专业的紫微斗数分析报告。\n\n---\n\n`;
 }
+
+/**
+ * System prompt for fortune generation (venting branch)
+ */
+const FORTUNE_GENERATOR_SYSTEM_PROMPT = `你是一位精通紫微斗数的专业命理师。你的任务是根据用户的命盘信息和倾诉内容，提供专业、详细、有深度的命理分析报告。
+
+## 分析要点
+1. 结合用户的情绪状态和核心关注点
+2. 分析相关宫位的主星组合和亮度
+3. 给出具有同理心的分析和建议
+
+## 注意事项
+- 保持专业但通俗易懂
+- 解释命理术语的含义
+- 给出积极正面的建议
+- 对用户的情绪表示理解
+
+请根据以下信息进行命理分析。`;
 
 /**
  * Build chart section from formatted chart text
@@ -171,23 +189,41 @@ export async function fortuneGeneratorNode(state) {
     const startTime = Date.now();
 
     // Build prompt using available state data
-    const prompt = buildFortunePrompt(state);
+    const userPrompt = buildFortunePrompt(state);
 
-    // Generate report using ziwei model
-    const response = await ziweiLlm.generateReportFromPrompt(prompt);
+    // Get LLM service (uses cloud API with fallback)
+    const llmService = getLLMService();
+
+    // Get LLM config from configLoader
+    const nodeConfig = configLoader.getNodeConfig('rolecard', 'fortune_generator');
+    const llmOptions = {
+      temperature: nodeConfig?.llmConfig?.temperature || 0.7,
+      maxTokens: nodeConfig?.llmConfig?.maxTokens || 4096
+    };
+
+    // Generate report using cloud API (with fallback)
+    const response = await llmService.chat({
+      messages: [
+        { role: 'system', content: FORTUNE_GENERATOR_SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: llmOptions.temperature,
+      maxTokens: llmOptions.maxTokens
+    });
 
     const duration = Date.now() - startTime;
+    const fortuneResponse = response.content || '';
 
-    state.fortuneResponse = response;
-    state.metadata.modelUsed = process.env.ZIWEI_MODEL || 'ziwei-8b';
+    state.fortuneResponse = fortuneResponse;
+    state.metadata.modelUsed = 'cloud-api';
     state.metadata.fortuneGenerated = true;
     state.metadata.fortuneGeneratedAt = new Date();
     state.metadata.fortuneGenerationDuration = duration;
-    state.metadata.fortuneResponseLength = response?.length || 0;
+    state.metadata.fortuneResponseLength = fortuneResponse.length;
 
     fortuneLogger.info(
       `[FortuneGenerator] 命理分析生成完成 ` +
-      `(${response?.length || 0} 字符, ${duration}ms)`
+      `(${fortuneResponse.length} 字符, ${duration}ms)`
     );
 
     return state;

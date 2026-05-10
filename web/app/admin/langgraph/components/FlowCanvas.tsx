@@ -10,6 +10,8 @@ import ReactFlow, {
   MiniMap,
   MarkerType,
   NodeTypes,
+  Handle,
+  Position,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { cn } from '@/lib/utils';
@@ -58,6 +60,12 @@ const CustomNode = memo(function CustomNode({ data, selected }: { data: any; sel
         data.nodeType === 'condition' && 'rounded-full'
       )}
     >
+      {/* Target Handle - incoming edges */}
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="!bg-gray-400 !w-3 !h-3"
+      />
       <div className="font-medium text-sm">{data.label}</div>
       <div className="text-xs mt-1 flex flex-wrap gap-1 justify-center">
         {hasStaticPrompt && (
@@ -73,6 +81,12 @@ const CustomNode = memo(function CustomNode({ data, selected }: { data: any; sel
           <span className="px-1.5 py-0.5 bg-gray-200 text-gray-600 rounded">🔒 只读</span>
         )}
       </div>
+      {/* Source Handle - outgoing edges */}
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!bg-gray-400 !w-3 !h-3"
+      />
     </div>
   );
 });
@@ -84,13 +98,15 @@ const nodeTypes: NodeTypes = {
 
 // Dynamic Branch Legend
 const BranchLegend = memo(function BranchLegend({ edges }: { edges: LangGraphEdge[] }) {
-  const branchLabels = useMemo(() =>
-    [...new Set(edges.map(e => e.label).filter(Boolean))],
-    [edges]
-  );
+  const branchLabels = useMemo(() => {
+    const labels = [...new Set(edges.map(e => e.label).filter(Boolean))];
+    console.log('[BranchLegend] edge labels from props:', labels);
+    return labels;
+  }, [edges]);
 
   const mainBranchPriority = ['普通聊天', '倾诉模式', '算命预测'];
   const displayedBranches = mainBranchPriority.filter(b => branchLabels.includes(b));
+  console.log('[BranchLegend] displayed branches:', displayedBranches);
 
   if (displayedBranches.length === 0) return null;
 

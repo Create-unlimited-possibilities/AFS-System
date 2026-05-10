@@ -1,14 +1,15 @@
 /**
- * LangGraph Edge Definitions V3
+ * LangGraph Edge Definitions V3.1
  * AI角色卡对话升级 - 支持倾诉模式与命理分析
  *
  * 新增流程:
- * - 意图分类: 普通聊天 / 倾诉模式
+ * - 意图分类: 普通聊天 / 倾诉模式 / 算命预测
  * - 倾听阶段: 继续倾听 / 进入分析
  * - 分析阶段: 命盘检索 -> 命理生成 -> 角色转换
+ * - 算命预测: 直接进入算命分析（独立分支）
  *
  * @author AFS Team
- * @version 3.0.0
+ * @version 3.1.0
  */
 
 export const edges = {
@@ -33,10 +34,16 @@ export const edges = {
   // ==================== 倾诉-倾听分支 ====================
   // Listening phase -> 继续倾听或进入分析 (条件路由)
 
-  // 分析阶段
+  // 分析阶段（倾诉后的分析）
   'chart_rag_retriever': 'fortune_generator',
   'fortune_generator': 'role_translator',
   'role_translator': 'output_formatter',
+
+  // ==================== 算命预测分支 (v3.1 独立) ====================
+  // 直接算命请求 -> 独立的分析链
+  'direct_fortune_rag': 'direct_fortune_analyzer',
+  'direct_fortune_analyzer': 'direct_fortune_translator',
+  'direct_fortune_translator': 'output_formatter',
 
   // ==================== 输出 ====================
   // Token response -> Output formatter
@@ -70,12 +77,12 @@ export function routeByIntent(state) {
     return 'token_response';
   }
 
-  // 算命预测分支 - 检查开关是否启用
+  // 算命预测分支 - 使用独立的分析链
   if (intent === 'fortune_telling') {
     const fortuneEnabled = state.metadata?.fortuneTellingEnabled ?? true;
     if (fortuneEnabled) {
-      // 直接进入命盘检索，无需倾听阶段
-      return 'chart_rag_retriever';
+      // 直接进入独立算命分析链（无需倾听阶段）
+      return 'direct_fortune_rag';
     }
     // 如果禁用，回退到普通聊天
     return 'memory_check';
